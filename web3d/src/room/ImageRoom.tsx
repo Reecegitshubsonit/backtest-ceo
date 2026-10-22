@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { COMPUTERS } from '../config/computers'
-import { CEO_CHEST, RING_CENTER, ROOM_IMAGE, SCREEN_RECTS, SEAT_SPOTS, zoomTo, type Rect } from '../config/imageRoom'
+import { CEO_CHEST, CEO_LABEL, RING_CENTER, ROOM_IMAGE, SCREEN_RECTS, SEAT_SPOTS, zoomTo, type Rect } from '../config/imageRoom'
 import { SEATS } from '../config/seats'
 import type { PanelAction, PanelState } from '../model/panel'
 import { Sparkles } from './Sparkles'
@@ -59,6 +59,9 @@ export function ImageRoom({ panel, dispatch }: Props) {
             })}
           </svg>
           <Sparkles active={panel.phase === 'closed'} />
+          <div className="ceolabel" style={pct(CEO_LABEL)}>
+            <b>CEO AI</b><span>STRATEGIC OVERSIGHT</span><span>FINAL DECISION AUTHORITY</span>
+          </div>
           {SEATS.map(seat => (
             <div key={seat.id} className="seatlabel" style={pct(SEAT_SPOTS[seat.id].label)}>
               <b className={seat.name.length > 14 ? 'long' : ''}>{seat.name}</b><span>{seat.job}</span><span className="live">● Live Feed</span>

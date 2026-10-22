@@ -80,8 +80,7 @@ button:disabled { opacity: .5; cursor: default; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .seatlabel {
   position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-  background: radial-gradient(ellipse at center, rgba(3, 8, 22, .97) 55%, rgba(3, 8, 22, .85) 80%, rgba(3, 8, 22, 0) 100%);
-  border-radius: 6px; line-height: 1.15; pointer-events: none;
+  line-height: 1.2; pointer-events: none; text-shadow: 0 0 4px #000, 0 0 8px rgba(0, 0, 0, .9);
 }
 .seatlabel b { color: #fff; font-size: 1.32cqh; letter-spacing: .02em; text-shadow: 0 0 6px rgba(120, 200, 255, .8); white-space: nowrap; }
 .seatlabel span { color: #8fd2ff; font-size: 1.12cqh; white-space: nowrap; }
@@ -92,4 +91,7 @@ button:disabled { opacity: .5; cursor: default; }
 .screentag { position: absolute; left: 4%; top: 6%; display: flex; gap: .6em; align-items: baseline; padding: .15em .5em; background: rgba(4, 14, 34, .85); border: 1px solid rgba(108, 200, 255, .6); border-radius: 3px; color: #fff; font: 700 1.25cqh/1.2 system-ui, sans-serif; letter-spacing: .14em; }
 .screentag em { font-style: normal; font-size: .8em; color: #2fd27a; letter-spacing: .05em; }
 @media (prefers-reduced-motion: reduce) { .stream, .pulse, .ringspin { animation: none; } }
+.ceolabel { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; line-height: 1.25; }
+.ceolabel b { white-space: nowrap; font: 600 4.1cqh/1.1 system-ui, "Segoe UI", sans-serif; color: #eaf8ff; letter-spacing: .04em; text-shadow: 0 0 10px rgba(120, 210, 255, .95), 0 0 2px #fff; }
+.ceolabel span { font-size: 1.15cqh; color: #d4f0ff; letter-spacing: .1em; text-shadow: 0 0 6px rgba(80, 170, 255, .9); white-space: nowrap; }
 .seatlabel b.long { font-size: 1.05cqh; }

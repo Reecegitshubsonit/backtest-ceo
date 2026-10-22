@@ -4,7 +4,7 @@ import type { ComputerId } from '../model/types'
 export interface Rect { x: number; y: number; w: number; h: number }
 export type Pt = [number, number]
 
-/** The room picture (Grok reference, upscaled). All coordinates below are in its original 456 x 704 pixels. */
+/** The room picture: the Grok reference with its baked-in text painted out, upscaled. All coordinates below are in its original 456 x 704 pixels. */
 export const ROOM_IMAGE = { src: '/room.jpg', w: 456, h: 704 }
 
 /** Wall screens that act as the three computers. */
@@ -19,12 +19,14 @@ export const SEAT_SPOTS: Record<string, { label: Rect; chest: Pt }> = {
   scanner: { label: { x: 4, y: 236, w: 88, h: 36 }, chest: [42, 305] },
   strategist: { label: { x: 88, y: 215, w: 70, h: 34 }, chest: [122, 292] },
   backtester: { label: { x: 300, y: 215, w: 74, h: 34 }, chest: [336, 292] },
-  auditor: { label: { x: 382, y: 238, w: 72, h: 36 }, chest: [414, 308] },
+  auditor: { label: { x: 366, y: 238, w: 84, h: 36 }, chest: [414, 308] },
   regime: { label: { x: 6, y: 368, w: 80, h: 34 }, chest: [52, 445] },
   risk: { label: { x: 380, y: 370, w: 74, h: 34 }, chest: [420, 445] },
 }
 
 export const CEO_CHEST: Pt = [228, 205]
+/** Where the CEO's title sits on the chest. */
+export const CEO_LABEL: Rect = { x: 180, y: 172, w: 96, h: 66 }
 export const RING_CENTER: Pt = [228, 360]
 /** Projector beam the CEO stands in (sparkles rise through it). */
 export const BEAM: Rect = { x: 196, y: 70, w: 64, h: 300 }
