@@ -25,3 +25,18 @@ Open: what each unassigned screen shows; stock charts include extended hours (of
 - Batch several questions per message to save tokens.
 - Inspect each piece visually before moving on; the room must look exactly like their picture (no outlines or added decoration on it).
 - No image generation available; images come from the user via Grok, saved to `~/Downloads`.
+
+## 2026-10-22: 3D attempt reverted (read before trying 3D again)
+The user wants the exact Grok picture (`docs/reference/grok-room-wide.jpg`) in true 3D: free 360 spin like Scalp City,
+every screen clickable (each agent's whole screen), sharp when zoomed in. The picture view is grainy when zoomed
+because the room is a 1280x720 image.
+- Tried: procedural 3D room built from `src/scene/*` primitives (box chairs, particle figures). Rejected twice
+  (2026-10-21 and 2026-10-22) because it looks nothing like the picture. Do not reuse those parts for the look.
+- The user wants every object to match the picture: CEO hologram, six seated agents, chairs, round desk with
+  built-in screens, wall monitors, the dark silhouette in the foreground.
+- Parts of the attempt that worked and can be reused (see the reverted commits 53afa46, e471b31, 8206e7c, and
+  `docs/superpowers/specs|plans/2026-10-22-3d-room-orbit*`): 3D layout of all 26 screens, camera fly-in that
+  squares up to a screen, live DOM preview on the focused screen via drei `<Html transform>` at 1:1 scale (sharp),
+  expand to a full panel that keeps state by moving the DOM node, Esc stepping back one level.
+- Not tried: real 3D models (GLB) of each object, or image-to-3D models made from crops of the picture.
+  This machine has no NVIDIA GPU.
