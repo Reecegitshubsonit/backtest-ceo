@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Backtest CEO
+Comment=Visual backtesting room: CEO, agents, backtest charts
+Exec=/home/ronaldsecret/backtest-ceo/web3d/scripts/launch.sh
+Icon=backtest-ceo
+Terminal=false
+Categories=Office;Finance;
+Actions=Stop;
+
+[Desktop Action Stop]
+Name=Stop Backtest CEO
+Exec=/home/ronaldsecret/backtest-ceo/web3d/scripts/stop.sh
