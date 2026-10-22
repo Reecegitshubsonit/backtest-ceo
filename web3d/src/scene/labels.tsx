@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { SEATS } from '../config/seats'
 import { onArc } from '../model/camera'
-import { TABLE_H, TABLE_R } from '../config/room'
+import { TABLE_H, TABLE_R } from './Table'
 
 export interface LabelAnchor { id: string; lines: string[]; pos: [number, number, number]; big?: boolean }
 
@@ -31,7 +31,7 @@ export function Labels({ hidden }: { hidden: boolean }) {
   )
 }
 
-const v = new THREE.Vector3(), w = new THREE.Vector3()
+const v = new THREE.Vector3()
 /** Lives inside the Canvas: projects each label's 3D anchor to the screen. */
 export function LabelProjector() {
   const { camera, size } = useThree()
@@ -42,9 +42,6 @@ export function LabelProjector() {
       v.set(...l.pos).project(camera)
       const behind = v.z > 1
       el.style.display = behind ? 'none' : ''
-      // agents on the far side of the table fade, so their labels do not pile up over the CEO
-      const far = l.big ? 0 : camera.position.distanceTo(w.set(...l.pos)) - camera.position.length()
-      el.style.opacity = String(Math.min(1, Math.max(0.12, 1 - far / 2.5)))
       el.style.transform = `translate(-50%, -50%) translate(${((v.x + 1) / 2) * size.width}px, ${((1 - v.y) / 2) * size.height}px)`
     }
   })

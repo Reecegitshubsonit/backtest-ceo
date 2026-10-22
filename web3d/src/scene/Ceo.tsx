@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Figure, Halo, pointsMaterial } from './Figure'
-import { TABLE_H } from '../config/room'
+import { TABLE_H } from './Table'
 
 export const CEO_SCALE = 1.75
 export const CEO_CHEST = new THREE.Vector3(0, TABLE_H + 1.25 * CEO_SCALE, 0)

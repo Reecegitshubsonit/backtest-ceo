@@ -1,17 +1,18 @@
-export type Phase = 'closed' | 'flying' | 'focused' | 'expanded' | 'closing'
-/** `screen` is the id of the screen clicked (see config/screens3d). */
-export interface PanelState { phase: Phase; screen: string | null }
-export type PanelAction = { type: 'click'; id: string } | { type: 'arrived' } | { type: 'expand' } | { type: 'back' } | { type: 'returned' }
+import type { ComputerId } from './types'
 
-export const PANEL_CLOSED: PanelState = { phase: 'closed', screen: null }
+export type Phase = 'closed' | 'flying' | 'open' | 'closing'
+/** `computer` is what was clicked: a computer id (3D room) or a wall screen id (picture room). */
+export interface PanelState { phase: Phase; computer: ComputerId | string | null }
+export type PanelAction = { type: 'click'; id: ComputerId | string } | { type: 'arrived' } | { type: 'close' } | { type: 'returned' }
 
-/** closed -> flying (camera moves) -> focused (live preview on the screen) -> expanded (full panel); back steps out one level. */
+export const PANEL_CLOSED: PanelState = { phase: 'closed', computer: null }
+
+/** closed -> flying (camera moves) -> open (panel shown) -> closing (camera returns) -> closed. */
 export function panelReduce(s: PanelState, a: PanelAction): PanelState {
   switch (a.type) {
-    case 'click': return s.phase === 'closed' || s.phase === 'focused' ? { phase: 'flying', screen: a.id } : s
-    case 'arrived': return s.phase === 'flying' ? { ...s, phase: 'focused' } : s
-    case 'expand': return s.phase === 'focused' ? { ...s, phase: 'expanded' } : s
-    case 'back': return s.phase === 'expanded' ? { ...s, phase: 'focused' } : s.phase === 'focused' || s.phase === 'flying' ? { ...s, phase: 'closing' } : s
+    case 'click': return s.phase === 'closed' || s.phase === 'open' ? { phase: 'flying', computer: a.id } : s
+    case 'arrived': return s.phase === 'flying' ? { ...s, phase: 'open' } : s
+    case 'close': return s.phase === 'open' || s.phase === 'flying' ? { ...s, phase: 'closing' } : s
     case 'returned': return s.phase === 'closing' ? PANEL_CLOSED : s
   }
 }

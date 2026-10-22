@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { TABLE_R } from '../config/room'
+import { TABLE_R } from './Table'
 
 const dark = new THREE.MeshStandardMaterial({ color: 0x020307, metalness: 0.3, roughness: 0.8 })
 
