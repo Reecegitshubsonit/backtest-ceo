@@ -6,15 +6,16 @@ export type Pt = [number, number]
 
 /**
  * The room picture: the 16:9 Grok render (docs/reference/grok-room-wide.jpg) with its baked-in text painted out,
- * upscaled 2x. All coordinates below are in the source's 1280 x 720 pixels.
+ * at its original pixels. All coordinates below are in the source's 1280 x 720 pixels.
  */
 export const ROOM_IMAGE = { src: '/room.jpg', w: 1280, h: 720 }
 
 /** Wall screens that act as the three computers. */
 export const SCREEN_RECTS: Record<ComputerId, Rect> = {
   backtests: { x: 6, y: 22, w: 282, h: 306 },
-  scanner: { x: 306, y: 84, w: 240, h: 212 },
-  strategies: { x: 736, y: 84, w: 234, h: 212 },
+  // the two screens directly behind the CEO, including the narrow panels beside his body
+  scanner: { x: 306, y: 84, w: 292, h: 212 },
+  strategies: { x: 690, y: 84, w: 280, h: 212 },
 }
 
 /** Where each seat's label sits (where the picture had its own text) and the agent's chest, for data streams. */
