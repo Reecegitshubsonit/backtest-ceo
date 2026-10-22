@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
-import { COMPUTERS } from '../config/computers'
-import { CEO_CHEST, CEO_LABEL, SUMMARY_LABEL, ROOM_IMAGE, SCREEN_RECTS, SEAT_SPOTS, zoomTo, type Rect } from '../config/imageRoom'
+import { computerById } from '../config/computers'
+import { CEO_CHEST, CEO_LABEL, SUMMARY_LABEL, ROOM_IMAGE, SEAT_SPOTS, WALL_SCREENS, DESK_SCREENS, screenById, zoomTo, type Rect } from '../config/imageRoom'
 import { SEATS } from '../config/seats'
 import type { PanelAction, PanelState } from '../model/panel'
 import { Sparkles } from './Sparkles'
@@ -17,7 +17,8 @@ interface Props { panel: PanelState; dispatch: (a: PanelAction) => void }
 export function ImageRoom({ panel, dispatch }: Props) {
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, [])
   const zoomed = (panel.phase === 'flying' || panel.phase === 'open') && panel.computer
-  const z = zoomed ? zoomTo(SCREEN_RECTS[panel.computer!]) : { tx: 0, ty: 0, s: 1 }
+  const target = zoomed ? screenById(panel.computer!) : undefined
+  const z = target ? zoomTo(target.rect) : { tx: 0, ty: 0, s: 1 }
 
   // without a transition there is no transitionend: advance the panel state machine straight away
   useEffect(() => {
@@ -61,12 +62,26 @@ export function ImageRoom({ panel, dispatch }: Props) {
               <b className={seat.name.length > 14 ? 'long' : ''}>{seat.name}</b><span>{seat.job}</span><span className="live">● Live Feed</span>
             </div>
           ))}
-          {COMPUTERS.map(c => (
-            <button key={c.id} className="screenspot" style={pct(SCREEN_RECTS[c.id])} aria-label={`Open the ${c.label} computer`}
-              disabled={panel.phase !== 'closed'} onClick={() => dispatch({ type: 'click', id: c.id })}>
-              <span className="screentag">{c.label}<em>{c.live ? '● LIVE' : 'NEXT'}</em></span>
-            </button>
-          ))}
+          {DESK_SCREENS.map(sc => {
+            const seat = sc.seat ? SEATS.find(x => x.id === sc.seat) : undefined
+            return (
+              <button key={sc.id} className="screenspot desk" style={pct(sc.rect)}
+                aria-label={seat ? `Open ${seat.name} console` : `Open desk screen ${sc.n}`}
+                disabled={panel.phase !== 'closed'} onClick={() => dispatch({ type: 'click', id: sc.id })}>
+                <span className="screentag">{seat ? seat.name : `DESK ${sc.n}`}</span>
+              </button>
+            )
+          })}
+          {WALL_SCREENS.map(sc => {
+            const c = sc.computer ? computerById(sc.computer) : undefined
+            return (
+              <button key={sc.id} className={`screenspot${c ? ' computer' : ''}`} style={pct(sc.rect)}
+                aria-label={c ? `Open the ${c.label} computer` : `Open screen ${sc.n}`}
+                disabled={panel.phase !== 'closed'} onClick={() => dispatch({ type: 'click', id: sc.id })}>
+                <span className="screentag">{c ? <>{c.label}<em>{c.live ? '● LIVE' : 'NEXT'}</em></> : sc.n}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>

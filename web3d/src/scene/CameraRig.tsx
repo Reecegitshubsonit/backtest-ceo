@@ -5,6 +5,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { computerById, WALL_RADIUS } from '../config/computers'
 import { fovFor, poseDistance, roomPose, screenPose, type CamPose } from '../model/camera'
 import type { PanelAction, PanelState } from '../model/panel'
+import type { ComputerId } from '../model/types'
 
 interface Props { panel: PanelState; dispatch: (a: PanelAction) => void; controls: RefObject<OrbitControlsImpl | null> }
 
@@ -22,7 +23,7 @@ export function CameraRig({ panel, dispatch, controls }: Props) {
   useFrame((_, dt) => {
     if (panel.phase === 'closed' || panel.phase === 'open') return
     const want: CamPose = panel.phase === 'flying' && panel.computer
-      ? (c => screenPose(c.angleDeg, WALL_RADIUS, c.y, 3.2))(computerById(panel.computer))
+      ? (c => screenPose(c.angleDeg, WALL_RADIUS, c.y, 3.2))(computerById(panel.computer as ComputerId))
       : roomPose(aspect)
     const target = controls.current?.target ?? new THREE.Vector3()
     const k = reduced ? 1 : 1 - Math.exp(-dt * 6)

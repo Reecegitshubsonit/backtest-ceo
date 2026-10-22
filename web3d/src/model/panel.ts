@@ -1,8 +1,9 @@
 import type { ComputerId } from './types'
 
 export type Phase = 'closed' | 'flying' | 'open' | 'closing'
-export interface PanelState { phase: Phase; computer: ComputerId | null }
-export type PanelAction = { type: 'click'; id: ComputerId } | { type: 'arrived' } | { type: 'close' } | { type: 'returned' }
+/** `computer` is what was clicked: a computer id (3D room) or a wall screen id (picture room). */
+export interface PanelState { phase: Phase; computer: ComputerId | string | null }
+export type PanelAction = { type: 'click'; id: ComputerId | string } | { type: 'arrived' } | { type: 'close' } | { type: 'returned' }
 
 export const PANEL_CLOSED: PanelState = { phase: 'closed', computer: null }
 

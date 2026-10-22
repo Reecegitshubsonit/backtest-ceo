@@ -10,13 +10,45 @@ export type Pt = [number, number]
  */
 export const ROOM_IMAGE = { src: '/room.jpg', w: 1280, h: 720 }
 
-/** Wall screens that act as the three computers. */
-export const SCREEN_RECTS: Record<ComputerId, Rect> = {
-  backtests: { x: 6, y: 22, w: 282, h: 306 },
-  // the two screens directly behind the CEO, including the narrow panels beside his body
-  scanner: { x: 306, y: 84, w: 292, h: 212 },
-  strategies: { x: 690, y: 84, w: 280, h: 212 },
-}
+/** One screen on the wall behind the CEO. `computer` is set when the screen opens one of the computers. */
+export interface WallScreen { id: string; n: number; rect: Rect; computer?: ComputerId; seat?: string }
+
+/** All 17 screens on the wall, numbered left to right, top to bottom. Every one is clickable. */
+export const WALL_SCREENS: WallScreen[] = [
+  { id: 's1', n: 1, rect: { x: 12, y: 28, w: 266, h: 172 }, computer: 'backtests' },
+  { id: 's2', n: 2, rect: { x: 12, y: 204, w: 266, h: 96 } },
+  { id: 's3', n: 3, rect: { x: 8, y: 326, w: 172, h: 88 } },
+  { id: 's4', n: 4, rect: { x: 182, y: 316, w: 110, h: 88 } },
+  { id: 's5', n: 5, rect: { x: 310, y: 86, w: 228, h: 110 }, computer: 'scanner' },
+  { id: 's6', n: 6, rect: { x: 310, y: 200, w: 140, h: 88 } },
+  { id: 's7', n: 7, rect: { x: 452, y: 200, w: 88, h: 88 } },
+  { id: 's8', n: 8, rect: { x: 542, y: 112, w: 40, h: 186 } },
+  { id: 's9', n: 9, rect: { x: 700, y: 112, w: 38, h: 150 } },
+  { id: 's10', n: 10, rect: { x: 740, y: 104, w: 102, h: 100 }, computer: 'strategies' },
+  { id: 's11', n: 11, rect: { x: 740, y: 208, w: 102, h: 60 } },
+  { id: 's12', n: 12, rect: { x: 846, y: 92, w: 120, h: 84 } },
+  { id: 's13', n: 13, rect: { x: 846, y: 180, w: 120, h: 100 } },
+  { id: 's14', n: 14, rect: { x: 998, y: 76, w: 268, h: 140 } },
+  { id: 's15', n: 15, rect: { x: 998, y: 222, w: 268, h: 82 } },
+  { id: 's16', n: 16, rect: { x: 986, y: 316, w: 130, h: 90 } },
+  { id: 's17', n: 17, rect: { x: 1100, y: 326, w: 166, h: 94 } },
+]
+
+/** Screens built into the desk: one in front of each agent (its console), three on the front edge of the table. */
+export const DESK_SCREENS: WallScreen[] = [
+  { id: 'd-scanner', n: 1, seat: 'scanner', rect: { x: 335, y: 418, w: 120, h: 40 } },
+  { id: 'd-strategist', n: 2, seat: 'strategist', rect: { x: 462, y: 392, w: 104, h: 34 } },
+  { id: 'd-backtester', n: 3, seat: 'backtester', rect: { x: 716, y: 392, w: 104, h: 34 } },
+  { id: 'd-auditor', n: 4, seat: 'auditor', rect: { x: 826, y: 418, w: 120, h: 40 } },
+  { id: 'd-regime', n: 5, seat: 'regime', rect: { x: 322, y: 486, w: 150, h: 66 } },
+  { id: 'd-risk', n: 6, seat: 'risk', rect: { x: 812, y: 486, w: 150, h: 66 } },
+  { id: 'd7', n: 7, rect: { x: 400, y: 556, w: 150, h: 46 } },
+  { id: 'd8', n: 8, rect: { x: 560, y: 568, w: 160, h: 36 } },
+  { id: 'd9', n: 9, rect: { x: 730, y: 556, w: 150, h: 46 } },
+]
+
+export const screenById = (id: string): WallScreen | undefined => [...WALL_SCREENS, ...DESK_SCREENS].find(s => s.id === id)
+export const isDesk = (id: string) => DESK_SCREENS.some(s => s.id === id)
 
 /** Where each seat's label sits (where the picture had its own text) and the agent's chest, for data streams. */
 export const SEAT_SPOTS: Record<string, { label: Rect; chest: Pt }> = {

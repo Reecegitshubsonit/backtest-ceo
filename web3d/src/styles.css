@@ -111,3 +111,8 @@ button:disabled { opacity: .5; cursor: default; }
 .summarylabel span { color: #8fd2ff; font-size: 1.15cqh; letter-spacing: .1em; white-space: nowrap; }
 @keyframes screenglow { 0%, 100% { border-color: rgba(140, 215, 255, .55); } 50% { border-color: rgba(190, 235, 255, .95); } }
 @media (prefers-reduced-motion: reduce) { .screenspot { animation: none; } }
+.screenspot:not(.computer) .screentag { padding: .05em .45em; font-size: 1.5cqh; letter-spacing: 0; opacity: .85; }
+.screenspot:not(.computer) { border-color: rgba(140, 215, 255, .4); }
+.screenspot.desk { border-color: rgba(140, 215, 255, .28); border-radius: 6px; animation: none; box-shadow: 0 0 8px rgba(80, 170, 255, .25) inset; }
+.screenspot.desk .screentag { opacity: 0; top: auto; bottom: 105%; font-size: 1.3cqh; transition: opacity .15s; }
+.screenspot.desk:hover:not(:disabled) .screentag, .screenspot.desk:focus-visible .screentag { opacity: 1; }
