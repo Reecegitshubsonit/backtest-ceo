@@ -1,6 +1,6 @@
 # Backtest CEO: foundation design spec
 
-Date: 2026-10-21. Status: draft for user review.
+Date: 2026-10-21. Status: approved 2026-10-21 (options chain picker added, Scalp City indicators dropped).
 
 Backtest CEO is a visual backtesting system built the same way as Scalp City: a Python engine with a FastAPI
 server, and a 3D React front end with HTML panels that carry every exact number. A CEO AI hologram stands on a
@@ -62,6 +62,13 @@ Ports: view 5175, engine 8020 (Scalp City uses 5174 and 8010).
 
 `GET /health` returns `{ok, alpaca_keys_present}`.
 
+`GET /options/expirations?underlying=&on=YYYY-MM-DD` returns the expiration dates of contracts that were
+listed on that day (active or since expired), from Alpaca's `/v2/options/contracts` with `status` covering
+inactive contracts.
+
+`GET /options/chain?underlying=&expiration=&on=` returns `[{symbol, type: call|put, strike}]` for that
+expiration, sorted by strike, plus the underlying's close on `on` so the picker can mark at-the-money.
+
 `GET /bars?asset=stocks|etfs|crypto|options&symbol=&tf=1Min|5Min|15Min|1Hour|1Day&start=&end=` returns
 `{symbol, asset, tf, bars: [{t, o, h, l, c, v}]}` with `t` in UTC ISO 8601.
 
@@ -112,15 +119,21 @@ Scanner and Strategies panels show the four tabs with a plain "comes next" state
 ## 6. Backtests computer: chart viewer
 
 Per tab: symbol input (with a short default list: SPY, QQQ, IWM for ETFs; AAPL, NVDA, TSLA for stocks;
-BTC/USD, ETH/USD for crypto; options take an OCC contract symbol), timeframe, date range, Load.
+BTC/USD, ETH/USD for crypto), timeframe, date range, Load.
+
+Options tab: a chain picker. Pick an underlying (default SPY, QQQ, IWM) and a date; the picker lists that
+day's expirations; pick one and it shows a strike ladder with calls on the left and puts on the right, the
+at-the-money strike highlighted. Clicking a contract loads its bars. Typing an OCC symbol directly still
+works. Dates before 2024-02-01 are disabled with the reason shown. The underlying's candles can be shown in a
+small chart above the option chart, same time axis.
 
 Chart, ported from Scalp City's canvas chart (`drawChart.ts`, `ZoomChart.tsx`):
 
 - Candles, volume bars under the price, crosshair with the hovered bar's time, OHLC and volume.
 - Zoom and pan as in Scalp City.
-- Indicators as a list of switchable overlays: VWAP, EMA 9, EMA 21, EMA 50, ATR panel. The user expects to
-  change indicators, so each indicator is one entry in a registry (name, colour, compute function); adding one
-  touches only that registry.
+- Indicators: none ship today. Scalp City's VWAP, EMAs and ATR are dropped; each new indicator will belong
+  to a strategy (user decision 2026-10-21). The chart has an indicator registry (name, colour, compute
+  function, overlay or lower panel), empty today, so adding one touches only the registry.
 - Scalp City's session-rule lines (RANGE arms, OR set, and so on) are removed; they belong to its bots.
 
 Replay ("live backtest" view, no strategy yet): play, pause, step, speed 1x to 50x, and a scrubber. The chart
@@ -135,7 +148,8 @@ runs `stop.sh`. Icon: a simple CEO-hologram glyph SVG.
 
 ## 8. Testing
 
-- Engine (pytest): parsing for each asset class, paging, cache hit and miss, the options date guard, each
+- Engine (pytest): parsing for each asset class, options expirations and chain (including expired
+  contracts and the 2024-02-01 guard), paging, cache hit and miss, the options date guard, each
   error code, `/bars` and `/health` through FastAPI's test client.
 - Front end (vitest): indicator functions, replay clock (never reveals bars past the clock), camera targets,
   panel state machine (closed, flying, open, closing).
@@ -146,5 +160,4 @@ runs `stop.sh`. Icon: a simple CEO-hologram glyph SVG.
 ## 9. Open items (not blocking this build)
 
 - Strategy rules: 2026-10-22 session.
-- Options contract picker (chain browser) instead of typing an OCC symbol: later piece.
 - Agent behaviour and chat: piece 5.
