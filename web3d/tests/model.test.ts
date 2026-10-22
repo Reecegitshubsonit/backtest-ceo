@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { fmtTime, fmtStamp, fmtPrice } from '../src/model/format'
 import { initialReplay, pause, play, revealed, seek, step, tick } from '../src/model/replay'
 import { PANEL_CLOSED, panelReduce } from '../src/model/panel'
-import { clampToRoom, flyPose, fovFor, htmlDistanceFactor, onArc, poseDistance, projectedWidthPx, roomPose, screenNormal } from '../src/model/camera'
-import { SCREENS } from '../src/config/screens3d'
-import { ROOM_R } from '../src/config/room'
+import { fovFor, onArc, poseDistance, roomPose, screenPose } from '../src/model/camera'
 import { fullView, priceRange, zoomTime } from '../src/model/viewport'
 import { lastSession } from '../src/model/dates'
 import { INDICATORS } from '../src/model/indicators'
@@ -87,33 +85,10 @@ describe('camera', () => {
     const [x, y, z] = onArc(180, 7, 3)
     expect(x).toBeCloseTo(0); expect(y).toBe(3); expect(z).toBeCloseTo(-7)
   })
-  it('fly pose looks straight at the screen and fills 85% of the view, for every screen', () => {
-    for (const aspect of [16 / 9, 4 / 3, 0.5]) {
-      const fov = fovFor(aspect)
-      for (const s of SCREENS) {
-        const p = flyPose(s, fov, aspect)
-        expect(p.target).toEqual(s.center)
-        const d = Math.hypot(p.pos[0] - s.center[0], p.pos[1] - s.center[1], p.pos[2] - s.center[2])
-        const n = screenNormal(s)
-        expect(((p.pos[0] - s.center[0]) * n[0] + (p.pos[1] - s.center[1]) * n[1] + (p.pos[2] - s.center[2]) * n[2]) / d).toBeCloseTo(1)
-        const visH = 2 * d * Math.tan((fov * Math.PI) / 360)
-        expect(Math.max(s.h / visH, s.w / (visH * aspect))).toBeCloseTo(0.85)
-        expect(Math.hypot(p.pos[0], p.pos[2]), `${s.id} at aspect ${aspect}`).toBeLessThan(ROOM_R)
-      }
-    }
-  })
-  it('screen normal of an upright screen facing +z is +z; tilting back points it up', () => {
-    expect(screenNormal({ yaw: 0, pitch: 0 })).toEqual([0, 0, 1])
-    expect(screenNormal({ yaw: 0, pitch: Math.PI / 2 })[1]).toBeCloseTo(1)
-  })
-  it('html scale: a DOM node as wide as the projected screen lands exactly on it', () => {
-    const px = projectedWidthPx(2, 3, 48, 16 / 9, 1920)
-    expect(px).toBeCloseTo((2 / (2 * 3 * Math.tan((48 * Math.PI) / 360) * (16 / 9))) * 1920)
-    expect((htmlDistanceFactor(2, px) * px) / 400).toBeCloseTo(2)
-  })
-  it('clamps the camera inside the room and above the floor', () => {
-    expect(clampToRoom([20, -3, 0], 9, 0.4, 7.6)).toEqual([9, 0.4, 0])
-    expect(clampToRoom([1, 2, 1], 9, 0.4, 7.6)).toEqual([1, 2, 1])
+  it('screen pose sits in front of the screen, looking at it', () => {
+    const p = screenPose(180, 7.4, 3)
+    expect(p.target[2]).toBeCloseTo(-7.4)
+    expect(p.pos[2]).toBeCloseTo(-4.8)
   })
   it('narrow screens widen the field of view instead of backing out of the room', () => {
     expect(fovFor(1.6)).toBe(48)
