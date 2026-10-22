@@ -18,20 +18,21 @@ function Camera({ detail, reset }: {detail: boolean; reset: number}) {
   const controls = useRef<Controls>(null)
   useLayoutEffect(() => {
     const cam = camera as THREE.PerspectiveCamera
-    cam.position.set(0, detail ? 0.70 : 0.67, detail ? 1.15 : 2.20)
-    cam.setViewOffset(size.width, size.height, 0, detail ? 0 : size.height * 0.12, size.width, size.height)
+    cam.position.set(0, 0.67, 2.20)
+    if (detail) cam.setViewOffset(1280, 720, 480, 156.4, 320, 400)
+    else cam.setViewOffset(1280, 720, 0, 86.4, 1280, 720)
     cam.updateProjectionMatrix()
-    controls.current?.target.set(0, detail ? 0.55 : 0.50, 0)
+    controls.current?.target.set(0, 0.50, 0)
     controls.current?.update()
   }, [camera, size.width, size.height, detail, reset])
   return <OrbitControls ref={controls} makeDefault enablePan={false} enableDamping
-    target={[0, detail ? 0.55 : 0.50, 0]} minDistance={0.55} maxDistance={3.3}
+    target={[0, 0.50, 0]} minDistance={0.55} maxDistance={3.3}
     minPolarAngle={0.12} maxPolarAngle={Math.PI / 2} />
 }
 
 /** Object review only. The other objects remain untouched until this CEO is approved. */
 export function CeoReview() {
-  const [detail, setDetail] = useState(false)
+  const [detail, setDetail] = useState(true)
   const [reset, setReset] = useState(0)
   return <main className="ceo-review">
     <header>
@@ -43,22 +44,22 @@ export function CeoReview() {
       <button aria-pressed={detail} onClick={() => {setDetail(true); setReset(n => n + 1)}}>Inspect detail</button>
       <button onClick={() => setReset(n => n + 1)}>Reset camera</button>
     </nav>
-    <div className="ceo-comparison">
+    <div className={`ceo-comparison${detail ? ' detail' : ''}`}>
       <figure>
         <figcaption>Reference</figcaption>
         <div className={`ceo-reference${detail ? ' detail' : ''}`}>
-          <img src="/reference/grok-room-wide.jpg" alt="Reference: blue human hologram above the round table" />
+          <img src={detail ? '/room.jpg' : '/reference/grok-room-wide.jpg'} alt="Reference: blue human hologram above the round table" />
         </div>
       </figure>
       <figure>
-        <figcaption>Real 3D CEO · GLB mesh</figcaption>
+        <figcaption>3D revision</figcaption>
         <div className="ceo-model" role="img" aria-label="Interactive 3D CEO hologram; drag to orbit and scroll to zoom">
           <ModelBoundary>
             <Canvas dpr={[1, 2]} camera={{position: [0, 0.67, 2.2], fov: 48, near: 0.01, far: 20}} gl={{antialias: true}}>
               <color attach="background" args={['#02050d']} />
               <Suspense fallback={<Html center>Loading CEO…</Html>}><CeoModel /></Suspense>
               <Camera detail={detail} reset={reset} />
-              <EffectComposer><Bloom intensity={0.65} luminanceThreshold={0.48} mipmapBlur /></EffectComposer>
+              <EffectComposer><Bloom intensity={0.35} luminanceThreshold={0.65} mipmapBlur /></EffectComposer>
             </Canvas>
           </ModelBoundary>
         </div>

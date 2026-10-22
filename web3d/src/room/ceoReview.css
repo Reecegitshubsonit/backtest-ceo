@@ -11,7 +11,8 @@
 .ceo-comparison figcaption { color: #b9d9ef; margin-bottom: 9px; font-size: 13px; }
 .ceo-reference, .ceo-model { width: 100%; aspect-ratio: 16/9; overflow: hidden; position: relative; background: #02050d; }
 .ceo-reference img { width: 100%; height: 100%; display: block; }
-.ceo-reference.detail img { transform: scale(1.92); transform-origin: 50% 20%; }
+.ceo-comparison.detail .ceo-reference, .ceo-comparison.detail .ceo-model { aspect-ratio: 4/5; }
+.ceo-reference.detail img { position: absolute; width: 400%; height: 180%; left: -150%; top: -17.5%; }
 .ceo-model canvas { display: block; touch-action: none; }
 .ceo-review .ceo-review-note { font-size: 12px; margin-top: 18px; }
 @media (max-width: 760px) {

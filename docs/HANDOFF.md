@@ -45,3 +45,9 @@ because the room is a 1280x720 image.
 - `?review=ceo` opens a side-by-side comparison of the original reference and a real human GLB with hologram shading. Default room stays unchanged.
 - Source: Blender Studio Human Base Meshes v1.4.1 (CC0), realistic male body and eyes. Provenance and reproduction: `docs/ceo-model-source.md`, `web3d/scripts/export-ceo.py`.
 - Only the CEO is under review. Get the user's visual approval before moving to another object or replacing the default room. No approval has been received yet. The full 3D room and sharp screen integration remain unfinished.
+
+## CEO likeness revision (2026-10-22)
+- User rejected the first stock GLB: it looked unlike the original CEO, and the comparison was too small. The user wants us to do the work, not ask them to run cloud tools.
+- Revised `?review=ceo`: portrait detail comparison by default, reference-fitted GLB silhouette, original cleaned artwork projected as front UV texture, inferred sides/back with cyan rim/network shading. Normal blending and depth writes replace additive anatomy that exposed eye sockets and mouth edges.
+- `web3d/scripts/fit-ceo-reference.mjs` is the second reproducible export stage; see `docs/ceo-model-source.md`. Original front appearance is preserved with image-based texturing; unseen-side likeness remains inferred. This is not a complete image-to-3D reconstruction.
+- Still only the CEO. Projector beam, room, table, chairs and screens have not been rebuilt. User approval has not yet been received.

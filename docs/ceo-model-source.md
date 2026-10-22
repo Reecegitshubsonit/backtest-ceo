@@ -12,15 +12,18 @@ Open `http://localhost:5175/?review=ceo`. Only the standing CEO is under review;
 - Source objects: `GEO-body_male_realistic` and its two eye meshes in `human_base_meshes_bundle.blend`.
 - Derivative: `web3d/public/models/ceo-standing.glb`, approximately 43,000 sculpt vertices before GLB UV/normal splits. One multiresolution level is baked. Existing sculpted arms are relaxed, torso proportions adjusted toward the projected reference, head widened slightly, height normalized to one unit; source materials are omitted.
 
-The model is a stock human, not a reconstruction of the reference person. A more exact face may still need a reference-derived asset. The comparison exposes that difference before any room replacement. No cloud service was used.
+The first stock-mesh candidate was rejected by the user. The revised asset deforms the continuous Blender sculpt to the reference silhouette, then bakes front-projection UVs against the reference camera. The original cleaned artwork (`/room.jpg`) is sampled as the front surface texture, preserving its face and hologram detail. This is image-based texturing on a volume, not an image plane or a full reconstruction from the photograph. The side and back are inferred from the sculpt and use a cyan rim/network material. The source contains no unseen-side appearance; that likeness cannot be verified from this image alone. No cloud service was used.
 
 ## Reproduce the asset
 
 Download and unzip the official bundle, then use Blender 4.2 or newer:
 
-    blender -b --factory-startup --python web3d/scripts/export-ceo.py -- /path/to/human_base_meshes_bundle.blend web3d/public/models/ceo-standing.glb
+    blender -b --factory-startup --python web3d/scripts/export-ceo.py -- /path/to/human_base_meshes_bundle.blend /tmp/ceo-sculpt.glb
+    node web3d/scripts/fit-ceo-reference.mjs /tmp/ceo-sculpt.glb web3d/public/models/ceo-standing.glb
 
-The renderer uses Fresnel rim glow, faint real mesh wireframe, surface speckles and scan modulation. Anatomy comes from the GLB mesh, not points or primitives. Bloom is restrained so facial detail survives.
+The fitted asset retains real depth, a nose, ears, arms and hands. The material writes depth and uses normal blending to prevent back surfaces and eye sockets from glowing through the face. Original front colors blend to a cyan Fresnel/network surface at inferred angles. Anatomy comes from the GLB mesh, not points or primitives. Bloom is restrained. The lower body fades instead of showing solid thighs.
+
+Detail comparison is the default: a 320 x 400 pixel crop at source origin (480, 70), shown enlarged beside the 3D model with exactly the same off-axis reference-camera crop. Full framing remains available. The front texture retains the source resolution; it does not manufacture missing facial pixels. This does not affect the later requirement for sharp live screen content.
 
 ## Review boundary
 
