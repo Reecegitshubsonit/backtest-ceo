@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiFailure } from '../net/api'
 import type { Chain, Contract } from '../model/types'
 
@@ -16,6 +16,7 @@ export function OptionsPicker({ day, onDay, onPick, picked }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const early = day < OPTIONS_START
+  const ladder = useRef<HTMLTableElement>(null)
 
   useEffect(() => {
     setExps([]); setExp(null); setChain(null); setError(null)
@@ -51,6 +52,12 @@ export function OptionsPicker({ day, onDay, onPick, picked }: Props) {
     ? rows.reduce((b, r) => (Math.abs(r.strike - chain.underlying_close!) < Math.abs(b.strike - chain.underlying_close!) ? r : b)).strike
     : null
 
+  // open the ladder centred on the at-the-money strike
+  useEffect(() => {
+    const t = ladder.current, row = t?.querySelector<HTMLTableRowElement>('tr.atm')
+    if (t && row) t.scrollTop = row.offsetTop - t.clientHeight / 2
+  }, [rows, atm])
+
   const cell = (c: Contract | undefined, u: string) => c
     ? <button className={c.symbol === picked ? 'picked' : ''} onClick={() => onPick(c, u)}>{c.type === 'call' ? 'C' : 'P'}</button>
     : <span className="muted">-</span>
@@ -74,7 +81,7 @@ export function OptionsPicker({ day, onDay, onPick, picked }: Props) {
       {error && <p className="warn">{error}</p>}
       <p className="muted small">Options bars have no historical bid/ask, so fills priced from them look better than live trading.</p>
       {rows.length > 0 && (
-        <table className="ladder">
+        <table className="ladder" ref={ladder}>
           <thead><tr><th>Call</th><th>Strike</th><th>Put</th></tr></thead>
           <tbody>
             {rows.map(r => (
