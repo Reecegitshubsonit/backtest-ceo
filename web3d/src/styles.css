@@ -85,11 +85,6 @@ button:disabled { opacity: .5; cursor: default; }
 .seatlabel b { color: #fff; font-size: 1.75cqh; letter-spacing: .02em; text-shadow: 0 0 6px rgba(120, 200, 255, .8); white-space: nowrap; }
 .seatlabel span { color: #8fd2ff; font-size: 1.4cqh; white-space: nowrap; }
 .seatlabel .live { color: #b8e8ff; }
-.screenspot { position: absolute; padding: 0; background: transparent; border: 1.5px solid rgba(140, 215, 255, .7); border-radius: 4px; cursor: pointer; box-shadow: 0 0 14px rgba(80, 170, 255, .55), 0 0 14px rgba(80, 170, 255, .3) inset; animation: screenglow 3s ease-in-out infinite; transition: box-shadow .2s, background .2s, border-color .2s; }
-.screenspot:hover:not(:disabled), .screenspot:focus-visible { border-color: #bfefff; background: rgba(108, 200, 255, .1); box-shadow: 0 0 18px rgba(120, 210, 255, .8), 0 0 18px rgba(80, 170, 255, .5) inset; }
-.screenspot:disabled { cursor: default; opacity: 1; }
-.screentag { position: absolute; left: 50%; top: 4%; transform: translateX(-50%); white-space: nowrap; display: flex; gap: .6em; align-items: baseline; padding: .15em .5em; background: rgba(4, 14, 34, .85); border: 1px solid rgba(108, 200, 255, .6); border-radius: 3px; color: #fff; font: 700 1.9cqh/1.2 system-ui, sans-serif; letter-spacing: .16em; box-shadow: 0 0 10px rgba(80, 170, 255, .6); }
-.screentag em { font-style: normal; font-size: .8em; color: #2fd27a; letter-spacing: .05em; }
 @media (prefers-reduced-motion: reduce) { .stream, .pulse, .ringspin { animation: none; } }
 .ceolabel { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; line-height: 1.25; }
 .ceolabel b { white-space: nowrap; font: 600 4.6cqh/1.1 system-ui, "Segoe UI", sans-serif; color: #eaf8ff; letter-spacing: .04em; text-shadow: 0 0 10px rgba(120, 210, 255, .95), 0 0 2px #fff; }
@@ -109,10 +104,15 @@ button:disabled { opacity: .5; cursor: default; }
   text-shadow: 0 0 6px #000, 0 0 10px rgba(40, 120, 255, .6); }
 .summarylabel b { color: #fff; font-size: 1.55cqh; letter-spacing: .08em; white-space: nowrap; }
 .summarylabel span { color: #8fd2ff; font-size: 1.15cqh; letter-spacing: .1em; white-space: nowrap; }
-@keyframes screenglow { 0%, 100% { border-color: rgba(140, 215, 255, .55); } 50% { border-color: rgba(190, 235, 255, .95); } }
-@media (prefers-reduced-motion: reduce) { .screenspot { animation: none; } }
-.screenspot:not(.computer) .screentag { padding: .05em .45em; font-size: 1.5cqh; letter-spacing: 0; opacity: .85; }
-.screenspot:not(.computer) { border-color: rgba(140, 215, 255, .4); }
-.screenspot.desk { border-color: rgba(140, 215, 255, .28); border-radius: 6px; animation: none; box-shadow: 0 0 8px rgba(80, 170, 255, .25) inset; }
-.screenspot.desk .screentag { opacity: 0; top: auto; bottom: 105%; font-size: 1.3cqh; transition: opacity .15s; }
-.screenspot.desk:hover:not(:disabled) .screentag, .screenspot.desk:focus-visible .screentag { opacity: 1; }
+
+/* screens in the picture: invisible until hovered, so the room looks exactly like the picture */
+.screenspot { position: absolute; padding: 0; background: transparent; border: 0; border-radius: 4px; cursor: pointer; transition: background .2s, box-shadow .2s; }
+.screenspot:hover:not(:disabled), .screenspot:focus-visible { background: rgba(140, 215, 255, .12); box-shadow: 0 0 24px rgba(120, 210, 255, .55); outline: none; }
+.screenspot:disabled { cursor: default; }
+.screentag { position: absolute; left: 50%; top: 4%; transform: translateX(-50%); white-space: nowrap; display: flex; gap: .6em; align-items: baseline;
+  padding: .15em .5em; background: rgba(4, 14, 34, .88); border: 1px solid rgba(108, 200, 255, .6); border-radius: 3px; color: #fff;
+  font: 700 1.6cqh/1.2 system-ui, sans-serif; letter-spacing: .14em; opacity: 0; transition: opacity .15s; pointer-events: none; }
+.screentag em { font-style: normal; font-size: .8em; color: #2fd27a; letter-spacing: .05em; }
+.screenspot:hover:not(:disabled) .screentag, .screenspot:focus-visible .screentag { opacity: 1; }
+.screenspot.desk { border-radius: 8px; }
+.screenspot.desk .screentag { top: auto; bottom: 105%; font-size: 1.3cqh; }

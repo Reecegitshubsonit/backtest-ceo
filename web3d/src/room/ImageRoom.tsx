@@ -78,7 +78,7 @@ export function ImageRoom({ panel, dispatch }: Props) {
               <button key={sc.id} className={`screenspot${c ? ' computer' : ''}`} style={pct(sc.rect)}
                 aria-label={c ? `Open the ${c.label} computer` : `Open screen ${sc.n}`}
                 disabled={panel.phase !== 'closed'} onClick={() => dispatch({ type: 'click', id: sc.id })}>
-                <span className="screentag">{c ? <>{c.label}<em>{c.live ? '● LIVE' : 'NEXT'}</em></> : sc.n}</span>
+                <span className="screentag">{c ? <>{c.label}<em>{c.live ? '● LIVE' : 'NEXT'}</em></> : `SCREEN ${sc.n}`}</span>
               </button>
             )
           })}
