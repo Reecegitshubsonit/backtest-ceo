@@ -62,23 +62,27 @@ describe('replay', () => {
 })
 
 describe('panel state', () => {
-  it('click flies, arrives opens, close returns', () => {
-    let s = panelReduce(PANEL_CLOSED, { type: 'click', id: 'backtests' })
-    expect(s).toEqual({ phase: 'flying', computer: 'backtests' })
-    s = panelReduce(s, { type: 'arrived' })
-    expect(s.phase).toBe('open')
-    s = panelReduce(s, { type: 'close' })
-    expect(s.phase).toBe('closing')
+  it('click flies, arrival focuses, expand opens the panel, back steps out one level at a time', () => {
+    let s = panelReduce(PANEL_CLOSED, { type: 'click', id: 's1' })
+    expect(s).toEqual({ phase: 'flying', screen: 's1' })
+    s = panelReduce(s, { type: 'arrived' }); expect(s.phase).toBe('focused')
+    s = panelReduce(s, { type: 'expand' }); expect(s.phase).toBe('expanded')
+    s = panelReduce(s, { type: 'back' }); expect(s.phase).toBe('focused')
+    s = panelReduce(s, { type: 'back' }); expect(s.phase).toBe('closing')
     expect(panelReduce(s, { type: 'returned' })).toEqual(PANEL_CLOSED)
   })
-  it('ignores clicks while closing and arrivals while closed', () => {
-    const closing = { phase: 'closing' as const, computer: 'scanner' as const }
-    expect(panelReduce(closing, { type: 'click', id: 'backtests' })).toBe(closing)
+  it('ignores clicks while closing or expanded, and arrivals while closed', () => {
+    const closing = { phase: 'closing' as const, screen: 's5' }
+    expect(panelReduce(closing, { type: 'click', id: 's1' })).toBe(closing)
+    const expanded = { phase: 'expanded' as const, screen: 's5' }
+    expect(panelReduce(expanded, { type: 'click', id: 's1' })).toBe(expanded)
     expect(panelReduce(PANEL_CLOSED, { type: 'arrived' })).toBe(PANEL_CLOSED)
+    expect(panelReduce(PANEL_CLOSED, { type: 'expand' })).toBe(PANEL_CLOSED)
   })
-  it('clicking another computer while open flies to it', () => {
-    const open = { phase: 'open' as const, computer: 'scanner' as const }
-    expect(panelReduce(open, { type: 'click', id: 'strategies' })).toEqual({ phase: 'flying', computer: 'strategies' })
+  it('clicking another screen while focused flies to it; back during a flight returns', () => {
+    const focused = { phase: 'focused' as const, screen: 's5' }
+    expect(panelReduce(focused, { type: 'click', id: 's10' })).toEqual({ phase: 'flying', screen: 's10' })
+    expect(panelReduce({ phase: 'flying', screen: 's1' }, { type: 'back' }).phase).toBe('closing')
   })
 })
 

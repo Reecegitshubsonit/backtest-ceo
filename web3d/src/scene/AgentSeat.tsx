@@ -4,10 +4,9 @@ import * as THREE from 'three'
 import type { Seat } from '../config/seats'
 import { onArc } from '../model/camera'
 import { Figure, Halo, pointsMaterial } from './Figure'
-import { TABLE_R } from './Table'
+import { SEAT_R } from '../config/room'
 import { CEO_CHEST } from './Ceo'
 
-const SEAT_R = TABLE_R + 0.75
 const AGENT_HOLO = { intensity: 1.3 }
 const chairMat = new THREE.MeshStandardMaterial({ color: 0x0a0d18, metalness: 0.6, roughness: 0.45 })
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x4fb8ff, transparent: true, opacity: 0.35 })

@@ -78,21 +78,16 @@ export function screenTexture(color: string, seed: number): THREE.CanvasTexture 
   return finish(c, 384, 240)
 }
 
-/** A clickable computer: big title bar, chart body, LIVE or NEXT badge. */
-export function computerTexture(label: string, live: boolean, hot: boolean, seed: number): THREE.CanvasTexture {
-  const c = document.createElement('canvas'); c.width = 640 * SHARP; c.height = 400 * SHARP
+/** Chart screen at rest, sized to the screen: longer side 768..1536 px, so it stays sharp from anywhere in the room. */
+export function restTexture(w: number, h: number, color: string, seed: number): THREE.CanvasTexture {
+  const L = 384, lw = w >= h ? L : Math.round((L * w) / h), lh = w >= h ? Math.round((L * h) / w) : L
+  const k = Math.min(1536, Math.max(768, Math.max(w, h) * 360)) / L
+  const c = document.createElement('canvas'); c.width = Math.round(lw * k); c.height = Math.round(lh * k)
   const g = c.getContext('2d')!
-  g.scale(SHARP, SHARP)
-  const col = hot ? '#bfefff' : '#6cc8ff'
-  g.fillStyle = 'rgba(20,70,140,0.35)'; g.fillRect(0, 0, 640, 400)
-  g.strokeStyle = col; g.lineWidth = hot ? 7 : 4; g.strokeRect(4, 4, 632, 392)
-  g.fillStyle = 'rgba(40,140,255,0.35)'; g.fillRect(4, 4, 632, 78)
-  g.font = '700 50px "Segoe UI", Helvetica, Arial, sans-serif'; g.textAlign = 'left'; g.fillStyle = '#ffffff'
-  g.shadowColor = col; g.shadowBlur = 12; g.fillText(label, 26, 62); g.shadowBlur = 0
-  g.font = '700 24px "Segoe UI", Helvetica, Arial, sans-serif'; g.textAlign = 'right'
-  g.fillStyle = live ? '#2fd27a' : '#9fb4d8'; g.fillText(live ? '● LIVE' : 'NEXT', 612, 56)
-  drawChartLines(g, 640, 400, 100, col, seed)
-  g.font = '500 22px "Segoe UI", Helvetica, Arial, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#d8f2ff'
-  g.fillText('click to open', 320, 384)
-  return finish(c, 640, 400)
+  g.scale(k, k)
+  g.fillStyle = color; g.globalAlpha = 0.1; g.fillRect(0, 0, lw, lh); g.globalAlpha = 1
+  drawChartLines(g, lw, lh, 14, color, seed)
+  const t = finish(c, lw, lh)
+  t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.anisotropy = 16
+  return t
 }

@@ -11,7 +11,7 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); color: var(-
 .hud h1 { margin: 0; font-size: 15px; letter-spacing: .3em; color: var(--accent); text-shadow: 0 0 10px rgba(108, 200, 255, .7); }
 .engine { font-size: 12px; color: var(--muted); }
 .engine.down { color: var(--warn); }
-.hint { position: absolute; bottom: 14px; left: 16px; margin: 0; color: var(--muted); font-size: 12px; letter-spacing: .08em; }
+.hint { z-index: 20; position: absolute; bottom: 14px; left: 16px; margin: 0; color: var(--muted); font-size: 12px; letter-spacing: .08em; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 .pos { color: var(--pos); }
@@ -30,8 +30,13 @@ button:disabled { opacity: .5; cursor: default; }
 }
 @keyframes panelin { from { opacity: 0; transform: translateY(12px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .computerpanel { animation: none; } }
-.computerpanel header { display: flex; gap: 16px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.computerpanel h2 { margin: 0; font-size: 16px; letter-spacing: .25em; color: var(--accent); }
+.slotfill { width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.screenview { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
+.screenpreview { display: flex; background: #060e22; border: 1px solid rgba(120, 210, 255, .55); box-shadow: 0 0 40px rgba(80, 180, 255, .35); color: var(--text); overflow: hidden; }
+.screentag3d { color: #fff; font: 700 13px/1 "Segoe UI", Helvetica, Arial, sans-serif; letter-spacing: .12em; white-space: nowrap; padding: 4px 8px; background: rgba(4, 12, 28, .85);
+  border: 1px solid rgba(120, 210, 255, .7); border-radius: 4px; text-shadow: 0 0 8px rgba(120, 210, 255, .9); }
+.screenview header { display: flex; gap: 16px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.screenview h2 { margin: 0; font-size: 16px; letter-spacing: .25em; color: var(--accent); }
 .tabs { display: flex; gap: 6px; }
 .tabs .on { background: #1a4a8a; border-color: var(--accent); }
 .close { margin-left: auto; }
@@ -62,35 +67,6 @@ button:disabled { opacity: .5; cursor: default; }
   .hud h1 { font-size: 13px; }
 }
 
-/* picture room */
-.imageroom { position: absolute; inset: 0; overflow: hidden; background: #02040a; }
-.imageroom-bg { position: absolute; inset: -60px; background-size: cover; background-position: center; filter: blur(40px) brightness(.35) saturate(1.1); }
-.stage { box-shadow: 0 0 80px 40px rgba(2, 4, 10, .9); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(100vw, calc(100vh * 1280 / 720)); aspect-ratio: 1280 / 720; overflow: hidden; container-type: size; box-shadow: 0 0 60px 30px rgba(2, 4, 10, .85); }
-.stage-inner { position: absolute; inset: 0; transform-origin: 0 0; transition: transform .8s cubic-bezier(.6, .05, .25, 1); }
-.stage-inner.still { transition: none; }
-.stage img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; user-select: none; }
-.overlay, .sparkles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; }
-.streambase { fill: none; stroke: #4fa8ff; stroke-width: .6; opacity: .35; }
-.stream { fill: none; stroke: #bfeaff; stroke-width: 1.2; stroke-dasharray: 2 10; stroke-linecap: round; animation: flow linear infinite; }
-@keyframes flow { to { stroke-dashoffset: -48; } }
-.pulse { animation: pulse 2.4s ease-in-out infinite; }
-.pulse.slow { animation-duration: 4s; }
-@keyframes pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-.ringspin { transform-box: fill-box; transform-origin: center; animation: spin 14s linear infinite; opacity: .7; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.seatlabel {
-  position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-  line-height: 1.2; pointer-events: none; text-shadow: 0 0 4px #000, 0 0 8px rgba(0, 0, 0, .9);
-}
-.seatlabel b { color: #fff; font-size: 1.75cqh; letter-spacing: .02em; text-shadow: 0 0 6px rgba(120, 200, 255, .8); white-space: nowrap; }
-.seatlabel span { color: #8fd2ff; font-size: 1.4cqh; white-space: nowrap; }
-.seatlabel .live { color: #b8e8ff; }
-@media (prefers-reduced-motion: reduce) { .stream, .pulse, .ringspin { animation: none; } }
-.ceolabel { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; line-height: 1.25; }
-.ceolabel b { white-space: nowrap; font: 600 4.6cqh/1.1 system-ui, "Segoe UI", sans-serif; color: #eaf8ff; letter-spacing: .04em; text-shadow: 0 0 10px rgba(120, 210, 255, .95), 0 0 2px #fff; }
-.ceolabel span { font-size: 1.45cqh; color: #d4f0ff; letter-spacing: .1em; text-shadow: 0 0 6px rgba(80, 170, 255, .9); white-space: nowrap; }
-.seatlabel b.long { font-size: 1.55cqh; }
-
 /* labels in the 3D room: page text moved by LabelProjector */
 .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
 .label3d { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; text-align: center; line-height: 1.25; white-space: nowrap;
@@ -99,20 +75,4 @@ button:disabled { opacity: .5; cursor: default; }
 .label3d span { font-size: .9em; }
 .label3d.ceo b { font-size: 3.1em; font-weight: 600; letter-spacing: .03em; text-shadow: 0 0 16px rgba(120, 210, 255, .95), 0 0 3px #fff; }
 .label3d.ceo span { color: #d4f0ff; letter-spacing: .12em; font-size: .85em; }
-
-.summarylabel { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; line-height: 1.2;
-  text-shadow: 0 0 6px #000, 0 0 10px rgba(40, 120, 255, .6); }
-.summarylabel b { color: #fff; font-size: 1.55cqh; letter-spacing: .08em; white-space: nowrap; }
-.summarylabel span { color: #8fd2ff; font-size: 1.15cqh; letter-spacing: .1em; white-space: nowrap; }
-
-/* screens in the picture: invisible until hovered, so the room looks exactly like the picture */
-.screenspot { position: absolute; padding: 0; background: transparent; border: 0; border-radius: 4px; cursor: pointer; transition: background .2s, box-shadow .2s; }
-.screenspot:hover:not(:disabled), .screenspot:focus-visible { background: rgba(140, 215, 255, .12); box-shadow: 0 0 24px rgba(120, 210, 255, .55); outline: none; }
-.screenspot:disabled { cursor: default; }
-.screentag { position: absolute; left: 50%; top: 4%; transform: translateX(-50%); white-space: nowrap; display: flex; gap: .6em; align-items: baseline;
-  padding: .15em .5em; background: rgba(4, 14, 34, .88); border: 1px solid rgba(108, 200, 255, .6); border-radius: 3px; color: #fff;
-  font: 700 1.6cqh/1.2 system-ui, sans-serif; letter-spacing: .14em; opacity: 0; transition: opacity .15s; pointer-events: none; }
-.screentag em { font-style: normal; font-size: .8em; color: #2fd27a; letter-spacing: .05em; }
-.screenspot:hover:not(:disabled) .screentag, .screenspot:focus-visible .screentag { opacity: 1; }
-.screenspot.desk { border-radius: 8px; }
-.screenspot.desk .screentag { top: auto; bottom: 105%; font-size: 1.3cqh; }
+.hint .reset { margin-left: 10px; padding: 2px 8px; font-size: 12px; }

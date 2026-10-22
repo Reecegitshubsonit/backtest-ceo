@@ -1,10 +1,9 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { TABLE_H, TABLE_R } from '../config/room'
 import { finish, screenTexture, SHARP } from './textures'
 
-export const TABLE_H = 0.95
-export const TABLE_R = 3
 
 const additive = { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide } as const
 const RINGS: [number, number, number, number][] = [
@@ -12,7 +11,8 @@ const RINGS: [number, number, number, number][] = [
   [1.25, 1.31, 0xb070ff, 0.85], [1.6, 1.62, 0x5fd8ff, 0.4], [2.15, 2.18, 0x3fa8ff, 0.35],
 ]
 
-function summaryTexture() {
+/** The executive summary: the rest picture of the front desk screen (d8). */
+export function summaryTexture() {
   const c = document.createElement('canvas'); c.width = 512 * SHARP; c.height = 220 * SHARP
   const g = c.getContext('2d')!
   g.scale(SHARP, SHARP)
@@ -26,12 +26,11 @@ function summaryTexture() {
   return finish(c, 512, 220)
 }
 
-/** Round strategy table: glowing edge, spinning rings, light column, rim dashboards, executive summary panel. */
+/** Round strategy table: glowing edge, spinning rings, light column, small dashboards set into the top. */
 export function Table() {
   const rings = useRef<(THREE.Mesh | null)[]>([])
   const beam = useRef<THREE.MeshBasicMaterial>(null)
-  const dash = useMemo(() => Array.from({ length: 22 }, (_, i) => screenTexture(i % 5 === 0 ? '#a98bff' : '#5fc8ff', 100 + i)), [])
-  const summary = useMemo(summaryTexture, [])
+  const dash = useMemo(() => Array.from({ length: 11 }, (_, i) => screenTexture(i % 5 === 0 ? '#a98bff' : '#5fc8ff', 100 + i)), [])
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
     rings.current.forEach((m, i) => { if (m) m.rotation.z = t * (i % 2 ? -0.15 : 0.25) * (1 + i * 0.1) })
@@ -62,18 +61,14 @@ export function Table() {
         <meshBasicMaterial ref={beam} color={0x3fa8ff} opacity={0.05} {...additive} />
       </mesh>
       {dash.map((tex, i) => {
-        const outer = i % 2 === 0, a = (i / 22) * Math.PI * 2 + 0.3, r = outer ? 2.55 : 1.95
+        const a = (i / 11) * Math.PI * 2 + 0.3, r = 1.95
         return (
           <mesh key={i} position={[Math.sin(a) * r, TABLE_H + 0.03, Math.cos(a) * r]} rotation={[-Math.PI / 2 + 0.2, a, 0, 'YXZ']}>
-            <planeGeometry args={outer ? [0.7, 0.42] : [0.45, 0.3]} />
+            <planeGeometry args={[0.45, 0.3]} />
             <meshBasicMaterial map={tex} opacity={0.8} {...additive} />
           </mesh>
         )
       })}
-      <mesh position={[0, TABLE_H + 0.32, TABLE_R - 0.15]} rotation-x={-0.35}>
-        <planeGeometry args={[1.6, 0.69]} />
-        <meshBasicMaterial map={summary} opacity={0.95} {...additive} />
-      </mesh>
     </group>
   )
 }
