@@ -40,3 +40,8 @@ because the room is a 1280x720 image.
   expand to a full panel that keeps state by moving the DOM node, Esc stepping back one level.
 - Not tried: real 3D models (GLB) of each object, or image-to-3D models made from crops of the picture.
   This machine has no NVIDIA GPU.
+
+## CEO model review started (2026-10-22)
+- `?review=ceo` opens a side-by-side comparison of the original reference and a real human GLB with hologram shading. Default room stays unchanged.
+- Source: Blender Studio Human Base Meshes v1.4.1 (CC0), realistic male body and eyes. Provenance and reproduction: `docs/ceo-model-source.md`, `web3d/scripts/export-ceo.py`.
+- Only the CEO is under review. Get the user's visual approval before moving to another object or replacing the default room. No approval has been received yet. The full 3D room and sharp screen integration remain unfinished.

@@ -1,0 +1,21 @@
+.ceo-review { height: 100%; overflow: auto; background: #02050d; padding: 24px; }
+.ceo-review > header { display: flex; align-items: start; justify-content: space-between; gap: 24px; }
+.ceo-review h1 { margin: 0 0 6px; font-size: 21px; font-weight: 500; }
+.ceo-review p { color: #91a9c2; margin: 0; }
+.ceo-review a { color: #8fdcff; white-space: nowrap; }
+.ceo-review nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 18px; }
+.ceo-review button { padding: 7px 12px; }
+.ceo-review button[aria-pressed=true] { background: #12395c; border-color: #70ccff; }
+.ceo-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.ceo-comparison figure { margin: 0; min-width: 0; }
+.ceo-comparison figcaption { color: #b9d9ef; margin-bottom: 9px; font-size: 13px; }
+.ceo-reference, .ceo-model { width: 100%; aspect-ratio: 16/9; overflow: hidden; position: relative; background: #02050d; }
+.ceo-reference img { width: 100%; height: 100%; display: block; }
+.ceo-reference.detail img { transform: scale(1.92); transform-origin: 50% 20%; }
+.ceo-model canvas { display: block; touch-action: none; }
+.ceo-review .ceo-review-note { font-size: 12px; margin-top: 18px; }
+@media (max-width: 760px) {
+  .ceo-review { padding: 16px; }
+  .ceo-review > header { flex-direction: column; gap: 10px; }
+  .ceo-comparison { grid-template-columns: 1fr; }
+}

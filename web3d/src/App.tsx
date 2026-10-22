@@ -5,6 +5,7 @@ import { ComputerPanel } from './panels/ComputerPanel'
 import { ImageRoom } from './room/ImageRoom'
 import { Scene } from './scene/Scene'
 import { Labels } from './scene/labels'
+import { CeoReview } from './room/CeoReview'
 
 // the picture room (Grok reference) is the default; ?room=3d shows the procedural 3D room
 const ROOM_3D = new URLSearchParams(window.location.search).get('room') === '3d'
@@ -12,6 +13,10 @@ const ROOM_3D = new URLSearchParams(window.location.search).get('room') === '3d'
 type Engine = { state: 'checking' } | { state: 'up'; keys: boolean } | { state: 'down' }
 
 export default function App() {
+  return new URLSearchParams(window.location.search).get('review') === 'ceo' ? <CeoReview /> : <RoomApp />
+}
+
+function RoomApp() {
   const [panel, dispatch] = useReducer(panelReduce, PANEL_CLOSED)
   const [engine, setEngine] = useState<Engine>({ state: 'checking' })
   useEffect(() => {
