@@ -7,9 +7,9 @@ interface Props { lines: LabelLine[]; color: string; position: [number, number, 
 export function Label({ lines, color, position, scale = 1 }: Props) {
   const key = lines.map(l => l.text).join('|')
   const tex = useMemo(() => labelTexture(lines, color), [key, color]) // eslint-disable-line react-hooks/exhaustive-deps
-  const img = tex.image as HTMLCanvasElement
+  const { w, h } = tex.userData as { w: number; h: number }
   return (
-    <sprite position={position} scale={[(img.width / 230) * scale, (img.height / 230) * scale, 1]}>
+    <sprite position={position} scale={[(w / 230) * scale, (h / 230) * scale, 1]}>
       <spriteMaterial map={tex} transparent depthWrite={false} />
     </sprite>
   )

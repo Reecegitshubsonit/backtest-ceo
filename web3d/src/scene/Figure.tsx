@@ -14,6 +14,15 @@ interface Props {
   particlesFrom?: number
 }
 
+/** Soft additive halo behind a hologram: glow without a full-screen bloom pass (keeps text sharp). */
+export function Halo({ position, scale, color = 0x3f9fff, opacity = 0.22 }: { position: [number, number, number]; scale: [number, number]; color?: number; opacity?: number }) {
+  return (
+    <sprite position={position} scale={[scale[0], scale[1], 1]}>
+      <spriteMaterial map={dotTexture()} color={color} opacity={opacity} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+    </sprite>
+  )
+}
+
 export function pointsMaterial(color: number, size: number, opacity = 0.9) {
   return new THREE.PointsMaterial({ color, size, map: dotTexture(), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false })
 }

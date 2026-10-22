@@ -14,8 +14,8 @@ import { Operator } from './Operator'
 import { Room } from './Room'
 import { Table } from './Table'
 
-// glow is on by default; ?fx=low turns it off for slow graphics
-const FX = new URLSearchParams(window.location.search).get('fx') !== 'low'
+// full-screen bloom softens text and edges, so it is opt-in (?fx=high); the holograms glow on their own
+const FX = new URLSearchParams(window.location.search).get('fx') === 'high'
 
 export function Scene({ panel, dispatch }: { panel: PanelState; dispatch: (a: PanelAction) => void }) {
   const controls = useRef<OrbitControlsImpl>(null)

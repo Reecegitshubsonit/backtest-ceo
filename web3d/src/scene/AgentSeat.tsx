@@ -3,13 +3,13 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Seat } from '../config/seats'
 import { onArc } from '../model/camera'
-import { Figure, pointsMaterial } from './Figure'
+import { Figure, Halo, pointsMaterial } from './Figure'
 import { Label } from './Label'
 import { TABLE_R } from './Table'
 import { CEO_CHEST } from './Ceo'
 
 const SEAT_R = TABLE_R + 0.75
-const AGENT_HOLO = { intensity: 0.9 }
+const AGENT_HOLO = { intensity: 1.3 }
 const chairMat = new THREE.MeshStandardMaterial({ color: 0x0a0d18, metalness: 0.6, roughness: 0.45 })
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x4fb8ff, transparent: true, opacity: 0.35 })
 
@@ -70,6 +70,7 @@ export function AgentSeat({ seat, index }: { seat: Seat; index: number }) {
     <group>
       <group position={[x, 0, z]} rotation-y={yaw}>
         <Chair />
+        <Halo position={[0, 0.85, 0]} scale={[1.6, 1.9]} opacity={0.2} />
         <group ref={head}>
           <Figure seated color={0x4fb8ff} density={1.6} size={0.024} headTilt={-0.6} seed={10 + index} material={mat} holo={AGENT_HOLO} />
         </group>

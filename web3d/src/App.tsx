@@ -5,8 +5,8 @@ import { ComputerPanel } from './panels/ComputerPanel'
 import { ImageRoom } from './room/ImageRoom'
 import { Scene } from './scene/Scene'
 
-// the picture room is the default; ?room=3d shows the procedural 3D room
-const ROOM_3D = new URLSearchParams(window.location.search).get('room') === '3d'
+// the live 3D room is the default (sharp at any size, like Scalp City); ?room=image shows the picture room
+const ROOM_3D = new URLSearchParams(window.location.search).get('room') !== 'image'
 
 type Engine = { state: 'checking' } | { state: 'up'; keys: boolean } | { state: 'down' }
 

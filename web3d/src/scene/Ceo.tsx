@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Figure, pointsMaterial } from './Figure'
+import { Figure, Halo, pointsMaterial } from './Figure'
 import { Label } from './Label'
 import { TABLE_H } from './Table'
 
@@ -9,7 +9,7 @@ export const CEO_SCALE = 1.75
 export const CEO_CHEST = new THREE.Vector3(0, TABLE_H + 1.25 * CEO_SCALE, 0)
 const RAIN = 700
 // legs fade into the projector beam, as in the reference image
-const CEO_HOLO = { intensity: 1.2, fadeFrom: TABLE_H + 0.9, fadeTo: TABLE_H + 2.1 }
+const CEO_HOLO = { intensity: 1.6, fadeFrom: TABLE_H + 0.9, fadeTo: TABLE_H + 2.1 }
 
 /** The CEO: a blue particle hologram standing full-body on the table, with data rising through it. */
 export function Ceo() {
@@ -37,6 +37,8 @@ export function Ceo() {
       <group ref={body} scale={CEO_SCALE} position-y={TABLE_H}>
         <Figure color={0x6fdcff} density={5} size={0.03} seed={1} material={mat} holo={CEO_HOLO} particlesFrom={0.7} />
       </group>
+      <Halo position={[0, TABLE_H + 2.2, -0.3]} scale={[3.2, 4.6]} opacity={0.32} />
+      <Halo position={[0, TABLE_H + 3.0, -0.2]} scale={[1.4, 1.4]} color={0x8fe0ff} opacity={0.35} />
       <points material={rainMat} position-y={TABLE_H}>
         <bufferGeometry ref={rainGeo}><bufferAttribute attach="attributes-position" args={[rainPos, 3]} /></bufferGeometry>
       </points>

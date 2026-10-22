@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { screenTexture } from './textures'
+import { finish, screenTexture, SHARP } from './textures'
 
 export const TABLE_H = 0.95
 export const TABLE_R = 3
@@ -13,8 +13,9 @@ const RINGS: [number, number, number, number][] = [
 ]
 
 function summaryTexture() {
-  const c = document.createElement('canvas'); c.width = 512; c.height = 220
+  const c = document.createElement('canvas'); c.width = 512 * SHARP; c.height = 220 * SHARP
   const g = c.getContext('2d')!
+  g.scale(SHARP, SHARP)
   g.strokeStyle = g.fillStyle = '#6cc8ff'; g.lineWidth = 3
   g.globalAlpha = 0.12; g.fillRect(4, 4, 504, 212); g.globalAlpha = 1; g.strokeRect(4, 4, 504, 212)
   g.textAlign = 'center'; g.fillStyle = '#ffffff'; g.font = '700 30px "Segoe UI", Arial, sans-serif'; g.fillText('EXECUTIVE SUMMARY', 256, 50)
@@ -22,7 +23,7 @@ function summaryTexture() {
   g.lineWidth = 2; g.beginPath()
   for (let x = 30; x < 482; x += 3) g.lineTo(x, 150 + Math.sin(x * 0.09) * 18 * Math.sin(x * 0.013) + Math.sin(x * 1.7) * 6)
   g.stroke()
-  return new THREE.CanvasTexture(c)
+  return finish(c, 512, 220)
 }
 
 /** Round strategy table: glowing edge, spinning rings, light column, rim dashboards, executive summary panel. */

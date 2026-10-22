@@ -12,21 +12,34 @@ export function dotTexture(): THREE.Texture {
   return (dot = new THREE.CanvasTexture(c))
 }
 
+/** Canvas textures are drawn at this multiple of their logical size so text and lines stay sharp up close. */
+export const SHARP = 3
+
+/** Wrap a canvas as a crisp texture; logical (pre-SHARP) size goes in userData for sizing sprites. */
+export function finish(c: HTMLCanvasElement, w: number, h: number): THREE.CanvasTexture {
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = 8
+  t.userData = { w, h }
+  return t
+}
+
 export interface LabelLine { text: string; big?: boolean }
 
 /** White first line, coloured lines under it; sized so 230 px = 1 world unit. */
 export function labelTexture(lines: LabelLine[], color: string): THREE.CanvasTexture {
   const c = document.createElement('canvas'), big = !!lines[0]?.big
-  c.width = 512; c.height = 40 + lines.length * 44 + (big ? 24 : 0)
+  const w = 512, h = 40 + lines.length * 44 + (big ? 24 : 0)
+  c.width = w * SHARP; c.height = h * SHARP
   const g = c.getContext('2d')!
+  g.scale(SHARP, SHARP)
   g.textAlign = 'center'; g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 6
   lines.forEach((l, i) => {
     g.font = (i === 0 ? `700 ${l.big ? 64 : 34}` : '500 26') + 'px "Segoe UI", Helvetica, Arial, sans-serif'
     g.fillStyle = i === 0 ? '#ffffff' : color
     g.fillText(l.text, 256, 52 + i * 42 + (big && i > 0 ? 24 : 0))
   })
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
-  return t
+  return finish(c, w, h)
 }
 
 function drawChartLines(g: CanvasRenderingContext2D, w: number, h: number, y0: number, color: string, seed: number) {
@@ -56,18 +69,21 @@ function drawChartLines(g: CanvasRenderingContext2D, w: number, h: number, y0: n
 
 /** Decorative wall screen: frame plus a random chart. */
 export function screenTexture(color: string, seed: number): THREE.CanvasTexture {
-  const c = document.createElement('canvas'); c.width = 384; c.height = 240
+  const c = document.createElement('canvas'); c.width = 384 * SHARP; c.height = 240 * SHARP
   const g = c.getContext('2d')!
+  g.scale(SHARP, SHARP)
   g.strokeStyle = color; g.fillStyle = color
   g.globalAlpha = 0.1; g.fillRect(6, 6, 372, 228); g.globalAlpha = 0.9; g.lineWidth = 2; g.strokeRect(6, 6, 372, 228)
   drawChartLines(g, 384, 240, 20, color, seed)
-  return new THREE.CanvasTexture(c)
+  return finish(c, 384, 240)
 }
 
 /** A clickable computer: big title bar, chart body, LIVE or NEXT badge. */
 export function computerTexture(label: string, live: boolean, hot: boolean, seed: number): THREE.CanvasTexture {
-  const c = document.createElement('canvas'); c.width = 640; c.height = 400
-  const g = c.getContext('2d')!, col = hot ? '#bfefff' : '#6cc8ff'
+  const c = document.createElement('canvas'); c.width = 640 * SHARP; c.height = 400 * SHARP
+  const g = c.getContext('2d')!
+  g.scale(SHARP, SHARP)
+  const col = hot ? '#bfefff' : '#6cc8ff'
   g.fillStyle = 'rgba(20,70,140,0.35)'; g.fillRect(0, 0, 640, 400)
   g.strokeStyle = col; g.lineWidth = hot ? 7 : 4; g.strokeRect(4, 4, 632, 392)
   g.fillStyle = 'rgba(40,140,255,0.35)'; g.fillRect(4, 4, 632, 78)
@@ -78,6 +94,5 @@ export function computerTexture(label: string, live: boolean, hot: boolean, seed
   drawChartLines(g, 640, 400, 100, col, seed)
   g.font = '500 22px "Segoe UI", Helvetica, Arial, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#d8f2ff'
   g.fillText('click to open', 320, 384)
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
-  return t
+  return finish(c, 640, 400)
 }
