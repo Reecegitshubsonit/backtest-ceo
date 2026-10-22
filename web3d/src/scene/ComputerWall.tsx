@@ -40,7 +40,7 @@ export function ComputerWall({ onPick, disabled }: { onPick: (id: ComputerId) =>
   // a few large screens, like the reference: dim ones behind the CEO and further out on both sides
   const decor = useMemo(() => DECOR.map(([deg, y, w, h], k) => ({
     pos: onArc(deg, DECOR_R, y), yaw: (deg * Math.PI) / 180 + Math.PI, w, h,
-    tex: screenTexture(k % 3 === 2 ? '#a98bff' : '#5fc8ff', 40 + k), base: 0.3 + (k % 3) * 0.05, phase: k * 2.3,
+    tex: screenTexture(k % 3 === 2 ? '#a98bff' : '#5fc8ff', 40 + k), base: 0.55 + (k % 3) * 0.08, phase: k * 2.3,
   })), [])
   const mats = useMemo(() => decor.map(d => new THREE.MeshBasicMaterial({ map: d.tex, opacity: d.base, ...additive })), [decor])
   useFrame(({ clock }) => {

@@ -30,7 +30,7 @@ function summaryTexture() {
 export function Table() {
   const rings = useRef<(THREE.Mesh | null)[]>([])
   const beam = useRef<THREE.MeshBasicMaterial>(null)
-  const dash = useMemo(() => Array.from({ length: 10 }, (_, i) => screenTexture('#5fc8ff', 100 + i)), [])
+  const dash = useMemo(() => Array.from({ length: 22 }, (_, i) => screenTexture(i % 5 === 0 ? '#a98bff' : '#5fc8ff', 100 + i)), [])
   const summary = useMemo(summaryTexture, [])
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
@@ -62,11 +62,11 @@ export function Table() {
         <meshBasicMaterial ref={beam} color={0x3fa8ff} opacity={0.05} {...additive} />
       </mesh>
       {dash.map((tex, i) => {
-        const a = (i / 10) * Math.PI * 2 + 0.3
+        const outer = i % 2 === 0, a = (i / 22) * Math.PI * 2 + 0.3, r = outer ? 2.55 : 1.95
         return (
-          <mesh key={i} position={[Math.sin(a) * 2.45, TABLE_H + 0.03, Math.cos(a) * 2.45]} rotation={[-Math.PI / 2 + 0.25, a, 0, 'YXZ']}>
-            <planeGeometry args={[0.8, 0.5]} />
-            <meshBasicMaterial map={tex} opacity={0.55} {...additive} />
+          <mesh key={i} position={[Math.sin(a) * r, TABLE_H + 0.03, Math.cos(a) * r]} rotation={[-Math.PI / 2 + 0.2, a, 0, 'YXZ']}>
+            <planeGeometry args={outer ? [0.7, 0.42] : [0.45, 0.3]} />
+            <meshBasicMaterial map={tex} opacity={0.8} {...additive} />
           </mesh>
         )
       })}

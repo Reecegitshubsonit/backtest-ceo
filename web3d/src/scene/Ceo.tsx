@@ -2,7 +2,6 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Figure, Halo, pointsMaterial } from './Figure'
-import { Label } from './Label'
 import { TABLE_H } from './Table'
 
 export const CEO_SCALE = 1.75
@@ -42,8 +41,6 @@ export function Ceo() {
       <points material={rainMat} position-y={TABLE_H}>
         <bufferGeometry ref={rainGeo}><bufferAttribute attach="attributes-position" args={[rainPos, 3]} /></bufferGeometry>
       </points>
-      <Label lines={[{ text: 'CEO AI', big: true }, { text: 'STRATEGIC OVERSIGHT' }, { text: 'FINAL DECISION AUTHORITY' }]}
-        color="#a8e6ff" position={[0, TABLE_H + 2.05, 0.75]} scale={0.7} />
     </group>
   )
 }

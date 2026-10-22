@@ -4,7 +4,6 @@ import * as THREE from 'three'
 import type { Seat } from '../config/seats'
 import { onArc } from '../model/camera'
 import { Figure, Halo, pointsMaterial } from './Figure'
-import { Label } from './Label'
 import { TABLE_R } from './Table'
 import { CEO_CHEST } from './Ceo'
 
@@ -79,8 +78,6 @@ export function AgentSeat({ seat, index }: { seat: Seat; index: number }) {
         <ringGeometry args={[0.45, 0.5, 64]} />
         <meshBasicMaterial color={0x3fa8ff} opacity={0.4} transparent blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
-      <Label lines={[{ text: seat.name }, { text: seat.job }, { text: '● Live Feed' }]} color="#6cc8ff"
-        position={[x * 1.04, 2.35, z * 1.04]} scale={0.6} />
       <primitive object={streamLine} />
       <points material={flowMat}>
         <bufferGeometry ref={flowGeo}><bufferAttribute attach="attributes-position" args={[flow, 3]} /></bufferGeometry>

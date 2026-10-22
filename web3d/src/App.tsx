@@ -4,6 +4,7 @@ import { api } from './net/api'
 import { ComputerPanel } from './panels/ComputerPanel'
 import { ImageRoom } from './room/ImageRoom'
 import { Scene } from './scene/Scene'
+import { Labels } from './scene/labels'
 
 // the live 3D room is the default (sharp at any size, like Scalp City); ?room=image shows the picture room
 const ROOM_3D = new URLSearchParams(window.location.search).get('room') !== 'image'
@@ -22,6 +23,7 @@ export default function App() {
   return (
     <div className="app">
       {ROOM_3D ? <Scene panel={panel} dispatch={dispatch} /> : <ImageRoom panel={panel} dispatch={dispatch} />}
+      {ROOM_3D && <Labels hidden={panel.phase !== 'closed'} />}
       <header className="hud">
         <h1>BACKTEST CEO</h1>
         <span className={`engine ${engine.state}`}>

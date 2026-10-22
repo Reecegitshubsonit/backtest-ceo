@@ -13,9 +13,10 @@ import { ComputerWall } from './ComputerWall'
 import { Operator } from './Operator'
 import { Room } from './Room'
 import { Table } from './Table'
+import { LabelProjector } from './labels'
 
-// full-screen bloom softens text and edges, so it is opt-in (?fx=high); the holograms glow on their own
-const FX = new URLSearchParams(window.location.search).get('fx') === 'high'
+// glow is on by default (labels are page text, so it does not blur them); ?fx=low turns it off for slow graphics
+const FX = new URLSearchParams(window.location.search).get('fx') !== 'low'
 
 export function Scene({ panel, dispatch }: { panel: PanelState; dispatch: (a: PanelAction) => void }) {
   const controls = useRef<OrbitControlsImpl>(null)
@@ -36,7 +37,8 @@ export function Scene({ panel, dispatch }: { panel: PanelState; dispatch: (a: Pa
       <OrbitControls ref={controls} target={start.target} enableDamping enablePan={false}
         minPolarAngle={0.95} maxPolarAngle={1.6} minDistance={6} maxDistance={15} enabled={panel.phase === 'closed'} />
       <CameraRig panel={panel} dispatch={dispatch} controls={controls} />
-      {FX && <EffectComposer><Bloom intensity={0.85} luminanceThreshold={0.4} luminanceSmoothing={0.3} mipmapBlur /></EffectComposer>}
+      <LabelProjector />
+      {FX && <EffectComposer><Bloom intensity={1.1} luminanceThreshold={0.45} luminanceSmoothing={0.25} mipmapBlur /></EffectComposer>}
     </Canvas>
   )
 }

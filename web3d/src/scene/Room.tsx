@@ -1,3 +1,4 @@
+import { MeshReflectorMaterial } from '@react-three/drei'
 import * as THREE from 'three'
 
 const additive = { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide } as const
@@ -34,8 +35,19 @@ export function Room() {
       })}
       <mesh rotation-x={-Math.PI / 2}>
         <circleGeometry args={[13, 64]} />
-        <meshStandardMaterial color={0x04060c} metalness={0.3} roughness={0.85} />
+        <MeshReflectorMaterial resolution={512} blur={[260, 80]} mixBlur={1} mixStrength={2.2} mirror={0.6}
+          roughness={0.8} depthScale={0.6} minDepthThreshold={0.4} maxDepthThreshold={1.2} color="#04070f" metalness={0.6} />
       </mesh>
+      {Array.from({ length: 7 }, (_, i) => {
+        // long purple light arcs across the ceiling, like the reference
+        const r = 6 + i * 0.9
+        return (
+          <mesh key={`arc${i}`} rotation-x={Math.PI / 2} rotation-z={Math.PI * (0.95 + (i % 2) * 0.55)} position-y={7.2 + (i % 3) * 0.35}>
+            <torusGeometry args={[r, 0.035, 8, 96, Math.PI * 0.42]} />
+            <meshBasicMaterial color={i % 3 === 1 ? 0x3fa8ff : 0xb04cff} />
+          </mesh>
+        )
+      })}
       {[5, 6.6, 8.2, 9.8, 11.4].map(r => (
         <mesh key={r} rotation-x={-Math.PI / 2} position-y={0.005}>
           <ringGeometry args={[r, r + 0.015, 96]} />
