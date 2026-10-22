@@ -12,10 +12,11 @@ export function onArc(angleDeg: number, r: number, y: number): Vec3 {
 /** On narrow screens widen the field of view instead of backing the camera out through the wall. */
 export function fovFor(aspect: number): number {
   if (aspect >= NARROW) return 48
-  return Math.min(80, (2 * Math.atan(5.0 / 11.5 / aspect) * 180) / Math.PI)
+  return Math.min(80, (2 * Math.atan(4.4 / 9.8 / aspect) * 180) / Math.PI)
 }
 
-export const roomPose = (aspect: number): CamPose => ({ pos: [0, 2.7, aspect >= NARROW ? 10.5 : 11.5], target: [0, 2.3, 0] })
+/** Close and a little above the table, looking down at it, like the reference image. */
+export const roomPose = (aspect: number): CamPose => ({ pos: [0, 4.0, aspect >= NARROW ? 9.2 : 9.8], target: [0, 2.3, 0] })
 
 /** Camera `dist` in front of a wall screen, looking straight at it. */
 export const screenPose = (angleDeg: number, r: number, y: number, dist = 2.6): CamPose =>

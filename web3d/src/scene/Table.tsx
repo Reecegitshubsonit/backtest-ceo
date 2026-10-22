@@ -34,7 +34,7 @@ export function Table() {
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
     rings.current.forEach((m, i) => { if (m) m.rotation.z = t * (i % 2 ? -0.15 : 0.25) * (1 + i * 0.1) })
-    if (beam.current) beam.current.opacity = 0.045 + Math.sin(t * 1.5) * 0.015
+    if (beam.current) beam.current.opacity = 0.02 + Math.sin(t * 1.5) * 0.008
   })
   return (
     <group>

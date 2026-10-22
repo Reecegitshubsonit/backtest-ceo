@@ -2,7 +2,7 @@ import { useEffect, useMemo, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { computerById, COMPUTER_Y, WALL_RADIUS } from '../config/computers'
+import { computerById, WALL_RADIUS } from '../config/computers'
 import { fovFor, poseDistance, roomPose, screenPose, type CamPose } from '../model/camera'
 import type { PanelAction, PanelState } from '../model/panel'
 
@@ -22,7 +22,7 @@ export function CameraRig({ panel, dispatch, controls }: Props) {
   useFrame((_, dt) => {
     if (panel.phase === 'closed' || panel.phase === 'open') return
     const want: CamPose = panel.phase === 'flying' && panel.computer
-      ? screenPose(computerById(panel.computer).angleDeg, WALL_RADIUS, COMPUTER_Y)
+      ? (c => screenPose(c.angleDeg, WALL_RADIUS, c.y, 3.2))(computerById(panel.computer))
       : roomPose(aspect)
     const target = controls.current?.target ?? new THREE.Vector3()
     const k = reduced ? 1 : 1 - Math.exp(-dt * 6)

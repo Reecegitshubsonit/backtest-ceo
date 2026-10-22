@@ -14,7 +14,8 @@ import { Operator } from './Operator'
 import { Room } from './Room'
 import { Table } from './Table'
 
-const FX_HIGH = new URLSearchParams(window.location.search).get('fx') === 'high'
+// glow is on by default; ?fx=low turns it off for slow graphics
+const FX = new URLSearchParams(window.location.search).get('fx') !== 'low'
 
 export function Scene({ panel, dispatch }: { panel: PanelState; dispatch: (a: PanelAction) => void }) {
   const controls = useRef<OrbitControlsImpl>(null)
@@ -35,7 +36,7 @@ export function Scene({ panel, dispatch }: { panel: PanelState; dispatch: (a: Pa
       <OrbitControls ref={controls} target={start.target} enableDamping enablePan={false}
         minPolarAngle={0.95} maxPolarAngle={1.6} minDistance={6} maxDistance={15} enabled={panel.phase === 'closed'} />
       <CameraRig panel={panel} dispatch={dispatch} controls={controls} />
-      {FX_HIGH && <EffectComposer><Bloom intensity={0.95} luminanceThreshold={0.2} mipmapBlur /></EffectComposer>}
+      {FX && <EffectComposer><Bloom intensity={0.85} luminanceThreshold={0.4} luminanceSmoothing={0.3} mipmapBlur /></EffectComposer>}
     </Canvas>
   )
 }

@@ -6,7 +6,7 @@ const dark = new THREE.MeshStandardMaterial({ color: 0x020307, metalness: 0.3, r
 /** You: a dark silhouette in a chair, back to the camera, in the foreground. */
 export function Operator() {
   return (
-    <group position={[0, -0.55, TABLE_R + 4.3]} scale={1.3}>
+    <group position={[0, -0.35, TABLE_R + 2.6]} scale={1.25}>
       <mesh material={dark} position={[0, 0.95, 0.12]}><boxGeometry args={[0.85, 0.8, 0.14]} /></mesh>
       <mesh material={dark} position={[0, 0.5, -0.3]}><boxGeometry args={[0.95, 0.12, 0.85]} /></mesh>
       <mesh material={dark} position={[0, 0.22, -0.3]}><cylinderGeometry args={[0.06, 0.06, 0.45, 12]} /></mesh>

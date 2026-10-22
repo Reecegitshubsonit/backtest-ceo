@@ -9,7 +9,7 @@ import { TABLE_R } from './Table'
 import { CEO_CHEST } from './Ceo'
 
 const SEAT_R = TABLE_R + 0.75
-const LABEL_Y = [2.05, 2.75, 1.8]
+const AGENT_HOLO = { intensity: 0.9 }
 const chairMat = new THREE.MeshStandardMaterial({ color: 0x0a0d18, metalness: 0.6, roughness: 0.45 })
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x4fb8ff, transparent: true, opacity: 0.35 })
 
@@ -71,7 +71,7 @@ export function AgentSeat({ seat, index }: { seat: Seat; index: number }) {
       <group position={[x, 0, z]} rotation-y={yaw}>
         <Chair />
         <group ref={head}>
-          <Figure seated color={0x4fb8ff} density={1.6} size={0.026} headTilt={-0.75} seed={10 + index} material={mat} />
+          <Figure seated color={0x4fb8ff} density={1.6} size={0.024} headTilt={-0.6} seed={10 + index} material={mat} holo={AGENT_HOLO} />
         </group>
       </group>
       <mesh rotation-x={-Math.PI / 2} position={[x, 0.01, z]}>
@@ -79,7 +79,7 @@ export function AgentSeat({ seat, index }: { seat: Seat; index: number }) {
         <meshBasicMaterial color={0x3fa8ff} opacity={0.4} transparent blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
       <Label lines={[{ text: seat.name }, { text: seat.job }, { text: '● Live Feed' }]} color="#6cc8ff"
-        position={[x * 1.08, LABEL_Y[index % 3], z * 1.08]} scale={0.5} />
+        position={[x * 1.04, 2.35, z * 1.04]} scale={0.6} />
       <primitive object={streamLine} />
       <points material={flowMat}>
         <bufferGeometry ref={flowGeo}><bufferAttribute attach="attributes-position" args={[flow, 3]} /></bufferGeometry>
