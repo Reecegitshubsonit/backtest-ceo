@@ -4,32 +4,37 @@ import type { ComputerId } from '../model/types'
 export interface Rect { x: number; y: number; w: number; h: number }
 export type Pt = [number, number]
 
-/** The room picture: the Grok reference with its baked-in text painted out, upscaled. All coordinates below are in its original 456 x 704 pixels. */
-export const ROOM_IMAGE = { src: '/room.jpg', w: 456, h: 704 }
+/**
+ * The room picture: the 16:9 Grok render (docs/reference/grok-room-wide.jpg) with its baked-in text painted out,
+ * upscaled 2x. All coordinates below are in the source's 1280 x 720 pixels.
+ */
+export const ROOM_IMAGE = { src: '/room.jpg', w: 1280, h: 720 }
 
 /** Wall screens that act as the three computers. */
 export const SCREEN_RECTS: Record<ComputerId, Rect> = {
-  backtests: { x: 4, y: 84, w: 156, h: 68 },
-  scanner: { x: 4, y: 158, w: 156, h: 58 },
-  strategies: { x: 298, y: 80, w: 156, h: 136 },
+  backtests: { x: 6, y: 22, w: 282, h: 306 },
+  scanner: { x: 306, y: 84, w: 240, h: 212 },
+  strategies: { x: 736, y: 84, w: 234, h: 212 },
 }
 
-/** Where each seat's label sits (covering the picture's own text) and the agent's chest, for data streams. */
+/** Where each seat's label sits (where the picture had its own text) and the agent's chest, for data streams. */
 export const SEAT_SPOTS: Record<string, { label: Rect; chest: Pt }> = {
-  scanner: { label: { x: 4, y: 236, w: 88, h: 36 }, chest: [42, 305] },
-  strategist: { label: { x: 88, y: 215, w: 70, h: 34 }, chest: [122, 292] },
-  backtester: { label: { x: 300, y: 215, w: 74, h: 34 }, chest: [336, 292] },
-  auditor: { label: { x: 366, y: 238, w: 84, h: 36 }, chest: [414, 308] },
-  regime: { label: { x: 6, y: 368, w: 80, h: 34 }, chest: [52, 445] },
-  risk: { label: { x: 380, y: 370, w: 74, h: 34 }, chest: [420, 445] },
+  scanner: { label: { x: 300, y: 286, w: 114, h: 54 }, chest: [362, 400] },
+  strategist: { label: { x: 430, y: 258, w: 114, h: 54 }, chest: [488, 372] },
+  backtester: { label: { x: 736, y: 258, w: 114, h: 54 }, chest: [792, 372] },
+  auditor: { label: { x: 868, y: 286, w: 114, h: 54 }, chest: [918, 400] },
+  regime: { label: { x: 214, y: 410, w: 116, h: 56 }, chest: [282, 520] },
+  risk: { label: { x: 940, y: 412, w: 116, h: 56 }, chest: [998, 545] },
 }
 
-export const CEO_CHEST: Pt = [228, 205]
+export const CEO_CHEST: Pt = [640, 240]
 /** Where the CEO's title sits on the chest. */
-export const CEO_LABEL: Rect = { x: 180, y: 172, w: 96, h: 66 }
-export const RING_CENTER: Pt = [228, 360]
+export const CEO_LABEL: Rect = { x: 570, y: 194, w: 140, h: 84 }
+/** The table's own summary text, replaced with ours. */
+export const SUMMARY_LABEL: Rect = { x: 550, y: 518, w: 180, h: 46 }
+export const RING_CENTER: Pt = [640, 455]
 /** Projector beam the CEO stands in (sparkles rise through it). */
-export const BEAM: Rect = { x: 196, y: 70, w: 64, h: 300 }
+export const BEAM: Rect = { x: 608, y: 95, w: 64, h: 360 }
 
 /**
  * CSS transform (origin top-left, translate in % of the stage, then scale) that brings `r` to the middle of the

@@ -6,8 +6,8 @@ import { ImageRoom } from './room/ImageRoom'
 import { Scene } from './scene/Scene'
 import { Labels } from './scene/labels'
 
-// the live 3D room is the default (sharp at any size, like Scalp City); ?room=image shows the picture room
-const ROOM_3D = new URLSearchParams(window.location.search).get('room') !== 'image'
+// the picture room (Grok reference) is the default; ?room=3d shows the procedural 3D room
+const ROOM_3D = new URLSearchParams(window.location.search).get('room') === '3d'
 
 type Engine = { state: 'checking' } | { state: 'up'; keys: boolean } | { state: 'down' }
 
@@ -32,7 +32,7 @@ export default function App() {
             : engine.keys ? 'Engine: connected' : 'Engine: connected, Alpaca keys missing'}
         </span>
       </header>
-      {panel.phase === 'closed' && <p className="hint">{ROOM_3D ? 'Click a computer behind the CEO · drag to orbit' : 'Click a screen behind the CEO to open it'}</p>}
+      {panel.phase === 'closed' && <p className="hint">{ROOM_3D ? 'Click a computer behind the CEO · drag to orbit' : 'Click a screen on the wall to open it'}</p>}
       <ComputerPanel panel={panel} dispatch={dispatch} />
     </div>
   )

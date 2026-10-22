@@ -5,8 +5,8 @@ interface Mote { x: number; y: number; v: number; r: number; life: number; kind:
 
 // regions (image px) where twinkles appear: the CEO's body and each agent's upper body
 const BODIES: [number, number, number, number][] = [
-  [CEO_CHEST[0], CEO_CHEST[1] + 10, 55, 140],
-  ...Object.values(SEAT_SPOTS).map(s => [s.chest[0], s.chest[1], 30, 45] as [number, number, number, number]),
+  [CEO_CHEST[0], CEO_CHEST[1] + 20, 72, 150],
+  ...Object.values(SEAT_SPOTS).map(s => [s.chest[0], s.chest[1], 34, 50] as [number, number, number, number]),
 ]
 
 function spawn(kind: Mote['kind']): Mote {

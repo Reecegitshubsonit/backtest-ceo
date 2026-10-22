@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { COMPUTERS } from '../config/computers'
-import { CEO_CHEST, CEO_LABEL, RING_CENTER, ROOM_IMAGE, SCREEN_RECTS, SEAT_SPOTS, zoomTo, type Rect } from '../config/imageRoom'
+import { CEO_CHEST, CEO_LABEL, RING_CENTER, SUMMARY_LABEL, ROOM_IMAGE, SCREEN_RECTS, SEAT_SPOTS, zoomTo, type Rect } from '../config/imageRoom'
 import { SEATS } from '../config/seats'
 import type { PanelAction, PanelState } from '../model/panel'
 import { Sparkles } from './Sparkles'
@@ -44,12 +44,12 @@ export function ImageRoom({ panel, dispatch }: Props) {
               <radialGradient id="ceoGlow"><stop offset="0" stopColor="#6fd0ff" stopOpacity=".55" /><stop offset="1" stopColor="#2a7bff" stopOpacity="0" /></radialGradient>
               <radialGradient id="ringGlow"><stop offset="0" stopColor="#8fe4ff" stopOpacity=".6" /><stop offset="1" stopColor="#3a6bff" stopOpacity="0" /></radialGradient>
             </defs>
-            <ellipse className="pulse slow" cx={CEO_CHEST[0]} cy={CEO_CHEST[1]} rx="70" ry="150" fill="url(#ceoGlow)" />
-            <ellipse className="pulse" cx={RING_CENTER[0]} cy={RING_CENTER[1]} rx="70" ry="20" fill="url(#ringGlow)" />
-            <ellipse className="ringspin" cx={RING_CENTER[0]} cy={RING_CENTER[1]} rx="96" ry="29" fill="none" stroke="#c08cff" strokeWidth="1.2" strokeDasharray="40 14" />
+            <ellipse className="pulse slow" cx={CEO_CHEST[0]} cy={CEO_CHEST[1]} rx="110" ry="230" fill="url(#ceoGlow)" />
+            <ellipse className="pulse" cx={RING_CENTER[0]} cy={RING_CENTER[1]} rx="110" ry="32" fill="url(#ringGlow)" />
+            <ellipse className="ringspin" cx={RING_CENTER[0]} cy={RING_CENTER[1]} rx="134" ry="40" fill="none" stroke="#c08cff" strokeWidth="1.2" strokeDasharray="40 14" />
             {SEATS.map((seat, i) => {
               const [x, y] = SEAT_SPOTS[seat.id].chest
-              const d = `M${x},${y} Q${(x + CEO_CHEST[0]) / 2},${Math.min(y, CEO_CHEST[1]) - 45} ${CEO_CHEST[0]},${CEO_CHEST[1]}`
+              const d = `M${x},${y} Q${(x + CEO_CHEST[0]) / 2},${Math.min(y, CEO_CHEST[1]) - 60} ${CEO_CHEST[0]},${CEO_CHEST[1]}`
               return (
                 <g key={seat.id}>
                   <path d={d} className="streambase" />
@@ -62,6 +62,7 @@ export function ImageRoom({ panel, dispatch }: Props) {
           <div className="ceolabel" style={pct(CEO_LABEL)}>
             <b>CEO AI</b><span>STRATEGIC OVERSIGHT</span><span>FINAL DECISION AUTHORITY</span>
           </div>
+          <div className="summarylabel" style={pct(SUMMARY_LABEL)}><b>EXECUTIVE SUMMARY</b><span>SYNTHESIZING AGENT REPORTS</span></div>
           {SEATS.map(seat => (
             <div key={seat.id} className="seatlabel" style={pct(SEAT_SPOTS[seat.id].label)}>
               <b className={seat.name.length > 14 ? 'long' : ''}>{seat.name}</b><span>{seat.job}</span><span className="live">● Live Feed</span>
