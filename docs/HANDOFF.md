@@ -73,3 +73,22 @@ because the room is a 1280x720 image.
   live focused BACKTESTS DOM verified; screenshot inspected. Expand/return retained a changed
   symbol in the in-app browser. A regression test checks desk faces are above the furniture.
 - Sources/build recipe/limitations: `docs/reference-room-3d.md`.
+
+## Physical layout and orbit repair (2026-10-26)
+- User reported distorted/jumbled desk, chairs and seated figures, the visual framework
+  disappearing behind the scene, zoom always targeting the CEO, and an unrealistic operator.
+- Replaced per-vertex silhouette warping for seated figures/chairs with a shared posed human
+  mesh, uniform body scaling, coherent radial seating and proportionate chair placement.
+  Palms now face the desktop, with forearms above it. Operator/chair use the same coherent
+  placement method, with a dark fabric/rim material instead of projected picture fragments.
+- Desk is genuinely circular; nine separate landscape consoles fit around its annulus,
+  clear of the central projector, without overlapping. Screen IDs and assignments persist.
+- Removed camera-distance material fading. Furniture/people/desk now have stable 3D materials;
+  a full enclosing shell keeps chart treatment and purple/cyan lighting behind the scene.
+  The seated figures' likeness is stylized and no longer faked with the full-room photograph.
+- Enabled pointer-directed scroll zoom and right-drag pan. Camera and target stay bounded.
+  Focus flights include screen up direction, fixing roll/framing for rotated desk consoles.
+- Verified home, side and rear views, pointer zoom, console focus and return in the in-app
+  browser; Firefox also rendered the revised landscape risk console sharply and upright.
+- Frontend 47 tests, TypeScript and production build pass; current engine suite 31 passes
+  (includes concurrent engine collector work outside this room change).

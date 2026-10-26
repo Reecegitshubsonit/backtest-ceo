@@ -24,7 +24,7 @@ void mainImage(const in vec4 inputColor,const in vec2 uv,out vec4 outputColor){
  float stepSize=(finish-start)/40.,light=0.;
  for(int i=0;i<40;i++){
    vec3 p=ro+rd*(start+(float(i)+.5)*stepSize);
-   float h=(p.y-1.7)/3.6;
+   float h=(p.y-1.5)/3.8;
    if(h>0.&&h<1.){
      float r=length(p.xz),radius=.025+h*.25;
      float envelope=exp(-r*r/(radius*radius)*4.0)*smoothstep(0.,.008,h)*(1.-smoothstep(.92,1.,h));

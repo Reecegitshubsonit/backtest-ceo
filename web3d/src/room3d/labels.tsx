@@ -17,7 +17,11 @@ const anchors=[
   const o=ROOM_OBJECTS.find(o=>o.name===`agent_${s.id}`)!;const z=(o.bounds[0][2]+o.bounds[1][2])/2
   return{id:s.id,point:middle(SEAT_SPOTS[s.id].label),z,lines:[s.name,s.job,'● Live Feed']}
  }),
-].map(a=>({...a,world:referencePoint(a.point[0],a.point[1],a.z)}))
+].map(a=>{
+ const o=ROOM_OBJECTS.find(o=>o.name===`agent_${a.id}`)
+ const world=o?new THREE.Vector3((o.bounds[0][0]+o.bounds[1][0])/2,o.bounds[1][1]+.24,(o.bounds[0][2]+o.bounds[1][2])/2):a.id==='summary'?new THREE.Vector3(0,1.62,1.75):referencePoint(a.point[0],a.point[1],a.z)
+ return {...a,world,homeDistance:world.distanceTo(new THREE.Vector3(0,3.844,7.04))}
+})
 export function RoomLabels(){return <div className="room-labels" aria-hidden>
  {anchors.map(a=><div key={a.id} className={`room-label ${a.id==='ceo'?'ceo':a.id==='summary'?'summary':'agent'}`} ref={el=>{if(el)nodes.set(a.id,el);else nodes.delete(a.id)}}>
   <b>{a.lines[0]}</b>{a.lines.slice(1).map((l,i)=><span key={i}>{l}</span>)}
@@ -27,7 +31,7 @@ export function RoomLabels(){return <div className="room-labels" aria-hidden>
 export function LabelProjector({hidden}:{hidden:boolean}){
  const {camera,size}=useThree()
  useFrame(()=>{
-  for(const a of anchors){const el=nodes.get(a.id);if(!el)continue;const v=a.world.clone().project(camera);const behind=v.z>1||v.z< -1;el.style.display=hidden||behind?'none':'';el.style.transform=`translate(-50%,-50%) translate(${(v.x+1)*size.width/2}px,${(1-v.y)*size.height/2}px)`}
+  for(const a of anchors){const el=nodes.get(a.id);if(!el)continue;const v=a.world.clone().project(camera);const behind=v.z>1||v.z< -1;el.style.display=hidden||behind?'none':'';el.style.transform=`translate(-50%,-50%) translate(${(v.x+1)*size.width/2}px,${(1-v.y)*size.height/2}px) scale(${THREE.MathUtils.clamp(a.homeDistance/camera.position.distanceTo(a.world),.4,1.3)})`}
   const el=nodes.get('hover');if(el&&hovered){const s=screenById(hovered)!;const v=new THREE.Vector3(...s.center).project(camera);el.style.transform=`translate(-50%,-100%) translate(${(v.x+1)*size.width/2}px,${(1-v.y)*size.height/2-16}px)`}
  })
  return null

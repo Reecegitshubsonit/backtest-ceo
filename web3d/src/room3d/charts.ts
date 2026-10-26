@@ -22,16 +22,13 @@ export function deskTexture():THREE.CanvasTexture {
  const c=canvas.getContext('2d')!,S=256,C=1024
  c.fillStyle='#030712';c.fillRect(0,0,2048,2048)
  c.translate(C,C)
- for(let i=0;i<12;i++){
-  c.save();c.rotate(i*Math.PI/6);c.translate(0,-S*2.25)
-  c.fillStyle='#051124';c.strokeStyle='#142b47';c.lineWidth=3;c.fillRect(-115,-100,230,200);c.strokeRect(-115,-100,230,200)
-  c.strokeStyle='#246993';c.lineWidth=1.5
-  c.beginPath();for(let j=0;j<55;j++){const x=-100+j*3.7,y=Math.sin(j*.33+i)*22+Math.cos(j*.7)*10-20;j?c.lineTo(x,y):c.moveTo(x,y)}c.stroke()
-  for(let j=0;j<45;j++){c.fillStyle=j%3?'#12345a':'#27567d';c.fillRect(-99+j*4.5,40,2,Math.abs(Math.sin(j*.7+i))*43)}
-  for(let j=0;j<5;j++){c.fillStyle='#1a4161';c.fillRect(-100,75+j*4,60+(j*23)%130,1)}
-  c.restore()
+ // The nine separate physical screen meshes supply the desk graphics.
+ // This material is only the surrounding metal, rings and engraved seams.
+ for(let i=0;i<18;i++){
+  c.save();c.rotate(i*Math.PI/9);c.strokeStyle='#11253e';c.lineWidth=2
+  c.beginPath();c.moveTo(0,-S*1.55);c.lineTo(0,-S*3.1);c.stroke();c.restore()
  }
- for(const [radius,color,width] of [[1.48,'#b47aff',5],[1.03,'#64d8ff',5],[.81,'#155992',2],[.65,'#134e7e',2],[.39,'#155a85',2],[.18,'#4acafa',3]] as [number,string,number][]){c.strokeStyle=color;c.lineWidth=width;c.beginPath();c.arc(0,0,radius*S,0,Math.PI*2);c.stroke()}
+ for(const [radius,color,width] of [[1.29,'#b47aff',5],[1.03,'#64d8ff',5],[.81,'#155992',2],[.65,'#134e7e',2],[.39,'#155a85',2],[.18,'#4acafa',3]] as [number,string,number][]){c.strokeStyle=color;c.lineWidth=width;c.beginPath();c.arc(0,0,radius*S,0,Math.PI*2);c.stroke()}
  for(let i=0;i<180;i++){const a=i*Math.PI/90;c.strokeStyle=i%5?'#123656':'#25628b';c.lineWidth=1;c.beginPath();c.moveTo(Math.cos(a)*S*1.22,Math.sin(a)*S*1.22);c.lineTo(Math.cos(a)*S*1.33,Math.sin(a)*S*1.33);c.stroke()}
  const t=new THREE.CanvasTexture(canvas);t.colorSpace=THREE.NoColorSpace;t.anisotropy=8;return t
 }

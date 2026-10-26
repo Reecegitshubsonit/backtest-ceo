@@ -31,7 +31,7 @@ export function FullRoomApp(){
    {ready&&<RoomLabels/>}
   </div>
   <header className="hud"><h1>BACKTEST CEO</h1><span className="engine">Engine: {engine}</span></header>
-  {panel.phase==='closed'&&<div className="room-controls"><span>Drag to orbit · scroll to zoom · click a screen</span><button onClick={()=>setResetKey(k=>k+1)}>Reset view</button><button aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>Screens</button></div>}
+  {panel.phase==='closed'&&<div className="room-controls"><span>Drag to orbit · scroll toward pointer · right-drag to pan · click a screen</span><button onClick={()=>setResetKey(k=>k+1)}>Reset view</button><button aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>Screens</button></div>}
   {panel.phase==='focused'&&<p className="room-focus-hint">Expand for full screen · Esc returns to the room</p>}
   {menu&&<nav className="room-screen-menu" aria-label="Room screens">
    {ROOM_SCREENS.map(s=><button key={s.id} onClick={()=>{setMenu(false);dispatch({type:'click',id:s.id})}} aria-label={`Open ${screenName(s)} (${s.kind} ${s.n})`}><span>{s.kind==='wall'?'Wall':'Desk'} {s.n}</span>{screenName(s)}</button>)}

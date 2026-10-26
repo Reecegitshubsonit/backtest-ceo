@@ -36,7 +36,7 @@ function Screen({mesh,screen,reference,depth,panel,dispatch,onHover}:{mesh:THREE
  const {camera,size}=useThree()
  useFrame(()=>{
    const projected=screen.w/(2*camera.position.distanceTo(new THREE.Vector3(...screen.center))*Math.tan(48*Math.PI/360)*(size.width/size.height))*size.width
-   material.uniforms.uDetail.value=THREE.MathUtils.smoothstep(projected,screen.rect.w*1.5,screen.rect.w*2.5)
+   material.uniforms.uDetail.value=screen.kind==='desk'?1:THREE.MathUtils.smoothstep(projected,screen.rect.w*1.5,screen.rect.w*2.5)
    material.uniforms.uHot.value=hot?1:0
  })
  useEffect(()=>()=>{material.dispose();sharp.dispose()},[material,sharp])
@@ -52,13 +52,14 @@ function Assets({panel,dispatch,host,onReady}:Props){
  const buffer=useLoader(THREE.FileLoader,'/models/reference-depth.bin',loader=>loader.setResponseType('arraybuffer')) as unknown as ArrayBuffer
  const depth=useMemo(()=>{const t=new THREE.DataTexture(new Float32Array(buffer),1280,720,THREE.RedFormat,THREE.FloatType);t.minFilter=THREE.NearestFilter;t.magFilter=THREE.NearestFilter;t.needsUpdate=true;return t},[buffer])
  const tableMap=useMemo(deskTexture,[])
+ const wallMap=useMemo(()=>chartTexture(4),[])
  const assets=useMemo(()=>{
    reference.colorSpace=THREE.SRGBColorSpace;reference.anisotropy=8
    const result:{mesh:THREE.Mesh;kind:string;material:THREE.ShaderMaterial}[]=[]
-   scene.traverse(o=>{if(!(o instanceof THREE.Mesh))return;const geometry=o.geometry as Geo;if(!geometry.boundsTree)geometry.boundsTree=new MeshBVH(geometry,{maxLeafTris:12});const kind=o.userData.kind??'wall';result.push({mesh:o,kind,material:roomMaterial(reference,depth,kind,kind==='desk'?tableMap:undefined)})})
+   scene.traverse(o=>{if(!(o instanceof THREE.Mesh))return;const geometry=o.geometry as Geo;if(!geometry.boundsTree)geometry.boundsTree=new MeshBVH(geometry,{maxLeafTris:12});const kind=o.userData.kind??'wall';result.push({mesh:o,kind,material:roomMaterial(reference,depth,kind,kind==='desk'?tableMap:kind==='wall'?wallMap:undefined)})})
    return result
- },[scene,reference,depth,tableMap])
- useEffect(()=>()=>{for(const a of assets)a.material.dispose();tableMap.dispose();depth.dispose();document.body.style.cursor=''},[assets,depth,tableMap])
+ },[scene,reference,depth,tableMap,wallMap])
+ useEffect(()=>()=>{for(const a of assets)a.material.dispose();tableMap.dispose();wallMap.dispose();depth.dispose();document.body.style.cursor=''},[assets,depth,tableMap,wallMap])
  useFrame(({clock})=>{
    for(const a of assets)a.material.uniforms.uTime.value=clock.getElapsedTime()
  })
@@ -81,8 +82,8 @@ export function RoomScene(props:Props){
  return <Canvas className="room-canvas" dpr={[1,1.5]} camera={{position:HOME.position,fov:48,near:.05,far:80}} gl={{antialias:true,powerPreference:'high-performance'}}>
   <color attach="background" args={['#02040a']}/>
   <Suspense fallback={null}><Assets {...props}/></Suspense>
-  <OrbitControls ref={controls} makeDefault target={HOME.target} enablePan={false} enableDamping dampingFactor={.10}
-   minDistance={.9} maxDistance={8} minPolarAngle={.05} maxPolarAngle={2.0} enabled={props.panel.phase==='closed'}/>
+  <OrbitControls ref={controls} makeDefault target={HOME.target} enablePan zoomToCursor screenSpacePanning enableDamping dampingFactor={.10}
+   minDistance={.9} maxDistance={16} minPolarAngle={.05} maxPolarAngle={2.0} enabled={props.panel.phase==='closed'}/>
   <CameraRig panel={props.panel} dispatch={props.dispatch} controls={controls} resetKey={props.resetKey}/>
   <LabelProjector hidden={props.panel.phase!=='closed'}/>
   <EffectComposer depthBuffer multisampling={0}>

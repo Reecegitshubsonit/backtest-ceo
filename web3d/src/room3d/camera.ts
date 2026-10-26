@@ -14,7 +14,7 @@ export function flightDistance(w: number, h: number, aspect: number, fov = 48) {
 }
 export function flightPose(s: RoomScreen, aspect: number) {
   const d = flightDistance(s.w, s.h, aspect)
-  return {position: s.center.map((v,i)=>v+s.normal[i]*d) as XYZ, target: s.center}
+  return {position: s.center.map((v,i)=>v+s.normal[i]*d) as XYZ, target: s.center, up: new THREE.Vector3(0,1,0).applyQuaternion(new THREE.Quaternion(...s.quaternion)).toArray() as XYZ}
 }
 export function constrain([x,y,z]: XYZ): XYZ {
   const r = Math.hypot(x,z), k = r>LIMITS.radius?LIMITS.radius/r:1
