@@ -15,7 +15,7 @@ bars only, so options fills priced from bars are optimistic). No futures.
 Or use `web3d/scripts/launch.sh` or the dock launcher (Backtest CEO).
 
 The default view is the full 3D reference room: drag to orbit, scroll toward the pointer, right-drag to pan, click any
-of the 26 screens to fly to a sharp live panel. Expand keeps the panel state; Esc returns
+of the 26 logical screens (also mirrored on the rear monitor bank) to fly to a sharp live panel. Expand keeps the panel state; Esc returns
 one level. Reset view restores the reference framing. `?fx=low` disables bloom.
 `?room=image` keeps the previous flat image for comparison; `?review=ceo` is the earlier
 isolated CEO review. Model sources and reproduction: [3D room](docs/reference-room-3d.md).

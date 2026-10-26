@@ -92,3 +92,41 @@ because the room is a 1280x720 image.
   browser; Firefox also rendered the revised landscape risk console sharply and upright.
 - Frontend 47 tests, TypeScript and production build pass; current engine suite 31 passes
   (includes concurrent engine collector work outside this room change).
+
+## Reference art reconstruction after rejected repair (2026-10-26)
+- User rejected the generic radial layout and solid mannequin appearance. Passing geometry
+  tests was not visual success. The original reference is the art direction, not a loose theme.
+- Calibrated each figure's rigid world transform against reference head positions/sizes;
+  near figures and operator use a numerical landmark fit. Near agents now recline and keep
+  hands near their laps, with longer seat cushions and lower/wider executive-style backs.
+  Far/mid agents use separate arm poses; wrist orientation aligns both palm axes, with
+  relaxed fingers. No per-vertex silhouette stretching is used.
+- Reduced the desk to reference proportions, tapered its base, restored the raised projector,
+  and replaced generic canvas graphics with a reference-derived, generated tabletop texture
+  mapped to actual geometry. Prompt/provenance: `docs/desk-material-prompt.md`.
+- Restored original framing for labels and source wall/frame details, removed extra floor
+  grid lines, changed people to electric-blue surface detail, finer mesh wires and sparse
+  points, and added lower projector filaments. Source photographic detail is fixed to real
+  meshes, without the old camera-distance material switch.
+- Foreground operator head position and size are explicitly fitted to the reference; actual
+  hair and garment layers give the silhouette a clothed shape.
+- All nine desk consoles remain separate, flush meshes. Secondary instrument regions also
+  route whole-surface clicks/hover to their nearest console using `model/deskPicking.ts`.
+- Tests now include measured reference head landmarks and annular hit zones. Current frontend
+  suite has 49 tests. The unseen room and model likeness remain inferred; don't claim an
+  exact scan/reconstruction from a single artwork or use passing tests as proof of art quality.
+
+### Final rendering and rear-bank corrections in this pass
+- The rear chart mural was replaced with 17 actual monitor frame/face instances, mirrored
+  from the front bank. They share the original logical computer IDs through `canonicalId`;
+  all receive clicks and correctly focus their own physical screen. The canonical 26-entry
+  configuration/menu remains intact. Scene now has 108 objects, approximately 1.2M triangles.
+- Fixed CEO transparency depth writing: internal/back facial surfaces had been painting over
+  the face and making a visor-like band. Fully transparent fragments now discard, and lower
+  hologram fade/volumetric filaments connect the body to the projector.
+- Fine chart textures are shared by front/rear aliases, avoiding duplicated GPU texture memory.
+  Labels retain the canonical reference framing and suppress overlaps during oblique orbit.
+- Frontend suite now has 50 tests, including rear instance mapping and safe focus poses.
+  Rear BACKTESTS whole-face click, expansion state (QQQ), and both Escape return levels
+  were verified in the browser. Material generation used the native image tool; full prompt
+  and project asset path are saved in `docs/desk-material-prompt.md`.

@@ -16,19 +16,3 @@ export function chartTexture(index:number):THREE.CanvasTexture {
  const t=new THREE.CanvasTexture(canvas);t.colorSpace=THREE.NoColorSpace;t.anisotropy=8
  return t
 }
-
-export function deskTexture():THREE.CanvasTexture {
- const canvas=document.createElement('canvas');canvas.width=2048;canvas.height=2048
- const c=canvas.getContext('2d')!,S=256,C=1024
- c.fillStyle='#030712';c.fillRect(0,0,2048,2048)
- c.translate(C,C)
- // The nine separate physical screen meshes supply the desk graphics.
- // This material is only the surrounding metal, rings and engraved seams.
- for(let i=0;i<18;i++){
-  c.save();c.rotate(i*Math.PI/9);c.strokeStyle='#11253e';c.lineWidth=2
-  c.beginPath();c.moveTo(0,-S*1.55);c.lineTo(0,-S*3.1);c.stroke();c.restore()
- }
- for(const [radius,color,width] of [[1.29,'#b47aff',5],[1.03,'#64d8ff',5],[.81,'#155992',2],[.65,'#134e7e',2],[.39,'#155a85',2],[.18,'#4acafa',3]] as [number,string,number][]){c.strokeStyle=color;c.lineWidth=width;c.beginPath();c.arc(0,0,radius*S,0,Math.PI*2);c.stroke()}
- for(let i=0;i<180;i++){const a=i*Math.PI/90;c.strokeStyle=i%5?'#123656':'#25628b';c.lineWidth=1;c.beginPath();c.moveTo(Math.cos(a)*S*1.22,Math.sin(a)*S*1.22);c.lineTo(Math.cos(a)*S*1.33,Math.sin(a)*S*1.33);c.stroke()}
- const t=new THREE.CanvasTexture(canvas);t.colorSpace=THREE.NoColorSpace;t.anisotropy=8;return t
-}

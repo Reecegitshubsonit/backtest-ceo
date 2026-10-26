@@ -12,7 +12,7 @@ uniform float uClock;
 void mainImage(const in vec4 inputColor,const in vec2 uv,out vec4 outputColor){
  vec4 vv=uInverseProjection*vec4(uv*2.-1.,1.,1.);vec3 local=normalize(vv.xyz/vv.w);
  vec3 rd=normalize(mat3(uCameraWorld)*local),ro=uCameraWorld[3].xyz;
- float A=dot(rd.xz,rd.xz),B=2.*dot(ro.xz,rd.xz),C=dot(ro.xz,ro.xz)-.36*.36;
+ float A=dot(rd.xz,rd.xz),B=2.*dot(ro.xz,rd.xz),C=dot(ro.xz,ro.xz)-.62*.62;
  float disc=B*B-4.*A*C;
  outputColor=inputColor;
  if(disc<0.||A<.00001)return;
@@ -24,13 +24,17 @@ void mainImage(const in vec4 inputColor,const in vec2 uv,out vec4 outputColor){
  float stepSize=(finish-start)/40.,light=0.;
  for(int i=0;i<40;i++){
    vec3 p=ro+rd*(start+(float(i)+.5)*stepSize);
-   float h=(p.y-1.5)/3.8;
+   float h=(p.y-1.7)/3.6;
    if(h>0.&&h<1.){
      float r=length(p.xz),radius=.025+h*.25;
      float envelope=exp(-r*r/(radius*radius)*4.0)*smoothstep(0.,.008,h)*(1.-smoothstep(.92,1.,h));
      float strand=pow(max(0.,cos(atan(p.z,p.x)*32.+sin(p.y*2.-uClock*.4)*.15)),24.);
      float core=exp(-r*r/.0005)*.55;
-     light+=(envelope*(.18+strand*.28)+core)*stepSize*1.8;
+     float lower=(p.y-1.7)/1.35;
+     float lowerRadius=.015+clamp(lower,0.,1.)*.48;
+     float taper=exp(-pow(r/lowerRadius,4.))*step(0.,lower)*(1.-smoothstep(.72,1.,lower));
+     float filaments=pow(max(0.,cos(atan(p.z,p.x)*52.+sin(p.y*2.)*.12)),28.);
+     light+=(envelope*(.18+strand*.28)+core+taper*(.16+filaments*.60))*stepSize*1.8;
    }
  }
  outputColor.rgb+=vec3(.03,.40,.92)*light;

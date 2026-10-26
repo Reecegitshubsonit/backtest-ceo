@@ -7,13 +7,14 @@ import type { OrbitControls as Controls } from 'three-stdlib'
 import { acceleratedRaycast, MeshBVH } from 'three-mesh-bvh'
 import { ROOM_SCREENS, screenById, screenName, type RoomScreen } from '../config/roomScreens'
 import type { PanelAction, PanelState } from '../model/roomPanel'
+import { deskScreenAt } from '../model/deskPicking'
 import { Slot } from '../panels/Slot'
 import { HOME, flightDistance } from './camera'
 import { CameraRig } from './CameraRig'
 import { roomMaterial } from './material'
-import { chartTexture, deskTexture } from './charts'
+import { chartTexture } from './charts'
 import { Beam } from './Beam'
-import { LabelProjector, setHovered } from './labels'
+import { LabelProjector, setHovered, getHovered } from './labels'
 
 THREE.Mesh.prototype.raycast=acceleratedRaycast
 type Props={panel:PanelState;dispatch:(a:PanelAction)=>void;host:HTMLElement;resetKey:number;onReady:(ready:boolean)=>void}
@@ -29,17 +30,16 @@ function Preview({screen,host}:{screen:RoomScreen;host:HTMLElement}){
   <div className="room-screen-preview" style={{width:px,height:px*screen.h/screen.w}}><Slot host={host} className="slotfill"/></div>
  </Html>
 }
-function Screen({mesh,screen,reference,depth,panel,dispatch,onHover}:{mesh:THREE.Mesh;screen:RoomScreen;reference:THREE.Texture;depth:THREE.DataTexture;panel:PanelState;dispatch:Props['dispatch'];onHover:(id:string|null)=>void}){
+function Screen({mesh,screen,reference,depth,panel,dispatch,onHover,tableMap,sharp}:{sharp:THREE.CanvasTexture;tableMap:THREE.Texture;mesh:THREE.Mesh;screen:RoomScreen;reference:THREE.Texture;depth:THREE.DataTexture;panel:PanelState;dispatch:Props['dispatch'];onHover:(id:string|null)=>void}){
  const [hot,setHot]=useState(false)
- const sharp=useMemo(()=>chartTexture(ROOM_SCREENS.indexOf(screen)),[screen])
- const material=useMemo(()=>roomMaterial(reference,depth,'screen',sharp),[reference,depth,sharp])
+ const material=useMemo(()=>{const m=roomMaterial(reference,depth,'screen',sharp);m.uniforms.uDesk.value=screen.kind==='desk'?1:0;m.uniforms.uPhoto.value=tableMap;return m},[reference,depth,sharp,tableMap,screen.kind])
  const {camera,size}=useThree()
  useFrame(()=>{
    const projected=screen.w/(2*camera.position.distanceTo(new THREE.Vector3(...screen.center))*Math.tan(48*Math.PI/360)*(size.width/size.height))*size.width
-   material.uniforms.uDetail.value=screen.kind==='desk'?1:THREE.MathUtils.smoothstep(projected,screen.rect.w*1.5,screen.rect.w*2.5)
-   material.uniforms.uHot.value=hot?1:0
+   material.uniforms.uDetail.value=THREE.MathUtils.smoothstep(projected,screen.rect.w*1.5,screen.rect.w*2.5)
+   material.uniforms.uHot.value=hot||getHovered()===screen.id?1:0
  })
- useEffect(()=>()=>{material.dispose();sharp.dispose()},[material,sharp])
+ useEffect(()=>()=>{material.dispose()},[material])
  const enabled=panel.phase==='closed'||panel.phase==='focused'
  const hover=(on:boolean)=>{if(!enabled)on=false;setHot(on);onHover(on?screen.id:null);document.body.style.cursor=on?'pointer':''}
  const pick=(e:ThreeEvent<MouseEvent>)=>{e.stopPropagation();if(enabled&&e.delta<=6){hover(false);dispatch({type:'click',id:screen.id})}}
@@ -51,26 +51,33 @@ function Assets({panel,dispatch,host,onReady}:Props){
  const reference=useTexture('/room.jpg')
  const buffer=useLoader(THREE.FileLoader,'/models/reference-depth.bin',loader=>loader.setResponseType('arraybuffer')) as unknown as ArrayBuffer
  const depth=useMemo(()=>{const t=new THREE.DataTexture(new Float32Array(buffer),1280,720,THREE.RedFormat,THREE.FloatType);t.minFilter=THREE.NearestFilter;t.magFilter=THREE.NearestFilter;t.needsUpdate=true;return t},[buffer])
- const tableMap=useMemo(deskTexture,[])
- const wallMap=useMemo(()=>chartTexture(4),[])
+ const tableMap=useTexture('/textures/desk-reference-material.png')
+ tableMap.colorSpace=THREE.NoColorSpace;tableMap.anisotropy=16
+ const sharpMap=useMemo(()=>new Map(ROOM_SCREENS.map((s,i)=>[s.id,chartTexture(i)])),[])
+ const wallMap=sharpMap.get('s5')!
+ const wireMaterial=useMemo(()=>new THREE.MeshBasicMaterial({color:'#49baff',wireframe:true,transparent:true,opacity:.012,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-1}),[])
  const assets=useMemo(()=>{
    reference.colorSpace=THREE.SRGBColorSpace;reference.anisotropy=8
    const result:{mesh:THREE.Mesh;kind:string;material:THREE.ShaderMaterial}[]=[]
    scene.traverse(o=>{if(!(o instanceof THREE.Mesh))return;const geometry=o.geometry as Geo;if(!geometry.boundsTree)geometry.boundsTree=new MeshBVH(geometry,{maxLeafTris:12});const kind=o.userData.kind??'wall';result.push({mesh:o,kind,material:roomMaterial(reference,depth,kind,kind==='desk'?tableMap:kind==='wall'?wallMap:undefined)})})
    return result
  },[scene,reference,depth,tableMap,wallMap])
- useEffect(()=>()=>{for(const a of assets)a.material.dispose();tableMap.dispose();wallMap.dispose();depth.dispose();document.body.style.cursor=''},[assets,depth,tableMap,wallMap])
+ useEffect(()=>()=>{for(const a of assets)a.material.dispose();tableMap.dispose();for(const texture of sharpMap.values())texture.dispose();wireMaterial.dispose();depth.dispose();document.body.style.cursor=''},[assets,depth,tableMap,sharpMap,wireMaterial])
  useFrame(({clock})=>{
    for(const a of assets)a.material.uniforms.uTime.value=clock.getElapsedTime()
  })
  useEffect(()=>{if(panel.phase!=='closed'&&panel.phase!=='focused'){setHovered(null);document.body.style.cursor=''}},[panel.phase])
  useEffect(()=>{onReady(true)},[onReady])
+ const deskStation=(e:ThreeEvent<PointerEvent|MouseEvent>)=>panel.phase==='closed'?deskScreenAt(e.point):null
  const focused=panel.phase==='focused'&&panel.screen?screenById(panel.screen):undefined
  return <>
   {assets.map(({mesh,kind,material})=>{
     const s=mesh.name.startsWith('screen_')?screenById(mesh.name.slice(7)):undefined
-    return s?<Screen key={mesh.name} mesh={mesh} screen={s} reference={reference} depth={depth} panel={panel} dispatch={dispatch} onHover={setHovered}/>
-     :<mesh key={mesh.name} name={mesh.name} geometry={mesh.geometry} material={material} onClick={e=>e.stopPropagation()} onPointerOver={e=>e.stopPropagation()}/>
+    const frameScreen=mesh.name.startsWith('frame_')?screenById(mesh.name.slice(6)):undefined
+    return s?<Screen key={mesh.name} mesh={mesh} screen={s} reference={reference} depth={depth} panel={panel} dispatch={dispatch} onHover={setHovered} tableMap={tableMap} sharp={sharpMap.get(s.canonicalId??s.id)!}/>
+     :<group key={mesh.name}><mesh name={mesh.name} geometry={mesh.geometry} material={material} onClick={e=>{e.stopPropagation();const s=frameScreen&&panel.phase==='closed'?frameScreen:kind==='desk'?deskStation(e):null;if(s&&e.delta<=6){setHovered(null);dispatch({type:'click',id:s.id})}}}
+        onPointerMove={e=>{if(kind!=='desk'&&!frameScreen)return;e.stopPropagation();const s=frameScreen&&panel.phase==='closed'?frameScreen:deskStation(e);setHovered(s?.id??null);document.body.style.cursor=s?'pointer':''}}
+        onPointerOut={()=>{if(kind==='desk'||frameScreen){setHovered(null);document.body.style.cursor=''}}} onPointerOver={e=>e.stopPropagation()}/>{kind==='hologram'&&<mesh geometry={mesh.geometry} material={wireMaterial} raycast={()=>null}/>}</group>
   })}
   {focused&&<Preview screen={focused} host={host}/>}
 
@@ -88,7 +95,7 @@ export function RoomScene(props:Props){
   <LabelProjector hidden={props.panel.phase!=='closed'}/>
   <EffectComposer depthBuffer multisampling={0}>
    <Beam/>
-   {fx?<Bloom intensity={.25} luminanceThreshold={.8} mipmapBlur/>:<></>}
+   {fx?<Bloom intensity={.55} luminanceThreshold={.20} mipmapBlur/>:<></>}
   </EffectComposer>
  </Canvas>
 }
