@@ -37,3 +37,16 @@ isolated CEO review. Model sources and reproduction: [3D room](docs/reference-ro
 - `web3d/src/panels`: computer panel, backtest tab, options picker, canvas chart, replay bar.
 - `web3d/src/model`: pure logic with unit tests. `model/indicators.ts` is the (empty) indicator registry.
 - Specs and plans: `docs/superpowers/`.
+
+## Options execution research
+
+The three-month VWAP/EMA study has a separate quote-based options replay:
+
+    cd engine
+    .venv/bin/python -m backtestceo.options_backtest   # raw underlying + option trade-bar preparation/stress model
+    .venv/bin/python -m backtestceo.databento_quotes   # estimates selected NBBO requests; refuses estimate > $5
+    .venv/bin/python -m backtestceo.quote_backtest     # real one-second NBBO, simulated marketable fills
+
+Outputs are under `data/backtests/options-vwap-ema-3m-20260724-20261023/`. No orders are placed.
+Databento access uses an existing key; no subscription is created. See `docs/options-data-readiness.md`
+for entitlements, data limitations and the difference between trade-bar models and quote replay.

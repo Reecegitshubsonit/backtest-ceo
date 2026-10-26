@@ -32,3 +32,13 @@ Still required: no-lookahead joins to raw underlying prices, stale/invalid quote
 The user selected Databento for the next strategy backtest. The free date-level DoltHub importer, its tests and its downloaded sample files were removed at the user’s request. Existing Alpaca bulk downloads were preserved. The earlier Theta adapter is inactive and is not the selected data source.
 
 Before any Databento download, define the strategy universe, dates and required quote schema, verify account entitlements and estimate the request cost. Do not assume signup credits are available or authorize paid overages. No Databento backtest has run yet; strategy rules and account access are still required.
+
+## Real-quote replay added (supersedes the account-access finding above)
+
+The Scalp City Databento key line contained a valid 32-character key token followed by accidental pasted text. Reading the token alone authenticated successfully; the shared credential file was not edited and its contents were not displayed. Actual OPRA CBBO-1s records were retrieved and verified to contain timestamp, bid, ask and displayed sizes. No Theta subscription is needed for this run.
+
+`backtestceo.databento_quotes` estimates the selected contract/session requests before downloading. It refuses a new-download estimate above $5, within the user's $100 monthly budget, and reuses completed compressed archives with provenance manifests. The initial three-month selection was estimated at $1.174873; this is an estimate, not a verified invoice or credit balance. Transfers interrupted while switching to compression can incur additional small usage. The downloader does not create subscriptions or submit orders.
+
+`backtestceo.quote_backtest` replays sampled one-second historical NBBO, using receipt/snapshot time for information availability. It buys at ask plus adverse slippage and sells at bid minus slippage, requires displayed size, adds commissions, enforces cash and premium budgets, submits exits with latency, rejects invalid/stale markets, and refuses final equity if any exit remains unpriced. These remain simulated marketable fills, not proof of execution against the historical queue.
+
+The trade-bar simulation is retained separately as an explicitly modeled stress comparison; the quote replay is the preferred evidence. SPX is excluded unless a defensible underlying/contract-selection feed is established. No SPY quote is substituted for an SPX option fill.
