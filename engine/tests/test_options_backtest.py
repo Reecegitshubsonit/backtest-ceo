@@ -35,3 +35,21 @@ def test_atm_contract_selection_uses_only_expirations_on_or_after_session():
     groups={('2026-07-23','call'):[dict(symbol='expired',strike_price='100')],
             ('2026-07-24','call'):[dict(symbol='ATM',strike_price='100'),dict(symbol='OTM',strike_price='105')]}
     assert choose_contract(groups,'2026-07-24',1,101)=='ATM'
+
+
+def test_exact_one_dte_never_falls_back_to_same_day_or_next_week():
+    groups={('2026-07-23','call'):[dict(symbol='0dte',strike_price='100')],
+            ('2026-07-24','call'):[dict(symbol='1dte',strike_price='100')],
+            ('2026-07-27','call'):[dict(symbol='monday',strike_price='100')]}
+    assert choose_contract(groups,'2026-07-23',1,100,exact_dte=1)=='1dte'
+    assert choose_contract(groups,'2026-07-24',1,100,exact_dte=1) is None
+    assert choose_contract(groups,'2026-07-23',1,100)=='0dte'
+
+
+def test_matched_comparison_preserves_exit_events_but_only_common_entries():
+    from backtestceo.one_dte import matched_signals
+    original=[dict(t='t1',symbol='SPY',side=1,contract='0DTE'),
+              dict(t='t2',symbol='SPY',side=-1,contract='another'),
+              dict(t='t3',symbol='SPY',exit_side=-1)]
+    eligible=[dict(t='t1',symbol='SPY',side=1,contract='1DTE')]
+    assert matched_signals(original,eligible)==[original[0],original[2]]

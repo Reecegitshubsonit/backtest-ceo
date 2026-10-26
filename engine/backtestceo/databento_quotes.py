@@ -39,16 +39,25 @@ def params(job):
                 stype_in='raw_symbol',start=start.isoformat(),end=(start+timedelta(hours=6,minutes=30)).isoformat())
 
 
-def estimate(job,key):
-    path=DEST/(job['day']+'.csv.gz')
-    if path.exists() and path.with_suffix('.json').exists():return dict(**job,cost=0,cached=True)
+def cache_valid(job,dest):
+    path=dest/(job['day']+'.csv.gz');manifest=path.with_suffix('.json')
+    if not path.exists() or not manifest.exists():return False
+    info=json.loads(manifest.read_text())
+    present=set(info['parameters']['symbols'].split(','))
+    return (info['parameters']['schema']=='cbbo-1s' and set(occ(s) for s in job['symbols']).issubset(present)
+            and hashlib.sha256(path.read_bytes()).hexdigest()==info['sha256'])
+
+
+def estimate(job,key,dest=None):
+    path=(dest or DEST)/(job['day']+'.csv.gz')
+    if cache_valid(job,dest or DEST):return dict(**job,cost=0,cached=True)
     r=requests.get('https://hist.databento.com/v0/metadata.get_cost',auth=(key,''),params=params(job),timeout=90)
     if not r.ok:raise RuntimeError(f'Databento cost HTTP {r.status_code}; response omitted to protect credentials.')
     return dict(**job,cost=float(r.json()),cached=False)
 
 
-def fetch(job,key):
-    path=DEST/(job['day']+'.csv.gz')
+def fetch(job,key,dest=None):
+    path=(dest or DEST)/(job['day']+'.csv.gz')
     if job['cached']:return
     p=params(job);p.update(encoding='csv',compression='zstd',pretty_px='true',pretty_ts='true',map_symbols='true')
     r=requests.post('https://hist.databento.com/v0/timeseries.get_range',auth=(key,''),data=p,timeout=(15,300))
@@ -65,22 +74,24 @@ def fetch(job,key):
     print('Downloaded real quotes',job['day'],manifest['rows'],flush=True)
 
 
-def main():
-    DEST.mkdir(parents=True,exist_ok=True);key=api_key()
-    previous_path=DEST/'cost-plan.json'
+def download_jobs(selected_jobs,dest,estimate_cap=5):
+    dest.mkdir(parents=True,exist_ok=True);key=api_key()
+    previous_path=dest/'cost-plan.json'
     previous={j['day']:j for j in json.loads(previous_path.read_text())['jobs']} if previous_path.exists() else {}
     def plan_job(j):
-        path=DEST/(j['day']+'.csv.gz')
-        if path.exists() and path.with_suffix('.json').exists():return dict(**j,cost=0,cached=True)
+        if cache_valid(j,dest):return dict(**j,cost=0,cached=True)
         old=previous.get(j['day'])
         if old and old['symbols']==j['symbols'] and old['cost']>0:return dict(**j,cost=old['cost'],cached=False)
-        return estimate(j,key)
-    with ThreadPoolExecutor(max_workers=4) as pool:plan=list(pool.map(plan_job,jobs()))
+        return estimate(j,key,dest)
+    with ThreadPoolExecutor(max_workers=4) as pool:plan=list(pool.map(plan_job,selected_jobs))
     total=sum(j['cost'] for j in plan)
-    (DEST/'cost-plan.json').write_text(json.dumps(dict(estimated_new_download_usd=total,hard_estimate_cap_usd=5,jobs=plan),indent=2)+'\n')
+    (dest/'cost-plan.json').write_text(json.dumps(dict(estimated_new_download_usd=total,hard_estimate_cap_usd=estimate_cap,jobs=plan),indent=2)+'\n')
     print('Databento download estimate USD',round(total,6),'sessions',len(plan),flush=True)
     # Refuse new downloads above $5, leaving broad room under the user's $100/month budget.
-    if total>5:raise RuntimeError('Selected quote download estimate exceeds $5 run cap; no download started.')
-    with ThreadPoolExecutor(max_workers=8) as pool:list(pool.map(lambda j:fetch(j,key),plan))
+    if total>estimate_cap:raise RuntimeError('Selected quote download estimate exceeds run cap; no download started.')
+    with ThreadPoolExecutor(max_workers=8) as pool:list(pool.map(lambda j:fetch(j,key,dest),plan))
+
+def main():
+    download_jobs(jobs(),DEST)
 
 if __name__=='__main__':main()

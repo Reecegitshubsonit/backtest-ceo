@@ -13,8 +13,8 @@ def valid(q):
     return q is not None and all(math.isfinite(x) for x in q[:2]) and 0<q[0]<=q[1] and q[2]>0 and q[3]>0
 
 
-def read_day(day):
-    path=DEST/(day+'.csv.gz');manifest=json.loads(path.with_suffix('.json').read_text())
+def read_day(day,quote_dir=None):
+    path=(quote_dir or DEST)/(day+'.csv.gz');manifest=json.loads(path.with_suffix('.json').read_text())
     if hashlib.sha256(path.read_bytes()).hexdigest()!=manifest['sha256']:raise ValueError('Quote archive hash mismatch')
     events=defaultdict(list);invalid=0
     with gzip.open(path,'rt') as f:
@@ -29,7 +29,7 @@ def read_day(day):
     return events,invalid
 
 
-def run(signals,extra_slip=.01,latency=1):
+def run(signals,extra_slip=.01,latency=1,quote_dir=None):
     days=defaultdict(list)
     for e in signals:days[str(e['t'].date())].append(e)
     cash=CAPITAL;positions={};trades=[];daily=[];reject=Counter();peak=CAPITAL;dd=0;invalid=0;missing_marks=0
@@ -47,7 +47,7 @@ def run(signals,extra_slip=.01,latency=1):
         if not any('contract' in e for e in day_signals):
             daily.append(dict(day=day,net_pnl=0,losses=0,halted=False,unpriced_seconds=0))
             continue
-        quotes,invalid_count=read_day(day);invalid+=invalid_count
+        quotes,invalid_count=(read_day(day) if quote_dir is None else read_day(day,quote_dir));invalid+=invalid_count
         events=defaultdict(list)
         for e in day_signals:events[int(e['t'].timestamp())].append(e)
         begin=datetime.fromisoformat(day).replace(hour=9,minute=30,tzinfo=NY);start=int(begin.timestamp())

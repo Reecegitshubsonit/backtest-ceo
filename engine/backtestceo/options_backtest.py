@@ -68,14 +68,14 @@ def contract_map(symbol, api):
     return groups
 
 
-def choose_contract(groups,day,side,spot):
+def choose_contract(groups,day,side,spot,exact_dte=None):
     right='call' if side==1 else 'put'
-    exps=sorted(e for e,r in groups if r==right and 0<=(date.fromisoformat(e)-date.fromisoformat(day)).days<=7)
+    exps=sorted(e for e,r in groups if r==right and (0<=(date.fromisoformat(e)-date.fromisoformat(day)).days<=7 if exact_dte is None else (date.fromisoformat(e)-date.fromisoformat(day)).days==exact_dte))
     if not exps:return None
     return min(groups[(exps[0],right)],key=lambda r:(abs(float(r['strike_price'])-spot),float(r['strike_price'])))['symbol']
 
 
-def prepare(api):
+def prepare(api,exact_dte=None,fetch_option_bars=True):
     signals=[];tapes={};coverage={}
     for symbol in SYMBOLS:
         days=underlying(api,symbol);groups=contract_map(symbol,api);needed=defaultdict(set);counts=Counter()
@@ -89,7 +89,8 @@ def prepare(api):
                 # Signal is available at bar end, execution on following minute bar open.
                 if not b['signal'] or not b['ready'] or not b['vol_ok'] or b['trend']!=b['signal']:continue
                 if not ((585<=minute<690) or (840<=minute<930)):continue
-                c=choose_contract(groups,day,b['signal'],b['c'])
+                counts['qualifying_entry_signals']+=1
+                c=choose_contract(groups,day,b['signal'],b['c'],exact_dte)
                 if c is None:counts['no_contract']+=1;continue
                 time=b['t']+timedelta(minutes=3)
                 signals.append(dict(t=time,symbol=symbol,contract=c,side=b['signal']))
@@ -100,6 +101,9 @@ def prepare(api):
             for b in bars:
                 if b['signal']:signals.append(dict(t=b['t']+timedelta(minutes=3),symbol=symbol,exit_side=b['signal']))
         for day,contracts in sorted(needed.items()):
+            if not fetch_option_bars:
+                counts['contracts_requested']+=len(contracts)
+                continue
             lo=datetime.fromisoformat(day).replace(hour=9,minute=30,tzinfo=NY).astimezone(__import__('datetime').timezone.utc)
             hi=lo+timedelta(hours=6,minutes=30)
             path=CACHE/'options'/symbol/f'{day}.json'
