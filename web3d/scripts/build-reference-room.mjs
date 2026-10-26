@@ -89,13 +89,16 @@ const seatSpecs=[
  ['backtester',1.85,-2,2.06,-.70],['auditor',3.15,-1.3,1.90,-1.20],
  ['regime',-3.05,.7,1.35,1.76],['risk',3.05,.7,1.35,-1.76],
 ]
+// Near (foreground) chairs: the reference shows high executive backs reaching the sitter's
+// shoulders. The former 0.67 back scale cut them to waist height behind the regime/risk agents.
+const NEAR_BACK=+(process.env.NEAR_BACK??1.12)
 const seatLayout=new Map()
 for(const[id,initialX,initialZ,initialScale,yaw]of [...seatSpecs,['operator',0,4.3,1.95,Math.PI]]){
  const posed=poseBody(['regime','risk'].includes(id)?'near':['scanner','auditor'].includes(id)?'mid':id==='operator'?'operator':'far')
  const [x,z,scale]=id==='operator'?landmarkFit(posed,[initialX,initialZ,initialScale],yaw,[640,559,53]):['regime','risk'].includes(id)?landmarkFit(posed,[initialX,initialZ,initialScale],yaw,[id==='regime'?281:999,467,710],true):[initialX,initialZ,initialScale]
  const person=posed.clone().translate(0,0,-pelvis.z).scale(scale,scale,scale).rotateY(yaw).translate(x,0,z)
  const furniture=chair.clone(),cp=furniture.attributes.position
- for(let i=0;i<cp.count;i++){const y=cp.getY(i),near=['regime','risk'].includes(id);if(near&&y>.43){cp.setZ(i,(cp.getZ(i)+.3)*1.4-.3);if(y>.7&&cp.getZ(i)<-.15)cp.setX(i,cp.getX(i)*1.4)}cp.setY(i,y<=.62?y*.75:.465+(y-.62)*(near?.67:1.15))}
+ for(let i=0;i<cp.count;i++){const y=cp.getY(i),near=['regime','risk'].includes(id);if(near&&y>.43){cp.setZ(i,(cp.getZ(i)+.3)*1.4-.3);if(y>.7&&cp.getZ(i)<-.15)cp.setX(i,cp.getX(i)*1.4)}cp.setY(i,y<=.62?y*.75:.465+(y-.62)*(near?NEAR_BACK:1.15))}
  furniture.scale(scale,scale,scale).translate(0,0,.12*scale).rotateY(yaw).translate(x,0,z)
  if(id==='operator'){
   const p=furniture.attributes.position,seat=.465*scale
