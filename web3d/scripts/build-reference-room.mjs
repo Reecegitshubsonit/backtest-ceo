@@ -18,15 +18,16 @@ const neutral=new T.MeshBasicMaterial({color:'#0a1630'})
 
 function pack(j,bin){const s=Buffer.from(JSON.stringify(j));const a=Buffer.alloc(Math.ceil(s.length/4)*4,32);s.copy(a);const b=Buffer.alloc(Math.ceil(bin.length/4)*4);bin.copy(b);const h=Buffer.alloc(20);h.writeUInt32LE(0x46546c67,0);h.writeUInt32LE(2,4);h.writeUInt32LE(28+a.length+b.length,8);h.writeUInt32LE(a.length,12);h.writeUInt32LE(0x4e4f534a,16);const bh=Buffer.alloc(8);bh.writeUInt32LE(b.length);bh.writeUInt32LE(0x004e4942,4);return Buffer.concat([h,a,bh,b])}
 async function load(path){const b=fs.readFileSync(path);let n=b.readUInt32LE(12),j=JSON.parse(b.subarray(20,20+n)),bin=b.subarray(28+n);for(const m of j.meshes??[])for(const p of m.primitives)delete p.material;delete j.images;delete j.materials;delete j.textures;delete j.samplers;const clean=pack(j,bin);const g=await new GLTFLoader().parseAsync(clean.buffer.slice(clean.byteOffset,clean.byteOffset+clean.byteLength),'');g.scene.updateMatrixWorld(true);return g.scene}
-function flat(scene,filter=()=>true){const gs=[];scene.traverse(o=>{if(!o.isMesh||!filter(o))return;let g=o.geometry.clone();if(o.isSkinnedMesh){const p=g.attributes.position,v=new T.Vector3();for(let i=0;i<p.count;i++){v.fromBufferAttribute(o.geometry.attributes.position,i);o.applyBoneTransform(i,v);p.setXYZ(i,v.x,v.y,v.z)}}g.applyMatrix4(o.matrixWorld);for(const k of Object.keys(g.attributes))if(k!=='position'&&k!=='normal')g.deleteAttribute(k);g.clearGroups();if(!g.index)g=mergeVertices(g);g.computeVertexNormals();gs.push(g)});return mergeGeometries(gs)}
-function add(name,g,kind){g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();const m=new T.Mesh(g,neutral);m.name=name;m.userData={kind};room.add(m);meta.objects.push({name,kind,bounds:[g.boundingBox.min.toArray(),g.boundingBox.max.toArray()]});return m}
+function flat(scene,filter=()=>true,tagArms=false){const gs=[];scene.traverse(o=>{if(!o.isMesh||!filter(o))return;let g=o.geometry.clone();
+ if(tagArms){const tag=new Float32Array(g.attributes.position.count),si=g.attributes.skinIndex,sw=g.attributes.skinWeight;if(o.isSkinnedMesh&&si)for(let i=0;i<tag.length;i++){let best=0,w=-1;for(let k=0;k<4;k++){const wk=sw.getComponent(i,k);if(wk>w){w=wk;best=si.getComponent(i,k)}}tag[i]=/arm|wrist|hand|finger|thumb|metacarpal/i.test(o.skeleton.bones[best]?.name??'')?1:0}g.setAttribute('arm',new T.BufferAttribute(tag,1))}if(o.isSkinnedMesh){const p=g.attributes.position,v=new T.Vector3();for(let i=0;i<p.count;i++){v.fromBufferAttribute(o.geometry.attributes.position,i);o.applyBoneTransform(i,v);p.setXYZ(i,v.x,v.y,v.z)}}g.applyMatrix4(o.matrixWorld);for(const k of Object.keys(g.attributes))if(k!=='position'&&k!=='normal'&&k!=='arm')g.deleteAttribute(k);g.clearGroups();if(!g.index)g=mergeVertices(g);g.computeVertexNormals();gs.push(g)});return mergeGeometries(gs)}
+function add(name,g,kind){if(g.attributes.arm)g.deleteAttribute('arm');g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();const m=new T.Mesh(g,neutral);m.name=name;m.userData={kind};room.add(m);meta.objects.push({name,kind,bounds:[g.boundingBox.min.toArray(),g.boundingBox.max.toArray()]});return m}
 function project(p){const v=p.clone().project(camera);return [(v.x+1)*640,(1-v.y)*360,-p.clone().applyMatrix4(camera.matrixWorldInverse).z]}
 function ray(x,y){return new T.Ray(camera.position.clone(),new T.Vector3(x/640-1,1-y/360,.5).unproject(camera).sub(camera.position).normalize())}
 // Pose a detailed, rigged CC0 human. The anatomy is the imported mesh.
 const human=await load(source+'/human.glb')
 function aim(name,end,direction){const bone=human.getObjectByName(name),tip=human.getObjectByName(end);if(!bone||!tip)throw Error(name);const from=tip.getWorldPosition(new T.Vector3()).sub(bone.getWorldPosition(new T.Vector3())).normalize();const q=new T.Quaternion().setFromUnitVectors(from,direction.normalize());const world=bone.getWorldQuaternion(new T.Quaternion()).premultiply(q);bone.quaternion.copy(bone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(world));human.updateMatrixWorld(true)}
 const rest=[];human.traverse(o=>{if(o.isBone)rest.push([o,o.quaternion.clone(),o.position.clone()])})
-function poseBody(profile='far'){
+function poseBody(profile='far',lift=0,legDrop=0){
  for(const[b,q,p]of rest){b.quaternion.copy(q);b.position.copy(p)}human.updateMatrixWorld(true)
  if(profile==='near'){
   const spine=human.getObjectByName('spine05'),q=spine.getWorldQuaternion(new T.Quaternion()).premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1,0,0),-17*Math.PI/180))
@@ -34,10 +35,10 @@ function poseBody(profile='far'){
  }
  const arms=profile==='near'?[-.26,.03,-.08,.25]:profile==='operator'?[-.26,.03,-.1,.1]:profile==='mid'?[-.23,.08,.10,.25]:[-.18,.15,.11,.24]
  for(const[side,sign]of[['L',1],['R',-1]]){
-  aim('upperleg01'+side,'lowerleg01'+side,new T.Vector3(sign*.015,0,.40))
+  aim('upperleg01'+side,'lowerleg01'+side,new T.Vector3(sign*.015,-legDrop,.40))
   aim('lowerleg01'+side,'foot'+side,new T.Vector3(sign*.015,-.4,0))
-  aim('upperarm01'+side,'lowerarm01'+side,profile==='far'?new T.Vector3(sign===1?-.06:-.12,-.20,.14):new T.Vector3(sign*.04,arms[0],arms[1]))
-  aim('lowerarm01'+side,'wrist'+side,profile==='far'?new T.Vector3(sign===1?-.10:.13,.05,sign===1?.25:.22):new T.Vector3(-sign*.025,arms[2],arms[3]))
+  aim('upperarm01'+side,'lowerarm01'+side,profile==='far'?new T.Vector3(sign===1?-.06:-.12,-.20+lift,.14):new T.Vector3(sign*.04,arms[0]+lift,arms[1]))
+  aim('lowerarm01'+side,'wrist'+side,profile==='far'?new T.Vector3(sign===1?-.10:.13,.05+lift*.5,sign===1?.25:.22):new T.Vector3(-sign*.025,arms[2]+lift*.5,arms[3]))
  }
  for(const[side,sign]of[['L',1],['R',-1]]){
   const wrist=human.getObjectByName('wrist'+side)
@@ -55,7 +56,7 @@ function poseBody(profile='far'){
    bone.quaternion.copy(bone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(world));human.updateMatrixWorld(true)
   }
  }
- const g=flat(human,o=>o.name==='base'||o.name==='base_male_bodyhigh-poly');g.computeBoundingBox();g.translate(0,-g.boundingBox.min.y,profile==='near'?.20:0);return g
+ const g=flat(human,o=>o.name==='base'||o.name==='base_male_bodyhigh-poly',true);g.computeBoundingBox();g.translate(0,-g.boundingBox.min.y,profile==='near'?.20:0);return g
 }
 poseBody()
 const sitting=flat(human,o=>o.name==='base'||o.name==='base_male_bodyhigh-poly')
@@ -64,17 +65,17 @@ const chairScene=await load(source+'/chair.glb'),chair=flat(chairScene)
 // Shared world-space seating: every body keeps the source mesh's proportions.
 // The previous per-vertex image fitting flattened torsos and stretched chairs.
 // Fit rigid object transforms to measured reference landmarks, without warping any vertices.
-function landmarkFit(g,initial,yaw,target,feet=false){
+function landmarkFit(g,initial,yaw,target,feet=false,radius=false){
  g.computeBoundingBox();const p=g.attributes.position,points=[],head=[],high=g.boundingBox.max.y
- for(let i=0;i<p.count;i+=4){const v=new T.Vector3().fromBufferAttribute(p,i);v.z-=pelvis.z;v.applyAxisAngle(new T.Vector3(0,1,0),yaw);points.push(v);if(p.getY(i)>high-.24)head.push(v)}
+ for(let i=0;i<p.count;i+=4){const v=new T.Vector3().fromBufferAttribute(p,i);v.z-=pelvis.z;v.applyAxisAngle(new T.Vector3(0,1,0),yaw);points.push(v);if(p.getY(i)>high-(radius?.10:.24))head.push(v)}
  const metrics=([x,z,scale])=>{
   let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity
   for(const v of head){const[a,b]=project(v.clone().multiplyScalar(scale).add(new T.Vector3(x,0,z)));x0=Math.min(x0,a);x1=Math.max(x1,a);y0=Math.min(y0,b)}
   if(feet)for(const v of points)y1=Math.max(y1,project(v.clone().multiplyScalar(scale).add(new T.Vector3(x,0,z)))[1])
-  return[(x0+x1)/2,y0,feet?y1:x1-x0]
+  return[(x0+x1)/2,y0,radius?Math.hypot(x,z):feet?y1:x1-x0]
  }
  let params=[...initial]
- for(let iteration=0;iteration<12;iteration++){
+ for(let iteration=0;iteration<30;iteration++){
   const base=metrics(params),A=[[],[],[]]
   for(let j=0;j<3;j++){const next=[...params];next[j]+=.001;const m=metrics(next);for(let i=0;i<3;i++)A[i][j]=(m[i]-base[i])/.001}
   for(let i=0;i<3;i++)A[i][3]=target[i]-base[i]
@@ -82,7 +83,47 @@ function landmarkFit(g,initial,yaw,target,feet=false){
   params=params.map((v,i)=>v+T.MathUtils.clamp(A[i][3],i===2?-.3:-.7,i===2?.3:.7))
   params[2]=T.MathUtils.clamp(params[2],.6,3)
  }
- console.log('LANDMARK FIT',params,metrics(params));return params
+ if(!quietFit)console.log('LANDMARK FIT',params,metrics(params));return params
+}
+let quietFit=false
+function makeChair(id,x,z,scale,yaw){
+ const furniture=chair.clone(),cp=furniture.attributes.position
+ for(let i=0;i<cp.count;i++){const y=cp.getY(i),near=['regime','risk'].includes(id);if(near&&y>.43){cp.setZ(i,(cp.getZ(i)+.3)*1.4-.3);if(y>.7&&cp.getZ(i)<-.15)cp.setX(i,cp.getX(i)*1.4)}cp.setY(i,y<=.62?y*.75:.465+(y-.62)*(near?NEAR_BACK:1.15))}
+ return furniture.scale(scale,scale,scale).translate(0,0,.12*scale).rotateY(yaw).translate(x,0,z)
+}
+// Solid envelope of the command desk (radially symmetric): pedestal, bevelled underside, slab.
+// Measured from the reshaped table mesh: pedestal r<=.85 below y 1.15, underside rim 2.24 at
+// y 1.17 widening to 2.75 at 1.33, flat slab to the top at 1.60.
+function deskRadius(y){return y<0||y>1.62?0:y<1.14?.85:y<1.17?2.24:y<1.33?2.24+(y-1.17)/.16*.51:2.75}
+function deskClip(g,margin=.03){const p=g.attributes.position,arm=g.attributes.arm;let torso=0,arms=0,depth=0
+ for(let i=0;i<p.count;i++){const y=p.getY(i),r=Math.hypot(p.getX(i),p.getZ(i)),R=deskRadius(y-margin)+margin;if(R>0&&r<R&&y<1.6+margin){if(arm&&arm.getX(i)>.5)arms++;else torso++;depth=Math.max(depth,R-r)}}
+ return{torso,arms,depth}}
+function place(g,x,z,scale,yaw){return g.clone().translate(0,0,-pelvis.z).scale(scale,scale,scale).rotateY(yaw).translate(x,0,z)}
+// Seated agents were sitting inside the desk: the far pair 1.25 m deep (torso through the slab),
+// the mid pair with forearms 0.5 m into it, the near pair's knees through the bevel. Each figure
+// is now pushed back along its seat direction until the torso and its chair clear the desk edge,
+// its forearms are raised until they rest on the desk top, and its scale/position are re-solved
+// so the head still lands on the measured reference landmark.
+function seatClear(id,profile,initial,yaw,target,feet){
+ quietFit=true
+ const dir=Math.hypot(initial[0],initial[1]),ux=initial[0]/dir,uz=initial[1]/dir
+ let best=null
+ for(let push=0;push<=1.6;push+=.05){
+  let posed=poseBody(profile,0,0),fit
+  if(feet){fit=landmarkFit(posed,[initial[0]+ux*push,initial[1]+uz*push,initial[2]],yaw,target,true)}
+  else fit=landmarkFit(posed,[initial[0]+ux*push,initial[1]+uz*push,initial[2]],yaw,[target[0],target[1],dir+push],false,true)
+  let c=deskClip(place(posed,...fit,yaw))
+  if(feet&&c.torso){for(let drop=.02;drop<=.2&&c.torso;drop+=.02){posed=poseBody(profile,0,drop);fit=landmarkFit(posed,fit,yaw,target,true);c=deskClip(place(posed,...fit,yaw))}}
+  const cc=deskClip(makeChair(id,...fit,yaw));c.torso+=cc.torso+cc.arms
+  if(c.torso)continue
+  let lift=0
+  for(;lift<=.6&&c.arms;lift+=.02){posed=poseBody(profile,lift,0);fit=feet?landmarkFit(posed,fit,yaw,target,true):landmarkFit(posed,fit,yaw,[target[0],target[1],dir+push],false,true);c=deskClip(place(posed,...fit,yaw))}
+  best={posed,fit,push,lift,c};break
+ }
+ quietFit=false
+ if(!best)throw Error('No desk-clear seat for '+id)
+ best.fit=landmarkFit(best.posed,best.fit,yaw,[target[0],target[1],dir+best.push],false,true);best.c=deskClip(place(best.posed,...best.fit,yaw));console.log('SEAT',id,'push',best.push.toFixed(2),'lift',best.lift.toFixed(2),'fit',best.fit.map(v=>+v.toFixed(3)),'clip',best.c)
+ return best
 }
 const seatSpecs=[
  ['scanner',-3.15,-1.3,1.90,1.20],['strategist',-1.85,-2,2.06,.70],
@@ -94,12 +135,13 @@ const seatSpecs=[
 const NEAR_BACK=+(process.env.NEAR_BACK??1.12)
 const seatLayout=new Map()
 for(const[id,initialX,initialZ,initialScale,yaw]of [...seatSpecs,['operator',0,4.3,1.95,Math.PI]]){
- const posed=poseBody(['regime','risk'].includes(id)?'near':['scanner','auditor'].includes(id)?'mid':id==='operator'?'operator':'far')
- const [x,z,scale]=id==='operator'?landmarkFit(posed,[initialX,initialZ,initialScale],yaw,[640,559,53]):['regime','risk'].includes(id)?landmarkFit(posed,[initialX,initialZ,initialScale],yaw,[id==='regime'?281:999,467,710],true):[initialX,initialZ,initialScale]
- const person=posed.clone().translate(0,0,-pelvis.z).scale(scale,scale,scale).rotateY(yaw).translate(x,0,z)
- const furniture=chair.clone(),cp=furniture.attributes.position
- for(let i=0;i<cp.count;i++){const y=cp.getY(i),near=['regime','risk'].includes(id);if(near&&y>.43){cp.setZ(i,(cp.getZ(i)+.3)*1.4-.3);if(y>.7&&cp.getZ(i)<-.15)cp.setX(i,cp.getX(i)*1.4)}cp.setY(i,y<=.62?y*.75:.465+(y-.62)*(near?NEAR_BACK:1.15))}
- furniture.scale(scale,scale,scale).translate(0,0,.12*scale).rotateY(yaw).translate(x,0,z)
+ const profile=['regime','risk'].includes(id)?'near':['scanner','auditor'].includes(id)?'mid':id==='operator'?'operator':'far'
+ const HEAD={scanner:[357,338],auditor:[923,338],strategist:[486,310],backtester:[794,310],regime:[id==='regime'?281:999,467,710],risk:[999,467,710]}
+ let posed,x,z,scale
+ if(id==='operator'){posed=poseBody(profile);[x,z,scale]=landmarkFit(posed,[initialX,initialZ,initialScale],yaw,[640,559,53])}
+ else{const s=seatClear(id,profile,[initialX,initialZ,initialScale],yaw,HEAD[id],false);posed=s.posed;[x,z,scale]=s.fit}
+ const person=place(posed,x,z,scale,yaw)
+ const furniture=makeChair(id,x,z,scale,yaw)
  if(id==='operator'){
   const p=furniture.attributes.position,seat=.465*scale
   furniture.computeBoundingBox();const high=furniture.boundingBox.max.y
@@ -143,10 +185,27 @@ insert.computeBoundingBox();const ib=insert.boundingBox,ic=ib.getCenter(new T.Ve
 
 // Continuous architectural surfaces follow the reference's radial wall/floor/ceiling.
 // Tessellation is authored as a mesh asset; no rejected procedural furniture is used.
-function surface(name,fn,nu,nv,kind){const a=[],idx=[];for(let j=0;j<=nv;j++)for(let i=0;i<=nu;i++)a.push(...fn(i/nu,j/nv));for(let j=0;j<nv;j++)for(let i=0;i<nu;i++){const q=j*(nu+1)+i;idx.push(q,q+nu+1,q+1,q+1,q+nu+1,q+nu+2)}const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(a,3));g.setIndex(idx);return add(name,g,kind)}
+function surface(name,fn,nu,nv,kind){const a=[],idx=[];for(let j=0;j<=nv;j++)for(let i=0;i<=nu;i++)a.push(...fn(i/nu,j/nv));for(let j=0;j<nv;j++)for(let i=0;i<nu;i++){const q=j*(nu+1)+i;idx.push(q,q+nu+1,q+1,q+1,q+nu+1,q+nu+2)}const uv=[];for(let j=0;j<=nv;j++)for(let i=0;i<=nu;i++)uv.push(i/nu,j/nv);const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(a,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(idx);return add(name,g,kind)}
 surface('curved_wall',(u,v)=>{let a=u*Math.PI*2,r=8.35+.10*Math.cos(v*Math.PI*8);return[Math.sin(a)*r,v*7.2,Math.cos(a)*r]},256,44,'wall')
 surface('floor',(u,v)=>{let a=u*Math.PI*2,r=v*8.45;return[Math.sin(a)*r,-.015,Math.cos(a)*r]},256,48,'floor')
 surface('ceiling',(u,v)=>{let a=u*Math.PI*2,r=v*8.45;return[Math.sin(a)*r,7.2-.2*Math.sin(v*Math.PI),Math.cos(a)*r]},256,32,'ceiling')
+// Background architecture. The monitor banks floated on a bare wall: no counter under the tilted
+// lower consoles (s3/s4/s16/s17 bottoms at y~1.0, r~7.7) and two 36-degree bare side bays
+// (72-108 and 252-288 degrees). A continuous console ledge now carries the tilted displays, and
+// structural pillars with edge light strips divide the bank gaps and the side bays.
+{
+ const ledgeTop=.92,inner=7.42,outer=8.30
+ surface('wall_ledge_top',(u,v)=>{const a=u*Math.PI*2,r=inner+(outer-inner)*v;return[Math.sin(a)*r,ledgeTop,Math.cos(a)*r]},256,2,'trim')
+ surface('wall_ledge_front',(u,v)=>{const a=u*Math.PI*2,r=inner-.04*Math.sin(v*Math.PI);return[Math.sin(a)*r,v*ledgeTop,Math.cos(a)*r]},256,6,'trim')
+ const pillarAngles=[137.5,222.5,-42.5,42.5,76,104,256,284]
+ // louvred service panels fill the side bays between their pillars
+ for(const [from,to] of [[77.5,102.5],[257.5,282.5]])surface('bay_panel_'+from,(u,v)=>{const a=(from+(to-from)*u)*Math.PI/180,r=8.16;return[Math.sin(a)*r,1.25+v*4.9,Math.cos(a)*r]},48,8,'trim')
+ for(const deg of pillarAngles){
+  const a=deg*Math.PI/180,g=new T.BoxGeometry(.36,6.95,.30)
+  g.translate(0,6.95/2+.0,-8.12).rotateY(a+Math.PI)
+  add('pillar_'+String(deg).replace('-','m').replace('.','_'),g,'trim')
+ }
+}
 
 const config=fs.readFileSync(root+'/web3d/src/config/imageRoom.ts','utf8')
 function readArray(name){return Function('return '+config.match(new RegExp('export const '+name+': WallScreen\\[\\] = (\\[[\\s\\S]*?\\n\\])'))[1])()}

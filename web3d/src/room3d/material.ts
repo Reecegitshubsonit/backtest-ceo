@@ -110,16 +110,33 @@ void main(){
   base=(vec3(.0012,.0022,.006)*relief+vec3(.004,.028,.10)*pow(fres,3.)+glow*.035)*fabric;
  }
  if(uKind>9.5&&uKind<10.5){base=vec3(.0006,.0010,.0022)*relief+vec3(.003,.02,.07)*pow(fres,2.5);}
- if(uKind>10.5){
-  base=vec3(.0009,.0018,.0055)*relief+vec3(.004,.012,.036)*pow(fres,2.)+glow*.04;
+ if(uKind>10.5&&uKind<11.5){
+  // monitor housings: satin dark shell, catching the room's blue haze on its edges
+  base=vec3(.0016,.003,.009)*relief+vec3(.006,.02,.06)*pow(fres,2.)+glow*.05;
+ }
+ if(uKind>11.5){
+  // architecture trim: pillars with edge light strips, the wall console ledge with a lit lip
+  vec3 radial=normalize(vec3(vWorld.x,0.,vWorld.z));
+  float front=step(.6,-dot(n,radial));
+  float edge=1.-smoothstep(.0,.06,min(vUv.x,1.-vUv.x));
+  base=vec3(.0012,.0026,.0085)*relief+vec3(.003,.009,.028)*pow(fres,2.)+glow*.03;
+  base+=vec3(.03,.20,.55)*edge*front*step(.3,vWorld.y)*step(vWorld.y,6.7)*(r>7.6?1.:0.);
+  if(r>7.6&&abs(n.y)<.5){
+   base+=vec3(.002,.006,.018)*line(fract(vWorld.y*2.5)-.5,.03);
+   base+=vec3(.10,.03,.24)*(line(vWorld.y-1.25,.006)+line(vWorld.y-6.15,.006))*step(8.1,r);
+  }
+  if(r<7.6||vWorld.y<.95){
+   base+=vec3(.03,.22,.6)*line(r-7.45,.008)*step(.5,n.y)+vec3(.16,.04,.36)*line(vWorld.y-.62,.008)*step(.5,front)*step(r,7.6);
+  }
  }
  vec3 color=base;
  if(uKind>5.5&&uKind<6.5){
   vec3 chart=lin(texture2D(uSharp,vUv).rgb);
   // distant wall displays sit back in the dark like the reference; full contrast when focused
-  color=chart*mix(.24,1.,uDetail)*vec3(.7,.82,1.15);
+  color=chart*mix(.42,1.,uDetail)*vec3(.8,.9,1.1);
   if(uDesk>.5)color=mix(lin(texture2D(uPhoto,deskUV(vWorld)).rgb)*.35,chart,uDetail);
   float edge=min(min(vUv.x,1.-vUv.x),min(vUv.y,1.-vUv.y));
+  if(uDesk<.5)color+=vec3(.02,.09,.24)*(1.-smoothstep(.002,.008,edge));
   color+=uHot*(vec3(.015,.05,.1)+vec3(.08,.32,.65)*(1.-smoothstep(.005,.04,edge)));
  }
  if(alpha<.015)discard;
@@ -127,7 +144,7 @@ void main(){
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
 }`
-export const KIND: Record<string,number> = {wall:0,floor:7,ceiling:8,desk:1,chair:2,hologram:3,operator:4,ceo:5,monitor:11,screen:6,cloth:9,hair:10}
+export const KIND: Record<string,number> = {wall:0,floor:7,ceiling:8,desk:1,chair:2,hologram:3,operator:4,ceo:5,monitor:11,screen:6,cloth:9,hair:10,trim:12}
 const blank=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1)
 blank.needsUpdate=true
 export function roomMaterial(kind: string,sharp?: THREE.Texture) {
