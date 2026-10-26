@@ -53,3 +53,10 @@ def test_matched_comparison_preserves_exit_events_but_only_common_entries():
               dict(t='t3',symbol='SPY',exit_side=-1)]
     eligible=[dict(t='t1',symbol='SPY',side=1,contract='1DTE')]
     assert matched_signals(original,eligible)==[original[0],original[2]]
+
+
+def test_exact_zero_dte_skips_later_expiry_instead_of_falling_back():
+    groups={('2026-07-24','call'):[dict(symbol='same-day',strike_price='100')],
+            ('2026-07-27','put'):[dict(symbol='later-put',strike_price='100')]}
+    assert choose_contract(groups,'2026-07-24',1,100,exact_dte=0)=='same-day'
+    assert choose_contract(groups,'2026-07-24',-1,100,exact_dte=0) is None
