@@ -1,0 +1,47 @@
+# Reference-fitted 3D room
+
+The default app now loads a real 72-object GLB, about 1.17 million triangles. Human figures,
+chairs, desk and monitor housings are detailed imported meshes; they are not the rejected
+primitive/point-cloud scene. The custom continuous room shell follows the curved architecture.
+The original cleaned image supplies appearance from the calibrated home camera. Real depth,
+posed anatomy and furniture volume support orbit. A depth atlas and semantic masks avoid
+painting people onto the back wall when the camera moves. Unseen surfaces are inferred;
+one reference cannot establish their exact appearance. Close screens use 2048px chart textures
+and live HTML panels, rather than magnifying the 1280px source image.
+
+## Asset provenance
+
+All downloaded base assets were offered under CC0 on their source pages at retrieval.
+They were adapted substantially in scale, pose, silhouette and material.
+
+- [VECTOR ergonomic office chair](https://www.innerscene.com/library/vector-ergonomic-office-chair-ae299d68)
+  — `chair.glb`, seven instances, seat alignment and reference silhouette fitting.
+- [Male base mesh, rigged A-pose](https://www.innerscene.com/library/male-base-mesh-3d-person-rigged-a-pose-380e6d89)
+  — `human.glb`, bone-posed and baked for the seated agents and operator.
+- [Fire bowl outdoor table](https://www.innerscene.com/library/fire-bowl-table-outdoor-fire-table-f02ae536)
+  — `table.glb`, reshaped into the recessed round command desk.
+- [HALO 120 round dining table](https://www.innerscene.com/library/halo-120-round-dining-table-d1ecf403)
+  — `projector-top.glb`, solid circular top used as the central projector insert.
+- [Travel View portable monitor](https://www.innerscene.com/library/travel-view-portable-monitor-85a9906d)
+  — `monitor.glb`, 26 fitted monitor enclosures and whole-face screens.
+- CEO: Blender Studio CC0 Human Base Meshes; see [CEO provenance](ceo-model-source.md).
+- Reference artwork: project-supplied `docs/reference/grok-room-clean.jpg` / `web3d/public/room.jpg`.
+
+## Reproduction
+
+With the source GLBs named as above in a directory, run from `web3d`:
+
+```sh
+node scripts/build-reference-room.mjs /path/to/source-glbs
+```
+
+The source files can be obtained from each Innerscene page's download link
+(`/api/library/<same-slug>/download`). The existing `public/models/ceo-standing.glb` is also
+required. The script exports `reference-room.glb`, `reference-depth.bin`, `layout.json` and
+updates `src/config/roomScreens.ts` / `roomObjects.ts`. Pass an optional second directory
+argument to export the large assets elsewhere. No local GPU or cloud image-to-3D service is needed.
+
+`imageRoom.ts` retains the canonical ids and assignments. Geometry tests check all 26 faces,
+real figure/furniture volume, ground contact, camera bounds, screen framing and panel transitions.
+The home camera is `[0,3.844,7.04]`, target `[0,3.3,0]`, FOV 48, with calibrated vertical
+view offset. The 16:9 viewport preserves the supplied composition at other window sizes.
