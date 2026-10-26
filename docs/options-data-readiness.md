@@ -26,3 +26,19 @@ Official Theta v3 entitlement matrix lists Standard options tick data from 2016-
 ## Realism requirements
 
 Still required: no-lookahead joins to raw underlying prices, stale/invalid quote rejection, conservative ask-buy/bid-sell baseline, size limits, contract multipliers, fees, latency/slippage, multi-leg assumptions, partial fills, corporate actions, assignment/exercise, settlement, margin and out-of-sample validation. NBBO does not guarantee a fill or establish queue position. Bar-based results remain exploratory; quote collection alone does not make the current app a validated backtester.
+
+## Free alternative implemented (2026-10-26)
+
+`python -m backtestceo.free_options --symbol SPY --date 2026-10-23` fetches the public `post-no-preference/options` DoltHub table without credentials. The source has actual bid/ask columns and Greeks, but only a date (no exact observation timestamp, no sizes, volume or open interest). Archive metadata explicitly forbids using these records as an intraday execution tape, conservatively makes snapshots available the following session, records chain limitations and a SHA-256, and preserves upstream README/license documents when provided. No-source dates remain missing, not completed header-only files. This is an additional dataset, not a replacement for the ongoing Alpaca download.
+
+This is a viable free research input for selected daily strategies, subject to coverage and source-quality validation. It is not proof of historical NBBO or executable size. No quote should be fabricated or filled forward as a fresh market. Six SPY/QQQ date requests for October 21–23 are the initial validation batch, not a full-market backfill.
+
+For intraday validation without a Theta subscription, Databento officially offers eligible new teams $125 in historical-data credits, expiring after six months. A verified cost estimate and credit balance must precede any request; do not assume all years/all contracts fit the credit or allow paid overages. No account was created and no Databento data was fetched in this session.
+https://databento.com/docs/faqs/usage-pricing-and-data-credits
+
+OptionsDX also advertises zero-cost variants and provides timestamp, bid/ask and size fields, but not every year/frequency is free. Its public sample download returned HTTP 406 in our direct request, so no OptionsDX data was imported. Its product catalogue must not be described as a verified unrestricted free intraday archive.
+https://www.optionsdx.com/shop/
+https://www.optionsdx.com/option-chain-field-definitions/
+
+Alpaca's indicative quotes are modified derivatives, not actual OPRA quotes. Recording them going forward must retain that designation; it does not solve missing real historical NBBO.
+https://docs.alpaca.markets/us/docs/historical-option-data
