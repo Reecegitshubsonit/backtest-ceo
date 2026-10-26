@@ -51,3 +51,25 @@ because the room is a 1280x720 image.
 - Revised `?review=ceo`: portrait detail comparison by default, reference-fitted GLB silhouette, original cleaned artwork projected as front UV texture, inferred sides/back with cyan rim/network shading. Normal blending and depth writes replace additive anatomy that exposed eye sockets and mouth edges.
 - `web3d/scripts/fit-ceo-reference.mjs` is the second reproducible export stage; see `docs/ceo-model-source.md`. Original front appearance is preserved with image-based texturing; unseen-side likeness remains inferred. This is not a complete image-to-3D reconstruction.
 - Still only the CEO. Projector beam, room, table, chairs and screens have not been rebuilt. User approval has not yet been received.
+
+## Full 3D room implemented (2026-10-26; supersedes the review-only status above)
+- The user explicitly requested completing the whole room without further interim responses/checkpoints.
+- Default route now renders `src/room3d/FullRoomApp.tsx`, a complete 72-object GLB scene,
+  including CEO, six posed agents, seven real office chairs, operator silhouette, recessed
+  round command desk/projector insert, architectural shell and all 26 physical screens.
+  None of the rejected `src/scene` furniture or particle anatomy is used.
+- Reference-camera projection preserves the supplied artwork at home. Away from home,
+  depth/semantic masks remove projected foreground ghosts; physical mesh materials,
+  high-resolution chart textures and desk texture fill unseen areas. This is a reference-
+  fitted reconstruction, not recovered ground-truth geometry of the unseen room.
+- Full 360 orbit has floor/ceiling/wall camera bounds; reset returns to the calibrated view.
+  Wall 1/5/10 and all six agent console mappings retain their canonical ids. Entire screen
+  faces receive clicks; labels/glow appear on hover. The Screens menu also exposes all 26.
+- Screen flight squares the camera to the face, shows sharp live DOM at approximately 1:1,
+  expands by moving the same DOM host, and retains input state on Esc back to focused mode.
+- `?room=image` is the former flat room; `?review=ceo` remains for historical comparison.
+- Tests: engine 25, frontend 45, TypeScript and production build pass.
+- Firefox headless was also checked: full WebGL scene loaded, 26 screen entries and sharp
+  live focused BACKTESTS DOM verified; screenshot inspected. Expand/return retained a changed
+  symbol in the in-app browser. A regression test checks desk faces are above the furniture.
+- Sources/build recipe/limitations: `docs/reference-room-3d.md`.
