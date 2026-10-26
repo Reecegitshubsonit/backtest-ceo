@@ -22,43 +22,41 @@ function flat(scene,filter=()=>true){const gs=[];scene.traverse(o=>{if(!o.isMesh
 function add(name,g,kind){g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();const m=new T.Mesh(g,neutral);m.name=name;m.userData={kind};room.add(m);meta.objects.push({name,kind,bounds:[g.boundingBox.min.toArray(),g.boundingBox.max.toArray()]});return m}
 function project(p){const v=p.clone().project(camera);return [(v.x+1)*640,(1-v.y)*360,-p.clone().applyMatrix4(camera.matrixWorldInverse).z]}
 function ray(x,y){return new T.Ray(camera.position.clone(),new T.Vector3(x/640-1,1-y/360,.5).unproject(camera).sub(camera.position).normalize())}
-function atZ(x,y,z){return ray(x,y).intersectPlane(new T.Plane(new T.Vector3(0,0,1),-z),new T.Vector3())}
-function fit(g,rect,z){const p=g.attributes.position;g.computeBoundingBox();const b=g.boundingBox,centre=b.getCenter(new T.Vector3());g.translate(-centre.x,-centre.y,-centre.z);const v=new T.Vector3(),samples=[];for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i);v.z+=z;samples.push(project(v))}let x0=Math.min(...samples.map(x=>x[0])),x1=Math.max(...samples.map(x=>x[0])),y0=Math.min(...samples.map(x=>x[1])),y1=Math.max(...samples.map(x=>x[1]));const[x,y,w,h]=rect;for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i);v.z+=z;const[a,b]=project(v);const tx=x+(a-x0)/(x1-x0)*w,ty=y+(b-y0)/(y1-y0)*h;const mapped=atZ(tx,ty,v.z);p.setXYZ(i,mapped.x,mapped.y,mapped.z)}g.userData.fit={centre:centre.toArray(),x0,x1,y0,y1,rect,z};return g}
-function fitPoint(g,p){const f=g.userData.fit;let v=p.clone().sub(new T.Vector3(...f.centre));v.z+=f.z;const[a,b]=project(v),[x,y,w,h]=f.rect;return atZ(x+(a-f.x0)/(f.x1-f.x0)*w,y+(b-f.y0)/(f.y1-f.y0)*h,v.z)}
-function ground(g){g.computeBoundingBox();const lo=g.boundingBox.min.y,hi=g.boundingBox.max.y,p=g.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,(p.getY(i)-lo)*hi/(hi-lo));return y=>(y-lo)*hi/(hi-lo)}
-function shiftHead(g,dx,top){const p=g.attributes.position;for(let i=0;i<p.count;i++){const v=new T.Vector3().fromBufferAttribute(p,i),[x,y]=project(v);const k=1-T.MathUtils.smoothstep(y,top+30,top+110);const q=atZ(x+dx*k,y,v.z);p.setXYZ(i,q.x,q.y,q.z)}}
-function rot(g,y){g.rotateY(y);return g}
-
 // Pose a detailed, rigged CC0 human. The anatomy is the imported mesh.
 const human=await load(source+'/human.glb')
 function aim(name,end,direction){const bone=human.getObjectByName(name),tip=human.getObjectByName(end);if(!bone||!tip)throw Error(name);const from=tip.getWorldPosition(new T.Vector3()).sub(bone.getWorldPosition(new T.Vector3())).normalize();const q=new T.Quaternion().setFromUnitVectors(from,direction.normalize());const world=bone.getWorldQuaternion(new T.Quaternion()).premultiply(q);bone.quaternion.copy(bone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(world));human.updateMatrixWorld(true)}
 for(const[side,s]of[['L',1],['R',-1]]){
   aim('upperleg01'+side,'lowerleg01'+side,new T.Vector3(s*.015,0,.40))
   aim('lowerleg01'+side,'foot'+side,new T.Vector3(s*.015,-.4,0))
-  aim('upperarm01'+side,'lowerarm01'+side,new T.Vector3(s*.04,-.22,.09))
+  aim('upperarm01'+side,'lowerarm01'+side,new T.Vector3(s*.04,-.12,.20))
   aim('lowerarm01'+side,'wrist'+side,new T.Vector3(-s*.025,0,.25))
+}
+// Turn the palms toward the desktop without changing hand/arm proportions.
+for(const[side,sign]of[['L',1],['R',-1]]){
+ const wrist=human.getObjectByName('wrist'+side)
+ const width=human.getObjectByName('finger2-1'+side).getWorldPosition(new T.Vector3()).sub(human.getObjectByName('finger5-1'+side).getWorldPosition(new T.Vector3())).normalize()
+ const world=wrist.getWorldQuaternion(new T.Quaternion()).premultiply(new T.Quaternion().setFromUnitVectors(width,new T.Vector3(-sign,0,0)))
+ wrist.quaternion.copy(wrist.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(world));human.updateMatrixWorld(true)
 }
 const sitting=flat(human,o=>o.name==='base'||o.name==='base_male_bodyhigh-poly')
 sitting.computeBoundingBox();const sitBottom=sitting.boundingBox.min.y;const pelvis=human.getObjectByName('root').getWorldPosition(new T.Vector3());pelvis.y-=sitBottom;sitting.translate(0,-sitBottom,0)
 const chairScene=await load(source+'/chair.glb'),chair=flat(chairScene)
-const seatSpecs=[
- ['scanner',[320,338,114,225],-1.3,1.20,[302,370,120,195]],
- ['strategist',[451,308,103,207],-2.0,.70,[436,345,113,183]],
- ['backtester',[726,308,103,207],-2.0,-.70,[731,345,113,183]],
- ['auditor',[846,338,114,225],-1.3,-1.20,[858,370,120,195]],
- ['regime',[240,467,191,245],1.0,1.40,[198,535,185,170]],
- ['risk',[849,467,191,245],1.0,-1.40,[887,535,185,170]],
-]
-for(const[id,r,z,yaw,cr]of [...seatSpecs,['operator',[527,550,226,550],4.25,Math.PI,[511,685,258,250]]]){
- const person=fit(rot(sitting.clone(),yaw),r,z),furniture=fit(rot(chair.clone(),yaw),cr,z-.06)
- const hip=fitPoint(person,pelvis.clone().applyAxisAngle(new T.Vector3(0,1,0),yaw))
- const seat=fitPoint(furniture,new T.Vector3(0,.51,.02).applyAxisAngle(new T.Vector3(0,1,0),yaw))
- hip.y=ground(person)(hip.y);seat.y=ground(furniture)(seat.y)
- const delta=hip.y-.04-seat.y
- furniture.computeBoundingBox();const hi=furniture.boundingBox.max.y,p=furniture.attributes.position
- for(let i=0;i<p.count;i++){const y=p.getY(i);const weight=y<seat.y?y/seat.y:(hi-y)/(hi-seat.y);p.setY(i,y+delta*Math.max(0,weight))}
- if(id==='scanner')shiftHead(person,10,r[1]);if(id==='auditor')shiftHead(person,-14,r[1]);
- add(id==='operator'?'operator':'agent_'+id,person,id==='operator'?'operator':'hologram');add('chair_'+id,furniture,'chair')
+// Shared world-space seating: every body keeps the source mesh's proportions.
+// The previous per-vertex image fitting flattened torsos and stretched chairs.
+const seatSpecs=[['scanner',-95],['strategist',-140],['backtester',140],['auditor',95],['regime',-45],['risk',45]]
+const seatLayout=new Map()
+for(const[id,degrees]of [...seatSpecs,['operator',0]]){
+ const theta=degrees*Math.PI/180,radius=id==='operator'?4.30:3.65
+ const x=Math.sin(theta)*radius,z=Math.cos(theta)*radius,yaw=theta+Math.PI
+ const scale=id==='operator'?1.95:1.9
+ const person=sitting.clone().translate(0,0,-pelvis.z).scale(scale,scale,scale).rotateY(yaw).translate(x,0,z)
+ // Preserve chair shape in plan; align the cushion to the posed pelvis with one vertical scale.
+ const furniture=chair.clone(),cp=furniture.attributes.position
+ for(let i=0;i<cp.count;i++){const y=cp.getY(i);cp.setY(i,y<=.62?y*.75:.465+(y-.62)*1.35)}
+ furniture.scale(scale,scale,scale).translate(0,0,.12*scale).rotateY(yaw).translate(x,0,z)
+ add(id==='operator'?'operator':'agent_'+id,person,id==='operator'?'operator':'hologram')
+ add('chair_'+id,furniture,'chair')
+ seatLayout.set(id,{theta,x,z,scale})
 }
 const ceo=flat(await load(root+'/web3d/public/models/ceo-standing.glb'))
 ceo.scale(3.2,3.2,3.2);ceo.translate(0,1.7,0);add('ceo',ceo,'ceo')
@@ -66,11 +64,11 @@ ceo.scale(3.2,3.2,3.2);ceo.translate(0,1.7,0);add('ceo',ceo,'ceo')
 // Adapt the recessed, bevelled CC0 table rather than rebuilding it from cylinders.
 const tableScene=await load(source+'/table.glb')
 const table=flat(tableScene,o=>/concrete|bowl/i.test(o.name))
-const tp=table.attributes.position
-for(let i=0;i<tp.count;i++){const x=tp.getX(i),y=tp.getY(i),z=tp.getZ(i),r=Math.hypot(x,z);const rr=r<.235?r*6.38:1.5+(r-.235)*1.3/.34;const k=r?rr/r:1;const inner=1-T.MathUtils.smoothstep(r,.235,.36);let Y;if(y>.30)Y=1.25+(y-.40)*1.1+inner*.47;else Y=y*3.2;tp.setXYZ(i,x*k,Y,z*k-.7*(1-inner))}
+// Uniform radial scaling keeps a genuinely circular, bevelled table.
+table.scale(5.5,3.6,5.5)
 add('command_desk',table,'desk')
 const insert=flat(await load(source+'/projector-top.glb'),o=>o.name.startsWith('Solid_oak_circular_dining_top'))
-insert.computeBoundingBox();const ib=insert.boundingBox,ic=ib.getCenter(new T.Vector3()),isz=ib.getSize(new T.Vector3());insert.translate(-ic.x,-ic.y,-ic.z);insert.scale(3.0/isz.x,.045/isz.y,3.0/isz.z);insert.translate(0,1.705,0);add('projector_inset',insert,'desk')
+insert.computeBoundingBox();const ib=insert.boundingBox,ic=ib.getCenter(new T.Vector3()),isz=ib.getSize(new T.Vector3());insert.translate(-ic.x,-ic.y,-ic.z);insert.scale(2.7/isz.x,.045/isz.y,2.7/isz.z);insert.translate(0,1.50,0);add('projector_inset',insert,'desk')
 
 // Continuous architectural surfaces follow the reference's radial wall/floor/ceiling.
 // Tessellation is authored as a mesh asset; no rejected procedural furniture is used.
@@ -89,11 +87,17 @@ enclosure.computeBoundingBox();glass.computeBoundingBox()
 const glassBox=glass.boundingBox,glassCenter=glassBox.getCenter(new T.Vector3()),glassSize=glassBox.getSize(new T.Vector3())
 for(const s of screenSource){const r=s.rect,cx=r.x+r.w/2,cy=r.y+r.h/2;let centre,normal;
  if(s.kind==='wall'){const rr=ray(cx,cy),o=rr.origin,d=rr.direction;const A=d.x*d.x+d.z*d.z,B=2*(o.x*d.x+o.z*d.z),C=o.x*o.x+o.z*o.z-7.95*7.95;const t=(-B+Math.sqrt(B*B-4*A*C))/(2*A);centre=rr.at(t,new T.Vector3());normal=new T.Vector3(-centre.x,0,-centre.z).normalize();if(cy>300)normal.y=.48;normal.normalize()}
- else {centre=ray(cx,cy).intersectPlane(new T.Plane(new T.Vector3(0,1,0),-1.48),new T.Vector3());normal=new T.Vector3(0,1,0)}
- const right=s.kind==='desk'?new T.Vector3(1,0,0):new T.Vector3(0,1,0).cross(normal).normalize(),up=normal.clone().cross(right).normalize();
+ else {
+  const theta=s.seat?seatLayout.get(s.seat).theta:({d7:-20,d8:0,d9:20}[s.id]*Math.PI/180)
+  const radius=s.seat?2.48:2.64
+  centre=new T.Vector3(Math.sin(theta)*radius,1.535,Math.cos(theta)*radius)
+  normal=new T.Vector3(0,1,0)
+ }
+ const theta=s.kind==='desk'?Math.atan2(centre.x,centre.z):0
+ const right=s.kind==='desk'?new T.Vector3(Math.cos(theta),0,-Math.sin(theta)):new T.Vector3(0,1,0).cross(normal).normalize(),up=normal.clone().cross(right).normalize()
  const plane=new T.Plane().setFromNormalAndCoplanarPoint(normal,centre)
  const lr=ray(r.x,cy).intersectPlane(plane,new T.Vector3()),rr=ray(r.x+r.w,cy).intersectPlane(plane,new T.Vector3());const tr=ray(cx,r.y).intersectPlane(plane,new T.Vector3()),br=ray(cx,r.y+r.h).intersectPlane(plane,new T.Vector3())
- const w=Math.abs(rr.clone().sub(lr).dot(right)),h=Math.abs(tr.clone().sub(br).dot(up));
+ const w=s.kind==='desk'?(s.seat?1.10:.76):Math.abs(rr.clone().sub(lr).dot(right)),h=s.kind==='desk'?(s.seat?.78:.58):Math.abs(tr.clone().sub(br).dot(up))
  const rotation=new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(right,up,normal))
  const frame=enclosure.clone(),p=frame.attributes.position
  for(let i=0;i<p.count;i++){let v=new T.Vector3().fromBufferAttribute(p,i).sub(glassCenter);v.set(v.x*w/glassSize.x,v.y*h/glassSize.y,(v.z-(glassSize.z/2))*.8).applyQuaternion(rotation).add(centre);p.setXYZ(i,v.x,v.y,v.z)}
