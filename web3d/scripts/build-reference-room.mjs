@@ -232,7 +232,16 @@ surface('ceiling',(u,v)=>{let a=u*Math.PI*2,r=v*8.45;return[Math.sin(a)*r,7.2-.2
 
 const config=fs.readFileSync(root+'/web3d/src/config/imageRoom.ts','utf8')
 function readArray(name){return Function('return '+config.match(new RegExp('export const '+name+': WallScreen\\[\\] = (\\[[\\s\\S]*?\\n\\])'))[1])()}
-const screenSource=[...readArray('WALL_SCREENS').map(s=>({...s,kind:'wall'})),...readArray('DESK_SCREENS').map(s=>({...s,kind:'desk'}))]
+// v8 wall bank (reference-image rects the bank is projected from; the home camera is on the axis, so
+// x -> 1280-x mirrors a screen across the CEO):
+// - s8/s9 were 0.7 m x 3.4 m portrait strips beside the CEO, unreadable. They are now one stack of
+//   landscape 16:9 panels in the slot left of the CEO, s8 on top and s9 below; s5/s6/s7 narrow to make
+//   room and s10/s11 widen into s9's old strip so both sides of the CEO stay balanced.
+// - s16 overlapped s17 (x 1100-1116). The lower right pair now mirrors the lower left pair s4/s3.
+const BANK_V8={s5:{x:310,y:86,w:168,h:110},s6:{x:310,y:204,w:82,h:78},s7:{x:396,y:204,w:82,h:78},
+ s8:{x:482,y:128,w:100,h:56},s9:{x:482,y:192,w:100,h:56},s10:{x:700,y:104,w:142,h:100},s11:{x:700,y:208,w:142,h:60},
+ s16:{x:988,y:316,w:110,h:88},s17:{x:1100,y:326,w:172,h:88}}
+const screenSource=[...readArray('WALL_SCREENS').map(s=>({...s,rect:BANK_V8[s.id]??s.rect,kind:'wall'})),...readArray('DESK_SCREENS').map(s=>({...s,kind:'desk'}))]
 const monitorScene=await load(source+'/monitor.glb')
 const enclosure=flat(monitorScene,o=>o.name==='Display_enclosure'),glass=flat(monitorScene,o=>o.name==='Display_glass')
 if(!enclosure||!glass)throw Error('Monitor model did not expose its enclosure and glass')
