@@ -300,5 +300,5 @@ def test_smoke_test_dry_run_and_plan(tmp_path, capsys):
     assert "nothing sent" in capsys.readouterr().out
     assert cli.main(["smoke-test", "--dry-run", "--extended-hours", "--no-feed", "--state-dir", str(tmp_path)]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["alpaca"]["buy"]["status"] == "filled" and out["alpaca"]["sell"]["status"] == "filled"
+    assert out["alpaca"]["buy"]["status"] == "filled" and out["alpaca"]["close"]["status"] == "filled"
     assert out["webull"]["buy"]["extended_hours"] is True and out["webull"]["buy"]["order_type"] == "limit"

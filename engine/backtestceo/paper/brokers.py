@@ -10,6 +10,13 @@ from pathlib import Path
 from .safety import ALPACA_PAPER_URL, ORDER_HOSTS, WEBULL_SANDBOX_HOST, KillSwitchEngaged, SafetyError, assert_host
 
 
+ALPACA_MIN_CRYPTO_NOTIONAL = 10.0  # Alpaca: "cost basis must be >= minimal amount of order 10"
+
+
+def position_symbol(symbol):
+    return symbol.replace("/", "")  # Alpaca /v2/positions uses BTCUSD for BTC/USD
+
+
 def new_client_order_id(prefix=""):
     return (prefix.replace("_", "")[:8] + uuid.uuid4().hex)[:32]
 
@@ -29,8 +36,14 @@ class Broker:
         assert_host("https://" + self.host, ORDER_HOSTS)
         if (qty is None) == (notional is None):
             raise ValueError("give exactly one of qty or notional")
+        if self.name == "alpaca" and "/" in symbol and notional is not None and notional < ALPACA_MIN_CRYPTO_NOTIONAL:
+            raise ValueError(f"Alpaca crypto orders must be at least ${ALPACA_MIN_CRYPTO_NOTIONAL:.0f} (got ${notional:.2f})")
         return self._submit(symbol, side, qty=qty, notional=notional, order_type=order_type, limit_price=limit_price,
                             extended_hours=extended_hours, client_order_id=client_order_id or new_client_order_id())
+
+    def position_qty(self, symbol):
+        """Net quantity the broker actually holds (after fees). None if the broker cannot say."""
+        return None
 
     def wait_fill(self, client_order_id, timeout=20.0, sleep=time.sleep):
         end = time.monotonic() + timeout
@@ -44,8 +57,9 @@ class Broker:
 class FakeBroker(Broker):
     """Dry-run broker: fills market orders immediately at price_fn(symbol); limit orders fill if marketable."""
 
-    def __init__(self, name, price_fn, kill_check=lambda: False, reject=False):
+    def __init__(self, name, price_fn, kill_check=lambda: False, reject=False, crypto_fee=0.0):
         super().__init__(kill_check)
+        self.crypto_fee, self.positions = crypto_fee, {}  # crypto_fee: Alpaca-style fee taken from the bought asset
         self.name, self.host, self.price_fn, self.reject = name, ("paper-api.alpaca.markets" if name == "alpaca" else WEBULL_SANDBOX_HOST), price_fn, reject
         self.orders = {}
         self.counter = itertools.count(1)
@@ -59,6 +73,15 @@ class FakeBroker(Broker):
             marketable = order_type == "market" or (side in ("buy", "cover") and limit_price >= px) or (side in ("sell", "short") and limit_price <= px)
             o = dict(client_order_id=client_order_id, status="filled" if marketable else "new", filled_qty=q if marketable else 0.0,
                      filled_price=px if marketable else None, qty=q)
+            crypto = "/" in symbol
+            held = self.positions.get(symbol, 0.0)
+            if marketable and crypto and side == "sell" and q > held + 1e-12:
+                o.update(status="rejected", filled_qty=0.0, filled_price=None,
+                         message=f"insufficient balance for {symbol.split('/')[0]} (requested: {q}, available: {held})")
+            elif marketable:
+                d = 1 if side in ("buy", "cover") else -1
+                net = q * (1 - self.crypto_fee) if (crypto and d > 0) else q
+                self.positions[symbol] = round(held + d * net, 12)
         o.update(symbol=symbol, side=side, order_type=order_type, limit_price=limit_price, extended_hours=extended_hours,
                  time=datetime.now(timezone.utc).isoformat())
         self.orders[client_order_id] = o
@@ -66,6 +89,16 @@ class FakeBroker(Broker):
 
     def get_order(self, client_order_id):
         return dict(self.orders[client_order_id])
+
+    def position_qty(self, symbol):
+        return self.positions.get(symbol, 0.0)
+
+    def close_position(self, symbol):
+        q = self.positions.get(symbol, 0.0)
+        if q <= 0:
+            return None
+        return self._submit(symbol, "sell", qty=q, notional=None, order_type="market", limit_price=None, extended_hours=False,
+                            client_order_id=new_client_order_id("close"))
 
     def cancel(self, client_order_id):
         o = self.orders[client_order_id]
@@ -122,6 +155,23 @@ class AlpacaPaperBroker(Broker):
         if extended_hours and "/" not in symbol:
             body["extended_hours"] = True
         return self._norm(self._req("POST", "/v2/orders", json=body))
+
+    def position_qty(self, symbol):
+        """GET /v2/positions/{BTCUSD}: the post-fee quantity actually held (0 if there is no position)."""
+        try:
+            p = self._req("GET", f"/v2/positions/{position_symbol(symbol)}")
+        except RuntimeError as e:
+            if "-> 404" in str(e):
+                return 0.0
+            raise
+        return float(p.get("qty_available") or p.get("qty") or 0)
+
+    def close_position(self, symbol):
+        """DELETE /v2/positions/{BTCUSD}: liquidates the whole position (used by the smoke test only)."""
+        if self.kill_check():
+            raise KillSwitchEngaged("PAPER_TRADING_KILL_SWITCH is on: order not sent")
+        o = self._req("DELETE", f"/v2/positions/{position_symbol(symbol)}")
+        return self._norm(o) if o else None
 
     def get_order(self, client_order_id):
         return self._norm(self._req("GET", "/v2/orders:by_client_order_id", params=dict(client_order_id=client_order_id)))

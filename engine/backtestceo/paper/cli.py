@@ -21,7 +21,7 @@ from pathlib import Path
 
 from . import config as C
 from . import envfile
-from .brokers import AlpacaPaperBroker, FakeBroker, WebullSandboxBroker, new_client_order_id
+from .brokers import ALPACA_MIN_CRYPTO_NOTIONAL, AlpacaPaperBroker, FakeBroker, WebullSandboxBroker, new_client_order_id
 from .feed import LiveEvents
 from .marketdata import AlpacaData, ReplayData, load_csv
 from .runner import Runner
@@ -49,7 +49,7 @@ def _args(argv):
     p.add_argument("--confirm", action="store_true", help="smoke-test: actually send the paper orders")
     p.add_argument("--broker", choices=["alpaca", "webull", "both"], default="both", help="smoke-test: which broker(s)")
     p.add_argument("--extended-hours", action="store_true", help="smoke-test: Webull LIMIT order in the extended session (support_trading_session=ALL)")
-    p.add_argument("--alpaca-notional", type=float, default=10.0, help="smoke-test: Alpaca BTC/USD buy size in USD")
+    p.add_argument("--alpaca-notional", type=float, default=10.0, help="smoke-test: Alpaca BTC/USD buy size in USD (Alpaca minimum $10)")
     return p.parse_args(argv)
 
 
@@ -82,7 +82,7 @@ def build(a, dry):
                   ("QQQ", 5): load_csv(FIXTURES / "qqq_5m.csv")}
         data = ReplayData(series)
         data.now = datetime.fromisoformat(a.sim_start)
-        brokers = {"alpaca": FakeBroker("alpaca", data.last_price, kill), "webull": FakeBroker("webull", data.last_price, kill)}
+        brokers = {"alpaca": FakeBroker("alpaca", data.last_price, kill, crypto_fee=0.0025), "webull": FakeBroker("webull", data.last_price, kill)}
         feed = _feed(a, cfg, sdir, "DRY RUN · fake brokers, replayed bars")
         return Runner(cfg, data, brokers, feed, kill, sdir / "state.json", mode="dry-run"), sdir
     env = _env(a)
@@ -228,13 +228,25 @@ def smoke(a, brokers, data, feed, kill, log=print):
     if kill():
         raise KillSwitchEngaged("kill switch is on: smoke test not run")
     if "alpaca" in brokers:
+        if a.alpaca_notional < ALPACA_MIN_CRYPTO_NOTIONAL:
+            raise ValueError(f"--alpaca-notional must be at least ${ALPACA_MIN_CRYPTO_NOTIONAL:.0f} (Alpaca crypto minimum)")
         b = brokers["alpaca"]
+        before = b.position_qty("BTC/USD") or 0.0
         o = b.submit("BTC/USD", "buy", notional=a.alpaca_notional, client_order_id=new_client_order_id("smoke"))
         o = b.wait_fill(o["client_order_id"]) if o["status"] != "filled" else o
         res = dict(buy=o)
         if o["status"] == "filled" and o["filled_qty"] > 0:
-            s = b.submit("BTC/USD", "sell", qty=o["filled_qty"], client_order_id=new_client_order_id("smoke"))
-            res["sell"] = b.wait_fill(s["client_order_id"]) if s["status"] != "filled" else s
+            held = b.position_qty("BTC/USD") or 0.0
+            res["position_after_fees"] = held
+            if before <= 0:
+                # nothing else held BTC: DELETE /v2/positions/BTCUSD liquidates exactly what is there
+                c = b.close_position("BTC/USD")
+                res["close"] = b.wait_fill(c["client_order_id"]) if c and c.get("client_order_id") and c["status"] != "filled" else c
+            else:
+                # other BTC (e.g. a runner position) is held: sell only what this buy added, after fees
+                q = math.floor(max(0.0, min(held - before, o["filled_qty"])) * 1e9) / 1e9
+                s = b.submit("BTC/USD", "sell", qty=q, client_order_id=new_client_order_id("smoke"))
+                res["sell"] = b.wait_fill(s["client_order_id"]) if s["status"] != "filled" else s
         out["alpaca"] = res
     if "webull" in brokers:
         b = brokers["webull"]
@@ -264,7 +276,7 @@ def smoke(a, brokers, data, feed, kill, log=print):
 
 def cmd_smoke(a):
     which = ["alpaca", "webull"] if a.broker == "both" else [a.broker]
-    plan = [f"Alpaca paper: market BUY ${a.alpaca_notional:.2f} of BTC/USD (gtc), then market SELL the filled qty",
+    plan = [f"Alpaca paper: market BUY ${a.alpaca_notional:.2f} of BTC/USD (gtc), then sell back the post-fee position (DELETE /v2/positions/BTCUSD if no other BTC is held)",
             f"Webull sandbox: LIMIT BUY 1 QQQ at the latest ask ({'extended session ALL' if a.extended_hours else 'CORE session'}, DAY);"
             " sell back at the bid if filled, else cancel after 30 s"]
     plan = [p for p, n in zip(plan, ["alpaca", "webull"]) if n in which]
@@ -298,6 +310,9 @@ def main(argv=None):
     try:
         return {"check": cmd_check, "start": cmd_start, "run": cmd_run, "stop": cmd_stop, "status": cmd_status,
                 "kill": lambda a: cmd_kill(a, True), "unkill": lambda a: cmd_kill(a, False), "smoke-test": cmd_smoke}[a.command](a)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
     except SafetyError as e:
         print(f"SAFETY: {e}", file=sys.stderr)
         return 2

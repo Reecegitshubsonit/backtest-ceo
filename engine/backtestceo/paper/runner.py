@@ -15,6 +15,10 @@ from .safety import KillSwitchEngaged
 ET = S.ET
 
 
+def _floor9(x):
+    return math.floor(x * 1e9 + 1e-6) / 1e9
+
+
 def _blank():
     return dict(pos=None, fills=[], closed=[], realized_usd=0.0, mark=None, last_bar=None, entries={}, status="waiting for data",
                 stage="backtest", short_skip_bar=None, done_day=None, last_error=None)
@@ -82,7 +86,13 @@ class Runner:
     def _execute(self, s, now, side, reason, qty=None, notional=None, stop=None, bar_ts=None):
         st = self.st[s.key]
         broker = self.brokers[s.broker]
+        crypto = "/" in s.symbol
         try:
+            held_before = broker.position_qty(s.symbol) if crypto else None
+            if crypto and side == "sell" and held_before is not None:
+                qty = _floor9(min(qty, held_before))  # fees taken on the buy leave less than the filled qty
+                if qty <= 0:
+                    raise RuntimeError(f"no {s.symbol} left at the broker to sell")
             o = broker.submit(s.symbol, side, qty=qty, notional=notional)
             if o["status"] not in ("filled", "rejected", "canceled", "failed"):
                 o = broker.wait_fill(o["client_order_id"])
@@ -99,6 +109,13 @@ class Runner:
             self._emit_status(s, f"order {o['client_order_id']} {o['status']}", "warn", slot="risk")
             return None
         px, q = float(o["filled_price"]), float(o["filled_qty"])
+        if crypto and side == "buy" and held_before is not None:
+            try:  # record the post-fee quantity actually added to the position, not the gross filled qty
+                added = broker.position_qty(s.symbol) - held_before
+                if 0 < added <= q + 1e-12:
+                    q = _floor9(added)
+            except Exception:
+                pass
         fill = dict(time=now.isoformat(), side=side, qty=q, price=px, client_order_id=o["client_order_id"], reason=reason, broker=s.broker)
         st["fills"] = (st["fills"] + [fill])[-20:]
         if side in ("buy", "short"):
