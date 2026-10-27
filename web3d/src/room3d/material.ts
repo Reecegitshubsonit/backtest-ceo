@@ -14,9 +14,6 @@ void main() {
 const FRAGMENT = `
 uniform sampler2D uSharp,uPhoto;
 uniform float uKind,uTime,uHot,uDetail,uDesk,uFlip;
-// Reading window: while a screen is read head-on, seated people between it and the eye dissolve
-// (dithered) inside the screen's footprint, so an agent's hands never cover its own console.
-uniform float uCut;uniform vec3 uCutC,uCutR,uCutU,uCutN,uCutS;
 varying vec3 vWorld,vNormal;
 varying vec2 vUv;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -40,11 +37,6 @@ float sparkle(vec3 p,vec3 n,float density,float threshold){
  return (1.-smoothstep(.03,.14,d))*step(threshold,hash(cell+13.))*(.6+.4*sin(uTime*1.7+hash(cell+3.)*30.));
 }
 void main(){
- if(uCut>0.&&((uKind>2.5&&uKind<4.5)||uKind>8.5&&uKind<10.5)){
-  vec3 q=vWorld-uCutC;float t=dot(q,uCutN);
-  float grow=1.15+.6*clamp(t/uCutS.z,0.,1.);
-  if(t>.0&&t<uCutS.z&&abs(dot(q,uCutR))<uCutS.x*grow&&abs(dot(q,uCutU))<uCutS.y*grow&&fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)<uCut)discard;
- }
  vec3 n=normalize(vNormal)*(gl_FrontFacing?1.:-1.),view=normalize(cameraPosition-vWorld);
  float nv=abs(dot(n,view)),fres=1.-nv,r=length(vWorld.xz),a=atan(vWorld.x,vWorld.z);
  float relief=.3+.7*max(0.,dot(n,normalize(vec3(-.4,.8,.4))));
@@ -168,15 +160,13 @@ void main(){
  #include <colorspace_fragment>
 }`
 export const KIND: Record<string,number> = {wall:0,floor:7,ceiling:8,desk:1,chair:2,hologram:3,operator:4,ceo:5,monitor:11,screen:6,cloth:9,hair:10,trim:12,rim:13}
-/** Shared by every room material: the reading window the zoom sets while a screen is read head-on. */
-export const READING_CUT={uCut:{value:0},uCutC:{value:new THREE.Vector3()},uCutR:{value:new THREE.Vector3(1,0,0)},uCutU:{value:new THREE.Vector3(0,1,0)},uCutN:{value:new THREE.Vector3(0,0,1)},uCutS:{value:new THREE.Vector3(.5,.5,1)}}
 const blank=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1)
 blank.needsUpdate=true
 export function roomMaterial(kind: string,sharp?: THREE.Texture) {
  return new THREE.ShaderMaterial({
    vertexShader:VERTEX,fragmentShader:FRAGMENT,
    uniforms:{uSharp:{value:sharp??blank},uKind:{value:KIND[kind]??0},
-    uTime:{value:0},uHot:{value:0},uDetail:{value:0},uDesk:{value:0},uFlip:{value:0},uPhoto:{value:blank},...READING_CUT},
+    uTime:{value:0},uHot:{value:0},uDetail:{value:0},uDesk:{value:0},uFlip:{value:0},uPhoto:{value:blank}},
    side:THREE.DoubleSide,transparent:kind==='ceo',depthWrite:true,toneMapped:false,
  })
 }

@@ -33,12 +33,14 @@ function poseBody(profile='far',lift=0,legDrop=0){
   const spine=human.getObjectByName('spine05'),q=spine.getWorldQuaternion(new T.Quaternion()).premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1,0,0),-17*Math.PI/180))
   spine.quaternion.copy(spine.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(q));human.updateMatrixWorld(true)
  }
- const arms=profile==='near'?[-.26,.03,-.08,.25]:profile==='operator'?[-.26,.03,-.1,.1]:profile==='mid'?[-.23,.08,.10,.25]:[-.18,.15,.11,.24]
+// v7: hands in the lap. Every arm was reaching onto the desk top, so forearms and hands covered
+ // the live ring computer. Upper arms now hang beside the torso, forearms rest along the thighs.
+ const lap=profile==='near'?[-1,.22,-.85,1]:profile==='operator'?[-1,.10,-.75,1]:[-1,.10,-.75,1]
  for(const[side,sign]of[['L',1],['R',-1]]){
   aim('upperleg01'+side,'lowerleg01'+side,new T.Vector3(sign*.015,-legDrop,.40))
   aim('lowerleg01'+side,'foot'+side,new T.Vector3(sign*.015,-.4,0))
-  aim('upperarm01'+side,'lowerarm01'+side,profile==='far'?new T.Vector3(sign===1?-.06:-.12,-.20+lift,.14):new T.Vector3(sign*.04,arms[0]+lift,arms[1]))
-  aim('lowerarm01'+side,'wrist'+side,profile==='far'?new T.Vector3(sign===1?-.10:.13,.05+lift*.5,sign===1?.25:.22):new T.Vector3(-sign*.025,arms[2]+lift*.5,arms[3]))
+  aim('upperarm01'+side,'lowerarm01'+side,new T.Vector3(sign*.10,lap[0],lap[1]-lift))
+  aim('lowerarm01'+side,'wrist'+side,new T.Vector3(-sign*.18,lap[2],lap[3]))
  }
  for(const[side,sign]of[['L',1],['R',-1]]){
   const wrist=human.getObjectByName('wrist'+side)
@@ -293,17 +295,8 @@ for(const s of screenSource){const r=s.rect,cx=r.x+r.w/2,cy=r.y+r.h/2;let centre
  meta.screens.push({...s,center:centre.toArray(),normal:normal.toArray(),quaternion:rotation.toArray(),w,h})
 }
 
-// A real rear bank preserves the same command-room framework through a full orbit.
-// Instances reuse the canonical applications and assignments; they are not new computers.
-const rearRotation=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),Math.PI)
-for(const s of meta.screens.filter(s=>s.kind==='wall')){
- const id='rear-'+s.id,center=[-s.center[0],s.center[1],-s.center[2]],normal=[-s.normal[0],s.normal[1],-s.normal[2]]
- const quaternion=rearRotation.clone().multiply(new T.Quaternion(...s.quaternion)).toArray()
- add('frame_'+id,room.getObjectByName('frame_'+s.id).geometry.clone().rotateY(Math.PI),'monitor')
- add('screen_'+id,room.getObjectByName('screen_'+s.id).geometry.clone().rotateY(Math.PI),'screen')
- meta.instances.push({...s,id,canonicalId:s.id,center,normal,quaternion})
-}
-
+// v7: every wall display stays in the one curved bank on the far wall behind the CEO, as in the
+// original concept. The mirrored rear bank (rear-* instances) spread screens all round the room.
 globalThis.FileReader=class{readAsArrayBuffer(blob){blob.arrayBuffer().then(r=>{this.result=r;this.onloadend?.()})}}
 const output=await new GLTFExporter().parseAsync(room,{binary:true})
 fs.writeFileSync(out+'/reference-room.glb',Buffer.from(output));fs.writeFileSync(out+'/layout.json',JSON.stringify(meta,null,2))

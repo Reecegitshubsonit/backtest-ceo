@@ -23,9 +23,12 @@ void mainImage(const in vec4 inputColor,const in vec2 uv,out vec4 outputColor){
  float d=readDepth(uv),near=uNearFar.x,far=uNearFar.y;
  float z=2.*near*far/(far+near-(d*2.-1.)*(far-near));
  finish=min(finish,z/max(.0001,-local.z));
+ // march only the slice of the column where light exists (1.72 < y < 5.02): same integral, fewer wasted steps
+ if(abs(rd.y)>.00001){float t1=(1.72-ro.y)/rd.y,t2=(5.02-ro.y)/rd.y;start=max(start,min(t1,t2));finish=min(finish,max(t1,t2));}
+ else if(ro.y<1.72||ro.y>5.02)return;
  if(finish<=start)return;
- float stepSize=(finish-start)/48.,light=0.,white=0.;
- for(int i=0;i<48;i++){
+ float stepSize=(finish-start)/40.,light=0.,white=0.;
+ for(int i=0;i<40;i++){
    vec3 p=ro+rd*(start+(float(i)+.5)*stepSize);
    float h=p.y-1.72;
    if(h>0.&&h<3.3){

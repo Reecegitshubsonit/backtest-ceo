@@ -14,7 +14,7 @@ import type { Asset, Bar, Timeframe } from '../model/types'
 import { SEATS } from '../config/seats'
 import { api } from '../net/api'
 import { CameraRig } from './CameraRig'
-import { READING_CUT, roomMaterial } from './material'
+import { roomMaterial } from './material'
 import { Beam } from './Beam'
 import { LabelProjector, setHovered, getHovered, getInspecting, setInspecting } from './labels'
 
@@ -222,7 +222,7 @@ function ringBase(){
  c.globalAlpha=1
  return cv
 }
-type Block={screen:RoomScreen;canvas:HTMLCanvasElement;mask:HTMLCanvasElement;theta:number;r:number}
+type Block={screen:RoomScreen;canvas:HTMLCanvasElement;mask:HTMLCanvasElement;theta:number;x:number;y:number;box:{x:number;y:number;w:number;h:number};patch:THREE.CanvasTexture;at:THREE.Vector2}
 function ringTexture(){const cv=document.createElement('canvas');cv.width=cv.height=RING_PX;const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.NoColorSpace;t.anisotropy=16;return t}
 function ringBlocks():Block[]{
  const k=RING_PX/(2*RING.rim)
@@ -230,33 +230,53 @@ function ringBlocks():Block[]{
   const W=Math.round((screen.shape?.outer??screen.w)*k),H=Math.round((screen.shape?.depth??RING.rout-RING.rin)*k)
   const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H
   const mask=document.createElement('canvas');mask.width=W;mask.height=H
-  return {screen,canvas,mask,theta:Math.atan2(screen.center[0],screen.center[2]),r:screen.shape?.r??(RING.rin+RING.rout)/2}
+  const theta=Math.atan2(screen.center[0],screen.center[2]),r=screen.shape?.r??(RING.rin+RING.rout)/2,[x,y]=ringPx(Math.sin(theta)*r,Math.cos(theta)*r)
+  // axis-aligned pixel box of the rotated block: the only part of the ring this block ever changes
+  const cs=Math.abs(Math.cos(theta)),sn=Math.abs(Math.sin(theta)),hw=(W*cs+H*sn)/2+2,hh=(W*sn+H*cs)/2+2
+  const x0=Math.max(0,Math.floor(x-hw)),y0=Math.max(0,Math.floor(y-hh)),x1=Math.min(RING_PX,Math.ceil(x+hw)),y1=Math.min(RING_PX,Math.ceil(y+hh))
+  const box={x:x0,y:y0,w:x1-x0,h:y1-y0},pc=document.createElement('canvas');pc.width=box.w;pc.height=box.h
+  const patch=new THREE.CanvasTexture(pc) // never bound to a material: only a source for copyTextureToTexture
+  return {screen,canvas,mask,theta,x,y,box,patch,at:new THREE.Vector2(box.x,RING_PX-box.y-box.h)} // flipY: GL rows count from the bottom
  })
 }
-function drawRing(t:THREE.CanvasTexture,base:HTMLCanvasElement,blocks:Block[],now:number){
- const c=(t.image as HTMLCanvasElement).getContext('2d')!
- c.drawImage(base,0,0)
- for(const b of blocks){
-  drawConsole(b.canvas,b.screen,now)
-  const m=b.mask.getContext('2d')!,W=b.mask.width,H=b.mask.height
-  m.globalCompositeOperation='copy';m.drawImage(b.canvas,0,0);m.globalCompositeOperation='destination-in'
-  const fx=m.createLinearGradient(0,0,W,0);fx.addColorStop(0,'#0000');fx.addColorStop(.09,'#000f');fx.addColorStop(.91,'#000f');fx.addColorStop(1,'#0000');m.fillStyle=fx;m.fillRect(0,0,W,H)
-  const fy=m.createLinearGradient(0,0,0,H);fy.addColorStop(0,'#0000');fy.addColorStop(.05,'#000f');fy.addColorStop(.97,'#000f');fy.addColorStop(1,'#0000');m.fillStyle=fy;m.fillRect(0,0,W,H)
-  const [x,y]=ringPx(Math.sin(b.theta)*b.r,Math.cos(b.theta)*b.r)
-  c.save();c.translate(x,y);c.rotate(-b.theta);c.drawImage(b.mask,-W/2,-H/2);c.restore() // top of the block toward the CEO
- }
- t.needsUpdate=true
+/** Composite one live region onto the CPU ring canvas over a fresh copy of the static base. */
+function composeBlock(c:CanvasRenderingContext2D,base:HTMLCanvasElement,b:Block,now:number){
+ drawConsole(b.canvas,b.screen,now)
+ const m=b.mask.getContext('2d')!,W=b.mask.width,H=b.mask.height
+ m.globalCompositeOperation='copy';m.drawImage(b.canvas,0,0);m.globalCompositeOperation='destination-in'
+ const fx=m.createLinearGradient(0,0,W,0);fx.addColorStop(0,'#0000');fx.addColorStop(.09,'#000f');fx.addColorStop(.91,'#000f');fx.addColorStop(1,'#0000');m.fillStyle=fx;m.fillRect(0,0,W,H)
+ const fy=m.createLinearGradient(0,0,0,H);fy.addColorStop(0,'#0000');fy.addColorStop(.05,'#000f');fy.addColorStop(.97,'#000f');fy.addColorStop(1,'#0000');m.fillStyle=fy;m.fillRect(0,0,W,H)
+ c.save();c.translate(b.x,b.y);c.rotate(-b.theta);c.beginPath();c.rect(-W/2,-H/2,W,H);c.clip() // top of the block toward the CEO
+ c.setTransform(1,0,0,1,0,0);c.drawImage(base,b.box.x,b.box.y,b.box.w,b.box.h,b.box.x,b.box.y,b.box.w,b.box.h)
+ c.translate(b.x,b.y);c.rotate(-b.theta);c.drawImage(b.mask,-W/2,-H/2);c.restore()
 }
-/** Polls the engine read-only and redraws the ring computer (every agent's area) once a second. */
-function useLiveConsoles(ring:THREE.CanvasTexture){
+/**
+ * The ring computer's texture is 3584 px square. v6 redrew and re-uploaded all of it (51 MB) every
+ * second, a visible hitch. Now the full texture is uploaded once; afterwards each live region is
+ * redrawn on its own, staggered across the second, and only its pixel box is copied to the GPU.
+ */
+function useLiveConsoles(ring:THREE.CanvasTexture,gl:THREE.WebGLRenderer){
  useEffect(()=>{
-  const base=ringBase(),blocks=ringBlocks()
-  const draw=()=>drawRing(ring,base,blocks,Date.now())
-  const feeds=()=>{for(const id of Object.keys(FEEDS))pollFeed(id).then(draw)}
-  pollHealth().then(draw);feeds();draw()
-  const a=setInterval(draw,1000),b=setInterval(pollHealth,3000),f=setInterval(feeds,15000)
-  return()=>{clearInterval(a);clearInterval(b);clearInterval(f)}
- },[ring])
+  const base=ringBase(),blocks=ringBlocks(),cv=ring.image as HTMLCanvasElement,c=cv.getContext('2d')!
+  let next=0,uploaded=false
+  ring.onUpdate=()=>{uploaded=true}
+  c.drawImage(base,0,0);for(const b of blocks)composeBlock(c,base,b,Date.now());ring.needsUpdate=true
+  const tick=()=>{
+   const t0=performance.now(),b=blocks[next++%blocks.length];composeBlock(c,base,b,Date.now())
+   const pc=b.patch.image as HTMLCanvasElement,p=pc.getContext('2d')!
+   p.globalCompositeOperation='copy';p.drawImage(cv,b.box.x,b.box.y,b.box.w,b.box.h,0,0,b.box.w,b.box.h)
+   const t1=performance.now()
+   if(uploaded)gl.copyTextureToTexture(b.patch,ring,null,b.at) // before the first upload the full canvas goes up anyway
+   if(import.meta.env.DEV)Object.assign(window,{__ringTickMs:{draw:t1-t0,uploadCall:performance.now()-t1}})
+  }
+  if(import.meta.env.DEV)Object.assign(window,{__ringTick:tick,__ringBoxes:blocks.map(b=>[b.box.w,b.box.h])}) // perf probes
+  const feeds=()=>{for(const id of Object.keys(FEEDS))pollFeed(id)}
+  pollHealth();feeds()
+  // each region once a second, run in the idle time after a frame so it never lands mid-frame
+  const idle=(window as unknown as {requestIdleCallback?:(f:()=>void,o:{timeout:number})=>number}).requestIdleCallback
+  const a=setInterval(()=>idle?idle(tick,{timeout:200}):tick(),Math.round(1000/blocks.length)),h=setInterval(pollHealth,3000),f=setInterval(feeds,15000)
+  return()=>{clearInterval(a);clearInterval(h);clearInterval(f);for(const b of blocks)b.patch.dispose()}
+ },[ring,gl])
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -265,11 +285,15 @@ function useLiveConsoles(ring:THREE.CanvasTexture){
 // Reading a screen: when the pointer is on a screen (its frame, an agent's desk station, the agent or
 // its chair all count as that agent's console) and the user deliberately scrolls toward it, the camera
 // glides to a head-on pose where the screen fills ~70% of the view, upright to its readable side.
-// Scrolling out from there (or Esc / double-click on empty space) glides back. Every glide follows a
+// Scrolling out from there (or Esc / double-click on empty space) glides back. Any other scroll-out, from
+// any position or orbit angle, eases back toward the wide overview (home distance and height, same heading). Every glide follows a
 // path that is ray-checked against the room, so the camera never passes through people or furniture.
 type Pose={position:THREE.Vector3;target:THREE.Vector3}
 type Flight={from:Pose;to:Pose;path:(k:number)=>THREE.Vector3;t:number;dur:number;done:()=>void;inward:boolean}
 type Inspecting={screen:RoomScreen;pose:Pose;back:Pose;out:number}
+/** The wide overview every scroll-out converges on: home target, home distance and home height, at any azimuth. */
+const OVERVIEW=(()=>{const p=new THREE.Vector3(...HOME.position),target=new THREE.Vector3(...HOME.target),radius=p.distanceTo(target);return{target,radius,phi:Math.acos((p.y-target.y)/radius)}})()
+const sph=new THREE.Spherical(),off=new THREE.Vector3()
 const HOME_POSE=():Pose=>({position:new THREE.Vector3(...HOME.position),target:new THREE.Vector3(...HOME.target)})
 /** The screen a hit belongs to, for aiming: the face, its frame, a desk station, or the seated agent/chair. */
 function screenFromHit(hit:THREE.Intersection):RoomScreen|undefined{
@@ -280,7 +304,7 @@ function screenFromHit(hit:THREE.Intersection):RoomScreen|undefined{
  if(seat)return ROOM_SCREENS.find(s=>s.seat===seat)
  return deskScreenAt(hit.point)??undefined
 }
-const solid=(h:THREE.Intersection)=>h.object.visible&&(h.object as THREE.Mesh).isMesh&&!((h.object as THREE.Mesh).material as THREE.MeshBasicMaterial)?.wireframe
+const solid=(h:THREE.Intersection)=>h.object.visible&&(h.object as THREE.Mesh).isMesh
 function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|null>;enabled:boolean;resetKey:number}){
  const {camera,gl,scene}=useThree()
  const cam=camera as THREE.PerspectiveCamera
@@ -291,7 +315,7 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
  const live=useRef(enabled);live.current=enabled
  const pose=():Pose=>({position:camera.position.clone(),target:(controls.current?.target??new THREE.Vector3(...HOME.target)).clone()})
  const aspect=()=>{const r=gl.domElement.getBoundingClientRect();return r.width/Math.max(1,r.height)}
- /** First solid hit along a ray, ignoring hologram wireframe overlays. */
+ /** First solid hit along a ray. */
  const cast=(from:THREE.Vector3,dir:THREE.Vector3,far:number)=>{ray.set(from,dir.clone().normalize());ray.near=0;ray.far=far;return ray.intersectObjects(scene.children,true).find(solid)}
  const blocked=(a:THREE.Vector3,b:THREE.Vector3)=>{const d=b.clone().sub(a),l=d.length();return l>1e-4&&!!cast(a,d,l)}
  /** Pick a collision-free path: straight, around the room's axis (clears the CEO hologram), or either raised. */
@@ -307,7 +331,7 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
  }
  const fly=(to:Pose,inward:boolean,done:()=>void=()=>{})=>{
   const from=pose(),len=from.position.distanceTo(to.position)+.5*from.target.distanceTo(to.target)
-  pending.current=0
+  if(inward||pending.current<0)pending.current=0
   flight.current={from,to,path:route(from.position,to.position),t:0,dur:THREE.MathUtils.clamp(.45+len*.07,.5,1.1),done,inward}
  }
  const setInspect=(v:Inspecting|null)=>{inspect.current=v;setInspecting(v?.screen.id??null)}
@@ -321,8 +345,6 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
   const to=inspectPose(s,d,readableUp(s,camera.position),off,cam.fov)
   const back=inspect.current?.back??anchor.current
   setInspect(null);gesture.current={screen:undefined,sum:0}
-  const q=new THREE.Quaternion(...s.quaternion),K=READING_CUT // the reading window that dissolves hands in front of the screen
-  K.uCutC.value.copy(c);K.uCutN.value.copy(n);K.uCutR.value.set(1,0,0).applyQuaternion(q);K.uCutU.value.set(0,1,0).applyQuaternion(q);K.uCutS.value.set(sw/2,sh/2,d)
   fly(to,true,()=>setInspect({screen:s,pose:to,back,out:0}))
  }
  const leave=(to:Pose)=>{setInspect(null);gesture.current={screen:undefined,sum:0};fly(to,false,()=>{anchor.current=to})}
@@ -339,8 +361,9 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
    const t=controls.current?.target??new THREE.Vector3(...HOME.target);focus.current.copy(ray.ray.at(camera.position.distanceTo(t),new THREE.Vector3()));under.current=undefined
   }
   const zoom=(amount:number)=>{ // amount in log-distance; negative = in
-   if(flight.current){ // a wheel-out during a glide in turns it around
+   if(flight.current){ // a wheel-out during a glide in turns it around; during a glide out it is kept for afterwards
     if(amount>0&&flight.current.inward){flight.current=null;leave(anchor.current)}
+    else if(amount>0)pending.current=THREE.MathUtils.clamp(pending.current+amount,0,1.2)
     return
    }
    const s=under.current,insp=inspect.current
@@ -379,9 +402,6 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
   }
   if(!c||!enabled){pending.current=0;return}
   if(import.meta.env.DEV){const w=window as unknown as {__zoom?:Record<string,unknown>};w.__zoom={...w.__zoom,flying:!!flight.current,inspect:inspect.current?.screen.id}}
-  { // fade the reading window in while gliding to a screen / reading it, out otherwise
-   const want=inspect.current||flight.current?.inward?1:0,u=READING_CUT.uCut
-   u.value=THREE.MathUtils.clamp(u.value+(want?1:-1)*Math.min(dt,.05)*2.5,0,1)}
   const f=flight.current
   if(f){
    f.t=Math.min(1,f.t+Math.min(dt,.05)/f.dur)
@@ -400,15 +420,20 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
    if(insp.out>=.06){pending.current=0;leave(insp.back)}
    return
   }
-  let k=Math.exp(step)
-  const F=focus.current,pos=camera.position,dist=pos.distanceTo(F)
-  const at=(kk:number)=>F.clone().add(pos.clone().sub(F).multiplyScalar(kk))
-  if(k<1&&dist*k<ZOOM.minSurface){k=Math.min(1,ZOOM.minSurface/dist);pending.current=0}
-  if(k>1){
-   if(!inRoom(at(k))||dist*k>ZOOM.maxDistance){let lo=1,hi=k;for(let i=0;i<14;i++){const mid=(lo+hi)/2;if(inRoom(at(mid))&&dist*mid<=ZOOM.maxDistance)lo=mid;else hi=mid}k=lo;pending.current=0}
-   const back=cast(pos,pos.clone().sub(F),dist*(k-1)+INSPECT.clearance) // never back into a person or chair
-   if(back){k=Math.max(1,1+(back.distance-INSPECT.clearance)/dist);pending.current=0}
+  const pos=camera.position
+  if(step>0){ // out: ease toward the overview from wherever you are. Same azimuth, home distance and height
+   const a=1-Math.exp(-step*ZOOM.out)
+   sph.setFromVector3(off.copy(pos).sub(c.target))
+   c.target.lerp(OVERVIEW.target,a)
+   sph.radius+=(OVERVIEW.radius-sph.radius)*a;sph.phi+=(OVERVIEW.phi-sph.phi)*a;sph.makeSafe()
+   pos.copy(c.target).add(off.setFromSpherical(sph))
+   if(!inRoom(pos)){let lo=0,hi=1;for(let i=0;i<14;i++){const mid=(lo+hi)/2;pos.copy(c.target).addScaledVector(off,mid);if(inRoom(pos))lo=mid;else hi=mid}pos.copy(c.target).addScaledVector(off,lo)}
+   if(c.target.distanceTo(OVERVIEW.target)<.005&&Math.abs(sph.radius-OVERVIEW.radius)<.005&&Math.abs(sph.phi-OVERVIEW.phi)<.002)pending.current=0
+   camera.lookAt(c.target);c.update();return
   }
+  let k=Math.exp(step)
+  const F=focus.current,dist=pos.distanceTo(F)
+  if(dist*k<ZOOM.minSurface){k=Math.min(1,ZOOM.minSurface/dist);pending.current=0}
   if(Math.abs(k-1)<1e-6)return
   pos.sub(F).multiplyScalar(k).add(F);c.target.sub(F).multiplyScalar(k).add(F)
   c.update()
@@ -426,14 +451,15 @@ function Preview({screen,host}:{screen:RoomScreen;host:HTMLElement}){
   <div className="room-screen-preview" style={{width:px,height:px*screen.h/screen.w}}><Slot host={host} className="slotfill"/></div>
  </Html>
 }
+const TAN_HALF_FOV=Math.tan(48*Math.PI/360)
 function Screen({mesh,screen,panel,dispatch,onHover,tableMap,sharp}:{sharp:THREE.CanvasTexture;tableMap:THREE.Texture;mesh:THREE.Mesh;screen:RoomScreen;panel:PanelState;dispatch:Props['dispatch'];onHover:(id:string|null)=>void}){
  const [hot,setHot]=useState(false)
  const material=useMemo(()=>{const m=roomMaterial('screen',sharp);m.uniforms.uDesk.value=screen.kind==='desk'?1:0;m.uniforms.uPhoto.value=tableMap;return m},[sharp,tableMap,screen.kind])
  const {camera,size}=useThree()
+ const center=useMemo(()=>new THREE.Vector3(...screen.center),[screen])
  useFrame(()=>{
-   const projected=screen.w/(2*camera.position.distanceTo(new THREE.Vector3(...screen.center))*Math.tan(48*Math.PI/360)*(size.width/size.height))*size.width
    // desk consoles always show their live texture; wall displays stay dim until approached
-   material.uniforms.uDetail.value=screen.kind==='desk'?1:THREE.MathUtils.smoothstep(projected,screen.rect.w*1.5,screen.rect.w*2.5)
+   material.uniforms.uDetail.value=screen.kind==='desk'?1:THREE.MathUtils.smoothstep(screen.w/(2*camera.position.distanceTo(center)*TAN_HALF_FOV*(size.width/size.height))*size.width,screen.rect.w*1.5,screen.rect.w*2.5)
    material.uniforms.uHot.value=(hot||getHovered()===screen.id)&&getInspecting()!==screen.id?1:0 // no glow over a screen being read
  })
  useEffect(()=>()=>{material.dispose()},[material])
@@ -449,18 +475,17 @@ function Assets({panel,dispatch,host,onReady}:Props){
  tableMap.colorSpace=THREE.NoColorSpace;tableMap.anisotropy=16
  const ring=useMemo(()=>ringTexture(),[])
  const sharpMap=useMemo(()=>new Map(ROOM_SCREENS.map((s,i)=>[s.id,s.kind==='desk'?ring:displayTexture(s,i)])),[ring])
- useLiveConsoles(ring)
+ const gl=useThree(s=>s.gl)
+ useLiveConsoles(ring,gl)
  const wallMap=sharpMap.get('s5')!
- const wireMaterial=useMemo(()=>new THREE.MeshBasicMaterial({color:'#49baff',wireframe:true,transparent:true,opacity:.012,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-1}),[])
  const assets=useMemo(()=>{
    const result:{mesh:THREE.Mesh;kind:string;material:THREE.ShaderMaterial}[]=[]
    scene.traverse(o=>{if(!(o instanceof THREE.Mesh))return;const geometry=o.geometry as Geo;if(!geometry.boundsTree)geometry.boundsTree=new MeshBVH(geometry,{maxLeafTris:12});const kind=o.userData.kind??'wall';result.push({mesh:o,kind,material:roomMaterial(kind,kind==='desk'?tableMap:kind==='wall'?wallMap:undefined)})})
    return result
  },[scene,tableMap,wallMap])
- useEffect(()=>()=>{for(const a of assets)a.material.dispose();tableMap.dispose();for(const texture of sharpMap.values())texture.dispose();wireMaterial.dispose();document.body.style.cursor=''},[assets,tableMap,sharpMap,wireMaterial])
+ useEffect(()=>()=>{for(const a of assets)a.material.dispose();tableMap.dispose();for(const texture of sharpMap.values())texture.dispose();document.body.style.cursor=''},[assets,tableMap,sharpMap])
  useFrame(({clock})=>{
-   for(const a of assets)a.material.uniforms.uTime.value=clock.getElapsedTime()
-   wireMaterial.opacity=.012*(1-.97*READING_CUT.uCut.value) // the hologram mesh lines fade with the reading window too
+   const t=clock.getElapsedTime();for(const a of assets)a.material.uniforms.uTime.value=t
  })
  useEffect(()=>{if(panel.phase!=='closed'&&panel.phase!=='focused'){setHovered(null);document.body.style.cursor=''}},[panel.phase])
  useEffect(()=>{onReady(true)},[onReady])
@@ -473,7 +498,7 @@ function Assets({panel,dispatch,host,onReady}:Props){
     return s?<Screen key={mesh.name} mesh={mesh} screen={s} panel={panel} dispatch={dispatch} onHover={setHovered} tableMap={tableMap} sharp={sharpMap.get(s.canonicalId??s.id)!}/>
      :<group key={mesh.name}><mesh name={mesh.name} geometry={mesh.geometry} material={material} onClick={e=>{e.stopPropagation();const s=frameScreen&&panel.phase==='closed'?frameScreen:kind==='desk'?deskStation(e):null;if(s&&e.delta<=6){setHovered(null);dispatch({type:'click',id:s.id})}}}
         onPointerMove={e=>{if(kind!=='desk'&&!frameScreen)return;e.stopPropagation();const s=frameScreen&&panel.phase==='closed'?frameScreen:deskStation(e);setHovered(s?.id??null);document.body.style.cursor=s?'pointer':''}}
-        onPointerOut={()=>{if(kind==='desk'||frameScreen){setHovered(null);document.body.style.cursor=''}}} onPointerOver={e=>e.stopPropagation()}/>{kind==='hologram'&&<mesh geometry={mesh.geometry} material={wireMaterial} raycast={()=>null}/>}</group>
+        onPointerOut={()=>{if(kind==='desk'||frameScreen){setHovered(null);document.body.style.cursor=''}}} onPointerOver={e=>e.stopPropagation()}/></group>
   })}
   {focused&&<Preview screen={focused} host={host}/>}
 
@@ -499,7 +524,7 @@ export function RoomScene(props:Props){
   <LabelProjector hidden={props.panel.phase!=='closed'}/>
   <EffectComposer depthBuffer multisampling={0}>
    <Beam/>
-   {fx?<Bloom intensity={.55} luminanceThreshold={.20} mipmapBlur/>:<></>}
+   {fx?<Bloom intensity={.55} luminanceThreshold={.20} mipmapBlur resolutionScale={.5}/>:<></>}
   </EffectComposer>
  </Canvas></>
 }

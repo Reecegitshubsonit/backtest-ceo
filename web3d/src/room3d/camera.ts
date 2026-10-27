@@ -5,7 +5,8 @@ export const HOME = { position: [0, 3.844, 7.04] as XYZ, target: [0, 3.3, 0] as 
 export const LIMITS = { radius: 8, floor: 0.18, ceiling: 7.0 }
 /** Zoom tuning: wheel sensitivity (log-distance per wheel pixel), damping rate, closest approach to the
  * surface under the cursor, farthest camera-to-focus distance. */
-export const ZOOM = { wheel: 0.00125, smoothing: 11, minSurface: 0.32, maxDistance: 11 }
+// out: rate at which each scroll-out step eases toward the overview (about a third of the way per notch)
+export const ZOOM = { wheel: 0.00125, smoothing: 11, minSurface: 0.32, maxDistance: 11, out: 3.5 }
 /** Inspect (zoom-to-read) tuning. A screen under the pointer is taken head-on once the user has
  * scrolled toward it by `gesture` in total (log-distance, two mouse notches; it resets when the pointer
  * moves to another screen, the user scrolls out or drags) or it already
