@@ -5,6 +5,7 @@ import { CEO_LABEL, SUMMARY_LABEL } from '../config/imageRoom'
 import { ROOM_OBJECTS } from '../config/roomObjects'
 import { screenById, screenName } from '../config/roomScreens'
 import { referencePoint } from './camera'
+import { liveAgents, STATUS_LABEL } from './strategies'
 
 const nodes=new Map<string,HTMLDivElement>()
 let hovered:string|null=null
@@ -21,7 +22,7 @@ const anchors=[
  ...SEATS.map(s=>{
   // agents sit evenly round the ring: each label floats just above its own figure's head
   const o=ROOM_OBJECTS.find(o=>o.name===`agent_${s.id}`)!,b=o.bounds
-  return{id:s.id,point:[0,0],z:0,at:new THREE.Vector3((b[0][0]+b[1][0])/2,b[1][1]+.32,(b[0][2]+b[1][2])/2),lines:[s.name,s.job,'● Live Feed']}
+  return{id:s.id,point:[0,0],z:0,at:new THREE.Vector3((b[0][0]+b[1][0])/2,b[1][1]+.32,(b[0][2]+b[1][2])/2),lines:[s.name,s.job,'● IDLE']}
  }),
 ].map(a=>{
  // Canonical reference label positions, anchored at each object's real depth.
@@ -42,6 +43,8 @@ export function LabelProjector({hidden}:{hidden:boolean}){
   const ordered=[...anchors].sort((a,b)=>(a.id==='ceo'?-1000:a.world.distanceTo(camera.position))-(b.id==='ceo'?-1000:b.world.distanceTo(camera.position)))
   for(const a of ordered){
    const el=nodes.get(a.id);if(!el)continue
+   const ag=liveAgents.slots.get(a.id) // one agent per strategy: the label names the strategy and its status
+   if(ag){const want=`${ag.strategy?.name??a.lines[1]}|● ${STATUS_LABEL[ag.status]}${liveAgents.source==='demo'?' · DEMO':''}`;if(el.dataset.live!==want){el.dataset.live=want;const [l1,l2]=want.split('|');if(el.children[1])el.children[1].textContent=l1;if(el.children[2])el.children[2].textContent=l2}}
    const v=a.world.clone().project(camera),behind=v.z>1||v.z< -1
    const scale=THREE.MathUtils.clamp(a.homeDistance/camera.position.distanceTo(a.world),.4,1.3)
    const x=(v.x+1)*size.width/2,y=(1-v.y)*size.height/2

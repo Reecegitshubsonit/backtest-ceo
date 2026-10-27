@@ -10,12 +10,12 @@ import type { PanelAction, PanelState } from '../model/roomPanel'
 import { deskScreenAt } from '../model/deskPicking'
 import { Slot } from '../panels/Slot'
 import { HOME, INSPECT, LIMITS, flightDistance, inRoom, inspectDistance, inspectPose, readableUp, screenFraction, ZOOM } from './camera'
-import type { Asset, Bar, Timeframe } from '../model/types'
 import { SEATS } from '../config/seats'
 import { api } from '../net/api'
 import { CameraRig } from './CameraRig'
 import { roomMaterial } from './material'
 import { Beam } from './Beam'
+import { liveAgents, startLiveAgents, STATUS_LABEL, type AgentStatus } from './strategies'
 import { LabelProjector, setHovered, getHovered, getInspecting, setInspecting } from './labels'
 
 THREE.Mesh.prototype.raycast=acceleratedRaycast
@@ -66,135 +66,122 @@ function displayTexture(screen:RoomScreen,index:number){
 }
 
 // ---------------------------------------------------------------------------------------------
-// Live desk consoles, drawn into each console's own screen texture (no DOM overlay). Data is read
-// only from the existing engine API the panels use: /api/health (heartbeat, keys) and /api/bars
-// (each agent's market feed). There is no agent runtime yet, so every agent reports IDLE honestly;
-// the feed panel, its indicator read-outs and the clock update live. Redrawn once a second.
+// Live desk consoles, drawn into the ring computer (no DOM overlay). One agent = one strategy: each
+// agent's region is a strategy tile (name, status, equity curve, stats, recent trades, log) fed by
+// ./strategies (engine /api/agents/live when it exists, ?demo=1 for a labelled simulation, honest
+// empty states otherwise). The engine heartbeat comes from /api/health. Nothing here is invented:
+// a value the source did not send is drawn as "—".
 type Engine={state:'checking'|'up'|'down';keys:boolean;at:number;latency:number[]}
-type Feed={asset:Asset;symbol:string;tf:Timeframe;days:number;focus:string}
-const FEEDS:Record<string,Feed>={
- scanner:{asset:'etfs',symbol:'QQQ',tf:'1Min',days:4,focus:'MOVE SCAN'},
- strategist:{asset:'etfs',symbol:'SPY',tf:'5Min',days:6,focus:'SMA 9 / 21'},
- backtester:{asset:'crypto',symbol:'BTC/USD',tf:'1Min',days:1,focus:'REPLAY FEED'},
- auditor:{asset:'etfs',symbol:'IWM',tf:'15Min',days:8,focus:'DATA CHECKS'},
- regime:{asset:'etfs',symbol:'SPY',tf:'1Day',days:150,focus:'REGIME READ'},
- risk:{asset:'crypto',symbol:'ETH/USD',tf:'1Min',days:1,focus:'RISK READ'},
-}
-const STEP_MS:Record<Timeframe,number>={'1Min':6e4,'5Min':3e5,'15Min':9e5,'1Hour':36e5,'1Day':864e5}
-type FeedState={bars:Bar[];at:number;error?:string}
-const live={engine:{state:'checking',keys:false,at:0,latency:[]} as Engine,feeds:new Map<string,FeedState>(),log:new Map<string,string[]>()}
-/** Per-console activity log (engine and feed events as they happen); 'engine' is shared by every console. */
+const live={engine:{state:'checking',keys:false,at:0,latency:[]} as Engine,log:new Map<string,string[]>()}
+/** Engine events as they happen, shown in the logs when a strategy has nothing of its own yet. */
 function note(key:string,line:string){const l=live.log.get(key)??[];if(l[0]?.slice(9)===line)return;l.unshift(`${hhmmss(Date.now())} ${line}`);live.log.set(key,l.slice(0,8))}
-const day=(ms:number)=>new Date(ms).toISOString().slice(0,10)
-async function pollFeed(seat:string){
- const f=FEEDS[seat],now=Date.now()
- try{const r=await api.bars(f.asset,f.symbol,f.tf,day(now-f.days*864e5),day(now))
-  const bars=r.bars.filter(b=>Date.parse(b.t)<=now).slice(-90) // never show bars from the future
-  live.feeds.set(seat,{bars,at:Date.now()});note(seat,bars.length?`${f.symbol} ${f.tf} · ${bars.length} bars · last ${fmt(bars.at(-1)!.c)}`:`${f.symbol} ${f.tf} · no bars in window`)}
- catch(e){const code=(e as {code?:string}).code??'ERROR';live.feeds.set(seat,{bars:live.feeds.get(seat)?.bars??[],at:Date.now(),error:code});note(seat,`${f.symbol} feed failed (${code})`)}
-}
 async function pollHealth(){const t0=performance.now()
  try{const h=await api.health();const e=live.engine;live.engine={state:'up',keys:h.alpaca_keys_present,at:Date.now(),latency:[...e.latency,performance.now()-t0].slice(-40)};if(e.state!=='up')note('engine',`engine up${h.alpaca_keys_present?'':' · alpaca keys missing'}`)}
  catch{if(live.engine.state!=='down')note('engine','engine unreachable');live.engine={...live.engine,state:'down',at:Date.now()}}}
-const sma=(v:number[],n:number)=>v.map((_,i)=>i+1<n?NaN:v.slice(i+1-n,i+1).reduce((a,b)=>a+b)/n)
-const stdev=(v:number[])=>{const m=v.reduce((a,b)=>a+b,0)/v.length;return Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/Math.max(1,v.length-1))}
 const hhmmss=(ms:number)=>new Date(ms).toLocaleTimeString([],{hour12:false})
-const fmt=(v:number)=>v>=1000?v.toLocaleString(undefined,{maximumFractionDigits:0}):v.toFixed(2)
-/** Role read-outs computed from the feed's bars (indicator values, not agent decisions). */
-function readouts(seat:string,bars:Bar[],tf:Timeframe,now:number):[string,string,string?][]{
- const c=bars.map(b=>b.c),last=c.at(-1)!,first=c[0],ch=(last/first-1)*100,ret=c.slice(1).map((v,i)=>Math.log(v/c[i]))
- const sign=(v:number)=>(v>=0?'+':'')+v.toFixed(2)+'%'
- switch(seat){
-  case 'scanner':{const vol=bars.map(b=>b.v),avg=vol.slice(0,-1).reduce((a,b)=>a+b,0)/Math.max(1,vol.length-1),hi=Math.max(...bars.map(b=>b.h)),lo=Math.min(...bars.map(b=>b.l))
-   return[['Window move',sign(ch),ch>=0?CYAN:PURPLE],['Range',`${fmt(lo)} – ${fmt(hi)}`],['Last bar volume',`${(vol.at(-1)!/avg).toFixed(2)}× avg`]]}
-  case 'strategist':{const a=sma(c,9).at(-1)!,b=sma(c,21).at(-1)!
-   return[['SMA 9',fmt(a)],['SMA 21',fmt(b)],['State',a>b?'9 ABOVE 21':'9 BELOW 21',a>b?CYAN:PURPLE]]}
-  case 'backtester':return[['Bars buffered',String(bars.length)],['Last close',fmt(last)],['Backtest','none running']]
-  case 'auditor':{let gaps=0;for(let i=1;i<bars.length;i++)if(Date.parse(bars[i].t)-Date.parse(bars[i-1].t)>STEP_MS[tf]*1.5)gaps++
-   const age=Math.round((now-Date.parse(bars.at(-1)!.t))/6e4)
-   return[['Bars checked',String(bars.length)],['Session gaps',String(gaps)],['Last bar age',age<120?`${age} min`:`${Math.round(age/60)} h`]]}
-  case 'regime':{const r20=(last/c[Math.max(0,c.length-21)]-1)*100,v=stdev(ret.slice(-20))*Math.sqrt(252)*100
-   return[['20-bar return',sign(r20),r20>=0?CYAN:PURPLE],['Realised vol',v.toFixed(1)+'%'],['Read',Math.abs(r20)<2?'RANGE':r20>0?'TREND UP':'TREND DOWN',r20>=0?CYAN:PURPLE]]}
-  default:{let peak=-Infinity,dd=0;for(const v of c){peak=Math.max(peak,v);dd=Math.min(dd,v/peak-1)}
-   return[['Max drawdown',(dd*100).toFixed(2)+'%',PURPLE],['Bar σ',(stdev(ret)*100).toFixed(3)+'%'],['Limits','none set']]}
- }
+const hhmm=(iso:string)=>{const t=Date.parse(iso);return Number.isFinite(t)?hhmmss(t):'--:--:--'}
+const GREEN='#3ddc84',RED='#ff5a6a',ORANGE='#ff8a3d'
+const STATUS_COLOR:Record<AgentStatus,string>={idle:'#6d86a8',researching:'#9b7bff',coding:'#5fd0ff',backtesting:ORANGE,live_paper:GREEN,error:RED}
+const signR=(v:number)=>(v>0?'+':'')+v.toFixed(1)+'R'
+/** What a region's pixels depend on; it is redrawn and re-uploaded only when this changes. */
+function consoleKey(screen:RoomScreen,now:number){
+ const slot=screen.seat,e=live.engine
+ if(slot)return `${liveAgents.version.get(slot)}|${liveAgents.sourceVersion}|${e.state}|${e.keys}`
+ if(screen.id==='d8')return `${Math.floor(now/1000)}` // the operator console carries a clock
+ return `${e.at}|${e.state}`
 }
 // One agent's work area on the ring computer, drawn into its own offscreen block (top = toward the
 // CEO) and then blended into the ring with soft edges. Panels are glass tints, not framed monitors.
 function drawConsole(canvas:HTMLCanvasElement,screen:RoomScreen,now:number){
  const c=canvas.getContext('2d')!,W=canvas.width,H=canvas.height,u=H/100,e=live.engine
- const seat=screen.seat?SEATS.find(x=>x.id===screen.seat):undefined,feed=seat?FEEDS[seat.id]:undefined,fs=seat?live.feeds.get(seat.id):undefined
- const inset=0,m=4*u
- const xl=(y:number)=>inset*(1-y/H)+m,xr=(y:number)=>W-xl(y)
- /** A panel between rows y0..y1 spanning fractions a..b of the usable width; returns its inscribed rect. */
+ const seat=screen.seat?SEATS.find(x=>x.id===screen.seat):undefined
+ const m=4*u,xl=()=>m,xr=()=>W-m
+ /** A panel between rows y0..y1 spanning fractions a..b of the usable width; returns its inner rect. */
  const zone=(y0:number,y1:number,a:number,b:number,label?:string,accent='#2b6fc0')=>{
-  const L=(y:number)=>xl(y)+a*(xr(y)-xl(y))+(a>0?.6*u:0),R=(y:number)=>xl(y)+b*(xr(y)-xl(y))-(b<1?.6*u:0)
-  c.beginPath();c.moveTo(L(y0),y0);c.lineTo(R(y0),y0);c.lineTo(R(y1),y1);c.lineTo(L(y1),y1);c.closePath()
-  c.fillStyle='#0a1d4266';c.fill();c.globalAlpha=.45;c.strokeStyle=accent;c.lineWidth=.25*u;c.stroke();c.globalAlpha=1
-  const x0=Math.max(L(y0),L(y1)),x1=Math.min(R(y0),R(y1))
-  if(label){c.fillStyle='#8fb4e0';c.font=`600 ${2.8*u}px ui-monospace,monospace`;c.textAlign='left';c.fillText(label,x0+1.4*u,y0+3.2*u)}
-  return {x:x0+1.4*u,y:y0+(label?6*u:1.5*u),w:x1-x0-2.8*u,h:y1-y0-(label?7.5*u:3*u)}
+  const x0=xl()+a*(xr()-xl())+(a>0?.6*u:0),x1=xl()+b*(xr()-xl())-(b<1?.6*u:0)
+  c.beginPath();c.roundRect(x0,y0,x1-x0,y1-y0,1.2*u);c.fillStyle='#0a1d4270';c.fill();c.globalAlpha=.5;c.strokeStyle=accent;c.lineWidth=.25*u;c.stroke();c.globalAlpha=1
+  if(label){c.fillStyle='#8fb4e0';c.font=`600 ${2.5*u}px ui-monospace,monospace`;c.textAlign='left';c.fillText(label,x0+1.4*u,y0+3*u)}
+  return {x:x0+1.4*u,y:y0+(label?5.6*u:1.5*u),w:x1-x0-2.8*u,h:y1-y0-(label?7*u:3*u)}
  }
  const text=(v:string,x:number,y:number,size:number,color:string,align:CanvasTextAlign='left',weight=400,mono=true,max?:number)=>{c.textAlign=align;c.fillStyle=color;c.font=`${weight} ${size*u}px ${mono?'ui-monospace,monospace':'system-ui,sans-serif'}`;c.fillText(v,x,y,max)}
- // a soft pool of light under the work area; its edges are feathered into the ring by drawRing()
+ const chip=(label:string,color:string,x:number,y:number,size=2.6)=>{c.font=`700 ${size*u}px ui-monospace,monospace`;const w=c.measureText(label).width+2.4*u
+  c.beginPath();c.roundRect(x-w,y-2.2*u,w,4.4*u,.9*u);c.fillStyle=color+'33';c.fill();c.strokeStyle=color;c.lineWidth=.25*u;c.stroke();text(label,x-1.2*u,y,size,color,'right',700);return w}
+ const engineLine=()=>`ENGINE ${e.state==='up'?'UP':e.state==='down'?'OFFLINE':'…'}${e.state==='up'&&!e.keys?' · NO KEYS':''}`
  c.clearRect(0,0,W,H);c.textBaseline='middle'
  const g=c.createRadialGradient(W/2,H*.55,H*.1,W/2,H*.55,Math.max(W,H)*.75);g.addColorStop(0,'#0b2a5ccc');g.addColorStop(1,'#04102a55');c.fillStyle=g;c.fillRect(0,0,W,H)
- // header strip: agent, state, engine, clock
- const dot=e.state==='up'?'#38e6a0':e.state==='down'?'#ff5a7a':'#f3c74b',rt=e.latency.at(-1)
- const hd=zone(2.5*u,19.5*u,0,1,undefined,'#3d8bff')
- const title=seat?seat.name:screen.id==='d8'?'COMMAND CONSOLE':`AUX CONSOLE ${screen.n}`
- text(title,hd.x+.5*u,hd.y+3.6*u,seat||screen.id==='d8'?4.8:4.4,'#e8f3ff','left',700,false)
- text(seat?seat.job.toUpperCase():screen.id==='d8'?'OPERATOR · ALL AGENTS':'UNASSIGNED',hd.x+.5*u,hd.y+8.8*u,2.7,'#7fa6d6')
- if(seat||screen.id==='d8')text(hhmmss(now),hd.x+hd.w,hd.y+3.6*u,4.6,'#cfe6ff','right',600)
- c.fillStyle=dot;c.beginPath();c.arc(hd.x+1.4*u,hd.y+13.4*u,1.1*u,0,7);c.fill()
- text(`ENGINE ${e.state==='up'?'UP':e.state==='down'?'OFFLINE':'…'}${e.state==='up'&&rt!==undefined?` · ${rt.toFixed(0)} ms`:''}${e.state==='up'&&!e.keys?' · NO KEYS':''}`,hd.x+3.6*u,hd.y+13.4*u,2.7,'#9fc3ee','left',600)
- text(seat?'IDLE · NO STRATEGY RUNNING':screen.id==='d8'?'MONITORING':'STANDBY',hd.x+hd.w,hd.y+8.8*u,2.9,seat?'#f3c74b':'#6d86a8','right',600)
- const Y0=22*u,Y1=70*u,Y2=73*u,Y3=97*u
- const latency=(r:{x:number;y:number;w:number;h:number})=>{const L=e.latency;if(L.length<2)return;const max=Math.max(...L,1);c.strokeStyle=CYAN;c.lineWidth=.4*u;c.beginPath();L.forEach((v,i)=>{const x=r.x+i/(L.length-1)*r.w,y=r.y+r.h-v/max*r.h*.9;i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();text(`max ${max.toFixed(0)} ms`,r.x+r.w,r.y+1.5*u,2.4,'#7f9cc4','right')}
- const logLines=(r:{x:number;y:number;w:number;h:number},keys:string[])=>{
-  const lines=keys.flatMap(k=>live.log.get(k)??[]).sort().reverse(),n=Math.max(1,Math.floor(r.h/(3.6*u)))
-  if(!lines.length)text('waiting for first event…',r.x,r.y+1.8*u,2.8,'#6d86a8')
-  lines.slice(0,n).forEach((l,i)=>{text(l.slice(0,8),r.x,r.y+1.8*u+i*3.6*u,2.7,'#6d86a8');text(l.slice(9),r.x+15*u,r.y+1.8*u+i*3.6*u,2.7,i?'#9fb9dc':'#d6e8ff','left',400,true,r.w-15*u)})
- }
- if(seat&&feed){
-  // chart panel: the agent's live feed
-  const ch=zone(Y0,Y1,0,.64,`${feed.symbol} · ${feed.tf}`)
-  const bars=fs?.bars??[]
-  if(bars.length>1){
-   const last=bars.at(-1)!,lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h)),cw=ch.w-9*u,cy=ch.y+1*u,chh=ch.h-6*u
-   const Y=(v:number)=>cy+chh*(1-(v-lo)/Math.max(1e-9,hi-lo))
-   text(fmt(last.c),ch.x+ch.w,ch.y-2.8*u,4,last.c>=bars[0].c?CYAN:PURPLE,'right',700)
-   c.strokeStyle=GRID;c.lineWidth=.2*u;for(let i=0;i<=4;i++){const y=cy+chh*i/4;c.beginPath();c.moveTo(ch.x,y);c.lineTo(ch.x+cw,y);c.stroke()}
-   const n=bars.length,bw=cw/n
-   bars.forEach((b,i)=>{const x=ch.x+(i+.5)*bw,up=b.c>=b.o;c.strokeStyle=c.fillStyle=up?CYAN:PURPLE;c.lineWidth=Math.max(1,.18*u);c.beginPath();c.moveTo(x,Y(b.h));c.lineTo(x,Y(b.l));c.stroke();c.fillRect(x-bw*.32,Math.min(Y(b.o),Y(b.c)),bw*.64,Math.max(1,Math.abs(Y(b.o)-Y(b.c))))})
-   if(seat.id==='strategist')for(const [nn,col] of [[9,'#f3c74b'],[21,'#c9b8ff']] as [number,string][]){const mm=sma(bars.map(b=>b.c),nn);c.strokeStyle=col;c.lineWidth=.4*u;c.beginPath();let on=false;mm.forEach((v,i)=>{if(isNaN(v))return;const x=ch.x+(i+.5)*bw;on?c.lineTo(x,Y(v)):c.moveTo(x,Y(v));on=true});c.stroke()}
-   text(fmt(hi),ch.x+ch.w,cy+1.2*u,2.5,'#7f9cc4','right');text(fmt(lo),ch.x+ch.w,cy+chh-1.2*u,2.5,'#7f9cc4','right')
-   text(`last bar ${new Date(last.t).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}`,ch.x,ch.y+ch.h-1.5*u,2.5,'#7f9cc4')
-  }else text(fs?.error?`Feed unavailable (${fs.error})`:'Waiting for engine feed…',ch.x,ch.y+6*u,3.2,'#7f9cc4','left',400,false)
-  // key numbers
-  const kn=zone(Y0,Y1,.64,1,feed.focus,'#6a4fd0')
-  const rows=bars.length>1?readouts(seat.id,bars,feed.tf,now):[]
-  rows.forEach(([k,v,col],i)=>{const y=kn.y+2*u+i*12*u;text(k,kn.x,y,2.7,'#7f9cc4','left',400,false);text(v,kn.x,y+5*u,4.2,col??'#e4f0ff','left',700)})
-  text(fs?`feed ${Math.max(0,Math.round((now-fs.at)/1000))} s ago`:'feed …',kn.x,kn.y+kn.h-1*u,2.5,'#6d86a8')
-  // activity log + task status, across the wide agent-side edge
-  logLines(zone(Y2,Y3,0,.62,'ACTIVITY LOG'),[seat.id,'engine'])
-  const st=zone(Y2,Y3,.62,1,'TASK','#6a4fd0')
-  text('No strategy assigned',st.x,st.y+2*u,3,'#cfe3f7','left',600,false,st.w)
-  text(seat.job.toLowerCase()+' · awaiting work',st.x,st.y+7*u,2.6,'#7f9cc4','left',400,false,st.w)
-  text('Click to open this agent',st.x,st.y+12*u,2.6,'#5f7ea6','left',400,false,st.w)
+ if(seat){
+  const a=liveAgents.slots.get(seat.id)!,src=liveAgents.source,demo=src==='demo',st=a.strategy,s=a.stats
+  // header: strategy name, agent and strategy id, status, data source
+  const hd=zone(2.5*u,18*u,0,1,undefined,demo?ORANGE:'#3d8bff')
+  const cw=chip(STATUS_LABEL[a.status],STATUS_COLOR[a.status],hd.x+hd.w,hd.y+2.6*u,2.8)
+  text(st?.name??'NO STRATEGY ASSIGNED',hd.x+.3*u,hd.y+2.8*u,4.4,st?'#f2f7ff':'#8fa9cc','left',700,false,hd.w-cw-2*u)
+  text([seat.name,...(st?[st.id,st.version,st.market,st.timeframe].filter(Boolean):[seat.job.toLowerCase()])].join(' · '),hd.x+.3*u,hd.y+7.6*u,2.4,'#7fa6d6','left',400,true,hd.w)
+  const srcText=demo?'DEMO · SIMULATED DATA · NOT A REAL RESULT':src==='engine'?`LIVE FROM ENGINE${a.updated?` · updated ${hhmmss(a.updated)}`:''}`:src==='unavailable'?'NO LIVE FEED · engine has no /api/agents/live yet':src==='down'?'ENGINE OFFLINE · no live data':'CHECKING ENGINE…'
+  text(srcText,hd.x+.3*u,hd.y+11.6*u,2.4,demo?ORANGE:src==='engine'?GREEN:'#f3c74b','left',700,true,hd.w*.72)
+  if(a.progress!==null){const pw=hd.w*.25,px=hd.x+hd.w-pw,py=hd.y+11.1*u;c.fillStyle='#ffffff14';c.fillRect(px,py,pw,1*u);c.fillStyle=STATUS_COLOR[a.status];c.fillRect(px,py,pw*Math.min(1,Math.max(0,a.progress)),1*u)}
+  // key stats, RHerman tile style
+  const stats:[string,string,string][]=[
+   ['TRADES',s?String(s.trades):'—','#e4f0ff'],
+   ['WR',s?.wr!=null?(s.wr*100).toFixed(1)+'%':'—','#e4f0ff'],
+   ['PF',s?.pf!=null?s.pf.toFixed(2):'—',s?.pf!=null?(s.pf>=1?GREEN:RED):'#e4f0ff'],
+   ['NET R',s?signR(s.netR):'—',s?(s.netR>0?GREEN:s.netR<0?RED:'#e4f0ff'):'#e4f0ff'],
+   ['MAX DD R',s?s.maxDD.toFixed(1)+'R':'—',s&&s.maxDD<0?RED:'#e4f0ff']]
+  stats.forEach(([k,v,col],i)=>{const z=zone(20*u,33*u,i/5,(i+1)/5,k,'#2b6fc0');text(v,z.x,z.y+3*u,4.2,col,'left',700,true,z.w)})
+  // equity curve (cumulative net R)
+  const eq=zone(35*u,69*u,0,.6,'EQUITY · NET R',demo?ORANGE:'#2b6fc0')
+  c.strokeStyle=GRID;c.lineWidth=.2*u;for(let i=0;i<=4;i++){const y=eq.y+eq.h*i/4;c.beginPath();c.moveTo(eq.x,y);c.lineTo(eq.x+eq.w,y);c.stroke()}
+  if(a.equity.length>1){
+   const v=a.equity,lo=Math.min(0,...v),hi=Math.max(0,...v),Y=(r:number)=>eq.y+eq.h*(1-(r-lo)/Math.max(1e-9,hi-lo)),X=(i:number)=>eq.x+i/(v.length-1)*(eq.w-8*u),up=v.at(-1)!>=0
+   c.setLineDash([.8*u,.8*u]);c.strokeStyle='#7f9cc4';c.lineWidth=.2*u;c.beginPath();c.moveTo(eq.x,Y(0));c.lineTo(eq.x+eq.w-8*u,Y(0));c.stroke();c.setLineDash([])
+   const fill=c.createLinearGradient(0,eq.y,0,eq.y+eq.h);fill.addColorStop(0,(up?GREEN:RED)+'55');fill.addColorStop(1,(up?GREEN:RED)+'05')
+   c.beginPath();v.forEach((r,i)=>i?c.lineTo(X(i),Y(r)):c.moveTo(X(i),Y(r)));c.lineTo(X(v.length-1),Y(0));c.lineTo(X(0),Y(0));c.closePath();c.fillStyle=fill;c.fill()
+   c.beginPath();v.forEach((r,i)=>i?c.lineTo(X(i),Y(r)):c.moveTo(X(i),Y(r)));c.strokeStyle=up?GREEN:RED;c.lineWidth=.45*u;c.stroke()
+   const marks:[number,string][]=[[Y(hi),signR(hi)],[Y(0),'0R'],[Y(lo),signR(lo)]]
+   marks.forEach(([y,l],i)=>{if(marks.slice(0,i).every(([yy])=>Math.abs(yy-y)>3*u))text(l,eq.x+eq.w,Math.min(eq.y+eq.h-1*u,Math.max(eq.y+1*u,y)),2.3,'#7f9cc4','right')})
+  }else{
+   c.setLineDash([.8*u,.8*u]);c.strokeStyle='#3a5a88';c.lineWidth=.25*u;c.beginPath();c.moveTo(eq.x,eq.y+eq.h/2);c.lineTo(eq.x+eq.w,eq.y+eq.h/2);c.stroke();c.setLineDash([])
+   text(st?'awaiting run':'no strategy · no equity',eq.x+eq.w/2,eq.y+eq.h/2-3*u,3,'#7f9cc4','center',600,false)
+  }
+  if(demo)text('DEMO · SIMULATED',eq.x+eq.w,eq.y-2.6*u,2.3,ORANGE,'right',700)
+  // recent trades
+  const tr=zone(35*u,69*u,.6,1,'RECENT TRADES'),rows=Math.max(1,Math.floor(tr.h/(3.7*u)))
+  if(!a.trades.length)text(st?'no trades yet':'—',tr.x,tr.y+1.8*u,2.6,'#6d86a8')
+  a.trades.slice(0,rows).forEach((t,i)=>{const y=tr.y+1.8*u+i*3.7*u;text(hhmm(t.t),tr.x,y,2.4,'#6d86a8');text(t.side==='long'?'LONG':'SHORT',tr.x+tr.w*.48,y,2.4,t.side==='long'?'#8fd0ff':'#c9b8ff','left',600)
+   text((t.r>=0?'+':'')+t.r.toFixed(2)+'R',tr.x+tr.w,y,2.6,t.r>=0?GREEN:RED,'right',700)})
+  // log: the strategy's own lines; until it has any, the data source and engine events
+  const lg=zone(71*u,97*u,0,1,'LOG'),n=Math.max(1,Math.floor(lg.h/(3.5*u)))
+  const lines:[string,string,string][]=a.log.length?a.log.map(l=>[hhmm(l.t),l.msg,l.level==='error'?RED:l.level==='warn'?'#f3c74b':'#d6e8ff']):[
+   [hhmmss(liveAgents.checked||now),liveAgents.detail||'checking engine for live agent data',demo?ORANGE:'#f3c74b'],
+   ...(live.log.get('engine')??[]).map(l=>[l.slice(0,8),l.slice(9),'#9fb9dc'] as [string,string,string])]
+  lines.slice(0,n).forEach(([t,msg,col],i)=>{const y=lg.y+1.6*u+i*3.5*u;text(t,lg.x,y,2.5,'#6d86a8');text(msg,lg.x+14*u,y,2.5,i?col+'cc':col,'left',400,true,lg.w-14*u)})
+  text(engineLine(),lg.x+lg.w,lg.y-3.6*u,2.3,e.state==='up'?GREEN:e.state==='down'?RED:'#f3c74b','right',600)
  }else if(screen.id==='d8'){
-  // the operator's console: every agent's feed at a glance
-  const tb=zone(Y0,Y1,0,.66,'AGENTS')
-  SEATS.forEach((a,i)=>{const f=FEEDS[a.id],b=live.feeds.get(a.id)?.bars??[],y=tb.y+2*u+i*(tb.h-2*u)/6,last=b.at(-1),ch=b.length>1?(last!.c/b[0].c-1)*100:NaN
-   text(a.name,tb.x,y,2.8,'#d6e8ff','left',600,false);text(`${f.symbol} ${f.tf}`,tb.x+tb.w*.45,y,2.6,'#8fb4e0')
-   text(last?fmt(last.c):'—',tb.x+tb.w*.78,y,2.8,'#e4f0ff','right',700);text(isNaN(ch)?'':(ch>=0?'+':'')+ch.toFixed(2)+'%',tb.x+tb.w,y,2.6,ch>=0?CYAN:PURPLE,'right')})
-  const lt=zone(Y0,Y1,.66,1,'ENGINE ROUND TRIP','#6a4fd0');latency({x:lt.x,y:lt.y+2*u,w:lt.w,h:lt.h-6*u})
-  text(e.keys?'Alpaca keys present':'Alpaca keys missing',lt.x,lt.y+lt.h-1*u,2.5,e.keys?'#38e6a0':'#f3c74b')
-  logLines(zone(Y2,Y3,0,1,'ACTIVITY LOG'),['engine',...SEATS.map(a=>a.id)])
+  // the operator's console: every agent's strategy at a glance
+  const hd=zone(2.5*u,18*u,0,1,undefined,'#3d8bff')
+  text('COMMAND CONSOLE',hd.x+.3*u,hd.y+2.8*u,4.6,'#e8f3ff','left',700,false);text(hhmmss(now),hd.x+hd.w,hd.y+2.8*u,4.4,'#cfe6ff','right',600)
+  text('OPERATOR · ONE AGENT PER STRATEGY',hd.x+.3*u,hd.y+7.6*u,2.5,'#7fa6d6')
+  const src=liveAgents.source
+  text(src==='demo'?'DEMO · SIMULATED DATA':src==='engine'?'LIVE FROM ENGINE':src==='unavailable'?'NO LIVE AGENT FEED ON THIS ENGINE':src==='down'?'ENGINE OFFLINE':'CHECKING…',hd.x+.3*u,hd.y+11.6*u,2.4,src==='demo'?ORANGE:src==='engine'?GREEN:'#f3c74b','left',700)
+  text(engineLine(),hd.x+hd.w,hd.y+11.6*u,2.4,e.state==='up'?GREEN:e.state==='down'?RED:'#f3c74b','right',600)
+  const tb=zone(20*u,69*u,0,1,'STRATEGIES')
+  const cols=[0,.24,.62,.82,1],head=['AGENT','STRATEGY','STATUS','NET R']
+  head.forEach((h,i)=>text(h,tb.x+tb.w*cols[i]+(i===3?tb.w*.18:0),tb.y+1.2*u,2.3,'#6d86a8',i===3?'right':'left',600))
+  SEATS.forEach((sx,i)=>{const a=liveAgents.slots.get(sx.id)!,y=tb.y+6*u+i*(tb.h-6*u)/6
+   text(sx.name.replace(' AGENT',''),tb.x,y,2.5,'#d6e8ff','left',600,false,tb.w*.23)
+   text(a.strategy?.name??'—',tb.x+tb.w*cols[1],y,2.5,a.strategy?'#e4f0ff':'#6d86a8','left',400,false,tb.w*.37)
+   text(STATUS_LABEL[a.status],tb.x+tb.w*cols[2],y,2.4,STATUS_COLOR[a.status],'left',700)
+   text(a.stats?signR(a.stats.netR):'—',tb.x+tb.w,y,2.6,a.stats?(a.stats.netR>=0?GREEN:RED):'#6d86a8','right',700)})
+  const lg=zone(71*u,97*u,0,1,'ACTIVITY LOG'),n=Math.max(1,Math.floor(lg.h/(3.5*u)))
+  const lines=[...SEATS.flatMap(sx=>(liveAgents.slots.get(sx.id)!.log.slice(0,2)).map(l=>[hhmm(l.t),`${sx.id} · ${l.msg}`])),...(live.log.get('engine')??[]).map(l=>[l.slice(0,8),l.slice(9)])].sort((p,q)=>p[0]<q[0]?1:-1)
+  if(!lines.length)text('waiting for first event…',lg.x,lg.y+1.6*u,2.6,'#6d86a8')
+  lines.slice(0,n).forEach(([t,msg],i)=>{const y=lg.y+1.6*u+i*3.5*u;text(t,lg.x,y,2.5,'#6d86a8');text(msg,lg.x+14*u,y,2.5,i?'#9fb9dc':'#d6e8ff','left',400,true,lg.w-14*u)})
  }else{
-  const lt=zone(Y0,Y1,0,1,'ENGINE ROUND TRIP');latency({x:lt.x,y:lt.y+2*u,w:lt.w,h:lt.h-4*u})
-  const nt=zone(Y2,Y3,0,1,'STATUS');text('Not assigned yet · click to open',nt.x,nt.y+2*u,3,'#cfe3f7','left',600,false)
-  text(`engine checked ${e.at?Math.max(0,Math.round((now-e.at)/1000)):'–'} s ago`,nt.x,nt.y+7*u,2.6,'#7f9cc4')
+  const rt=e.latency.at(-1)
+  const hd=zone(2.5*u,18*u,0,1,undefined,'#3d8bff');text(`AUX CONSOLE ${screen.n}`,hd.x+.3*u,hd.y+3*u,4.2,'#e8f3ff','left',700,false);text('UNASSIGNED',hd.x+.3*u,hd.y+8.6*u,2.6,'#7fa6d6')
+  text(engineLine()+(e.state==='up'&&rt!==undefined?` · ${rt.toFixed(0)} ms`:''),hd.x+.3*u,hd.y+12.4*u,2.4,'#9fc3ee','left',600)
+  const lt=zone(20*u,69*u,0,1,'ENGINE ROUND TRIP'),L=e.latency
+  if(L.length>1){const max=Math.max(...L,1);c.strokeStyle=CYAN;c.lineWidth=.4*u;c.beginPath();L.forEach((v,i)=>{const x=lt.x+i/(L.length-1)*lt.w,y=lt.y+lt.h-v/max*lt.h*.9;i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();text(`max ${max.toFixed(0)} ms`,lt.x+lt.w,lt.y+1.5*u,2.4,'#7f9cc4','right')}
+  const nt=zone(71*u,97*u,0,1,'STATUS');text('Not assigned yet · click to open',nt.x,nt.y+2*u,3,'#cfe3f7','left',600,false)
  }
 }
 // ---------------------------------------------------------------------------------------------
@@ -222,7 +209,7 @@ function ringBase(){
  c.globalAlpha=1
  return cv
 }
-type Block={screen:RoomScreen;canvas:HTMLCanvasElement;mask:HTMLCanvasElement;theta:number;x:number;y:number;box:{x:number;y:number;w:number;h:number};patch:THREE.CanvasTexture;at:THREE.Vector2}
+type Block={key:string;screen:RoomScreen;canvas:HTMLCanvasElement;mask:HTMLCanvasElement;theta:number;x:number;y:number;box:{x:number;y:number;w:number;h:number};patch:THREE.CanvasTexture;at:THREE.Vector2}
 function ringTexture(){const cv=document.createElement('canvas');cv.width=cv.height=RING_PX;const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.NoColorSpace;t.anisotropy=16;return t}
 function ringBlocks():Block[]{
  const k=RING_PX/(2*RING.rim)
@@ -236,12 +223,12 @@ function ringBlocks():Block[]{
   const x0=Math.max(0,Math.floor(x-hw)),y0=Math.max(0,Math.floor(y-hh)),x1=Math.min(RING_PX,Math.ceil(x+hw)),y1=Math.min(RING_PX,Math.ceil(y+hh))
   const box={x:x0,y:y0,w:x1-x0,h:y1-y0},pc=document.createElement('canvas');pc.width=box.w;pc.height=box.h
   const patch=new THREE.CanvasTexture(pc) // never bound to a material: only a source for copyTextureToTexture
-  return {screen,canvas,mask,theta,x,y,box,patch,at:new THREE.Vector2(box.x,RING_PX-box.y-box.h)} // flipY: GL rows count from the bottom
+  return {key:'',screen,canvas,mask,theta,x,y,box,patch,at:new THREE.Vector2(box.x,RING_PX-box.y-box.h)} // flipY: GL rows count from the bottom
  })
 }
 /** Composite one live region onto the CPU ring canvas over a fresh copy of the static base. */
 function composeBlock(c:CanvasRenderingContext2D,base:HTMLCanvasElement,b:Block,now:number){
- drawConsole(b.canvas,b.screen,now)
+ b.key=consoleKey(b.screen,now);drawConsole(b.canvas,b.screen,now)
  const m=b.mask.getContext('2d')!,W=b.mask.width,H=b.mask.height
  m.globalCompositeOperation='copy';m.drawImage(b.canvas,0,0);m.globalCompositeOperation='destination-in'
  const fx=m.createLinearGradient(0,0,W,0);fx.addColorStop(0,'#0000');fx.addColorStop(.09,'#000f');fx.addColorStop(.91,'#000f');fx.addColorStop(1,'#0000');m.fillStyle=fx;m.fillRect(0,0,W,H)
@@ -261,21 +248,25 @@ function useLiveConsoles(ring:THREE.CanvasTexture,gl:THREE.WebGLRenderer){
   let next=0,uploaded=false
   ring.onUpdate=()=>{uploaded=true}
   c.drawImage(base,0,0);for(const b of blocks)composeBlock(c,base,b,Date.now());ring.needsUpdate=true
-  const tick=()=>{
-   const t0=performance.now(),b=blocks[next++%blocks.length];composeBlock(c,base,b,Date.now())
+  const uploads=new Map<string,number>()
+  const tick=()=>{ // the next region whose content changed; an unchanged region is never redrawn or re-uploaded
+   const now=Date.now();let b:Block|undefined
+   for(let i=0;i<blocks.length&&!b;i++){const k=blocks[next++%blocks.length];if(consoleKey(k.screen,now)!==k.key)b=k}
+   if(!b)return
+   const t0=performance.now();composeBlock(c,base,b,now);uploads.set(b.screen.id,(uploads.get(b.screen.id)??0)+1)
    const pc=b.patch.image as HTMLCanvasElement,p=pc.getContext('2d')!
    p.globalCompositeOperation='copy';p.drawImage(cv,b.box.x,b.box.y,b.box.w,b.box.h,0,0,b.box.w,b.box.h)
    const t1=performance.now()
    if(uploaded)gl.copyTextureToTexture(b.patch,ring,null,b.at) // before the first upload the full canvas goes up anyway
    if(import.meta.env.DEV)Object.assign(window,{__ringTickMs:{draw:t1-t0,uploadCall:performance.now()-t1}})
   }
-  if(import.meta.env.DEV)Object.assign(window,{__ringTick:tick,__ringBoxes:blocks.map(b=>[b.box.w,b.box.h])}) // perf probes
-  const feeds=()=>{for(const id of Object.keys(FEEDS))pollFeed(id)}
-  pollHealth();feeds()
-  // each region once a second, run in the idle time after a frame so it never lands mid-frame
+  if(import.meta.env.DEV)Object.assign(window,{__ringTick:tick,__ringBoxes:blocks.map(b=>[b.box.w,b.box.h]),__ringUploads:uploads}) // perf probes
+  const stopAgents=startLiveAgents()
+  pollHealth()
+  // up to ~9 dirty regions a second, in the idle time after a frame so a redraw never lands mid-frame
   const idle=(window as unknown as {requestIdleCallback?:(f:()=>void,o:{timeout:number})=>number}).requestIdleCallback
-  const a=setInterval(()=>idle?idle(tick,{timeout:200}):tick(),Math.round(1000/blocks.length)),h=setInterval(pollHealth,3000),f=setInterval(feeds,15000)
-  return()=>{clearInterval(a);clearInterval(h);clearInterval(f);for(const b of blocks)b.patch.dispose()}
+  const a=setInterval(()=>idle?idle(tick,{timeout:200}):tick(),Math.round(1000/blocks.length)),h=setInterval(pollHealth,3000)
+  return()=>{stopAgents();clearInterval(a);clearInterval(h);for(const b of blocks)b.patch.dispose()}
  },[ring,gl])
 }
 
