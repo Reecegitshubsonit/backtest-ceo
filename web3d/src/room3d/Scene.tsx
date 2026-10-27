@@ -119,35 +119,33 @@ function readouts(seat:string,bars:Bar[],tf:Timeframe,now:number):[string,string
    return[['Max drawdown',(dd*100).toFixed(2)+'%',PURPLE],['Bar σ',(stdev(ret)*100).toFixed(3)+'%'],['Limits','none set']]}
  }
 }
-// One integrated computer per desk sector. The canvas spans the trapezoid's bounding box; the glass
-// is narrower toward the room centre (canvas top), so every panel follows the slanted side edges.
-function drawConsole(t:THREE.CanvasTexture,screen:RoomScreen,now:number){
- const canvas=t.image as HTMLCanvasElement,c=canvas.getContext('2d')!,W=canvas.width,H=canvas.height,u=H/100,e=live.engine
+// One agent's work area on the ring computer, drawn into its own offscreen block (top = toward the
+// CEO) and then blended into the ring with soft edges. Panels are glass tints, not framed monitors.
+function drawConsole(canvas:HTMLCanvasElement,screen:RoomScreen,now:number){
+ const c=canvas.getContext('2d')!,W=canvas.width,H=canvas.height,u=H/100,e=live.engine
  const seat=screen.seat?SEATS.find(x=>x.id===screen.seat):undefined,feed=seat?FEEDS[seat.id]:undefined,fs=seat?live.feeds.get(seat.id):undefined
- const inset=screen.shape?(1-screen.shape.inner/screen.shape.outer)/2*W:0,m=1.6*u
+ const inset=0,m=4*u
  const xl=(y:number)=>inset*(1-y/H)+m,xr=(y:number)=>W-xl(y)
  /** A panel between rows y0..y1 spanning fractions a..b of the usable width; returns its inscribed rect. */
  const zone=(y0:number,y1:number,a:number,b:number,label?:string,accent='#2b6fc0')=>{
   const L=(y:number)=>xl(y)+a*(xr(y)-xl(y))+(a>0?.6*u:0),R=(y:number)=>xl(y)+b*(xr(y)-xl(y))-(b<1?.6*u:0)
   c.beginPath();c.moveTo(L(y0),y0);c.lineTo(R(y0),y0);c.lineTo(R(y1),y1);c.lineTo(L(y1),y1);c.closePath()
-  c.fillStyle='#06132acc';c.fill();c.strokeStyle=accent;c.lineWidth=.3*u;c.stroke()
+  c.fillStyle='#0a1d4266';c.fill();c.globalAlpha=.45;c.strokeStyle=accent;c.lineWidth=.25*u;c.stroke();c.globalAlpha=1
   const x0=Math.max(L(y0),L(y1)),x1=Math.min(R(y0),R(y1))
   if(label){c.fillStyle='#8fb4e0';c.font=`600 ${2.8*u}px ui-monospace,monospace`;c.textAlign='left';c.fillText(label,x0+1.4*u,y0+3.2*u)}
   return {x:x0+1.4*u,y:y0+(label?6*u:1.5*u),w:x1-x0-2.8*u,h:y1-y0-(label?7.5*u:3*u)}
  }
- const text=(v:string,x:number,y:number,size:number,color:string,align:CanvasTextAlign='left',weight=400,mono=true)=>{c.textAlign=align;c.fillStyle=color;c.font=`${weight} ${size*u}px ${mono?'ui-monospace,monospace':'system-ui,sans-serif'}`;c.fillText(v,x,y)}
- // glass body and its lit bezel
+ const text=(v:string,x:number,y:number,size:number,color:string,align:CanvasTextAlign='left',weight=400,mono=true,max?:number)=>{c.textAlign=align;c.fillStyle=color;c.font=`${weight} ${size*u}px ${mono?'ui-monospace,monospace':'system-ui,sans-serif'}`;c.fillText(v,x,y,max)}
+ // a soft pool of light under the work area; its edges are feathered into the ring by drawRing()
  c.clearRect(0,0,W,H);c.textBaseline='middle'
- const glass=()=>{c.beginPath();c.moveTo(inset,0);c.lineTo(W-inset,0);c.lineTo(W,H);c.lineTo(0,H);c.closePath()}
- const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#020814');g.addColorStop(1,'#04102a');glass();c.fillStyle=g;c.fill()
- glass();c.strokeStyle='#3d8bff';c.lineWidth=.9*u;c.stroke()
+ const g=c.createRadialGradient(W/2,H*.55,H*.1,W/2,H*.55,Math.max(W,H)*.75);g.addColorStop(0,'#0b2a5ccc');g.addColorStop(1,'#04102a55');c.fillStyle=g;c.fillRect(0,0,W,H)
  // header strip: agent, state, engine, clock
  const dot=e.state==='up'?'#38e6a0':e.state==='down'?'#ff5a7a':'#f3c74b',rt=e.latency.at(-1)
  const hd=zone(2.5*u,19.5*u,0,1,undefined,'#3d8bff')
  const title=seat?seat.name:screen.id==='d8'?'COMMAND CONSOLE':`AUX CONSOLE ${screen.n}`
- text(title,hd.x+.5*u,hd.y+3.6*u,5.4*u/u,'#e8f3ff','left',700,false)
+ text(title,hd.x+.5*u,hd.y+3.6*u,seat||screen.id==='d8'?4.8:4.4,'#e8f3ff','left',700,false)
  text(seat?seat.job.toUpperCase():screen.id==='d8'?'OPERATOR · ALL AGENTS':'UNASSIGNED',hd.x+.5*u,hd.y+8.8*u,2.7,'#7fa6d6')
- text(hhmmss(now),hd.x+hd.w,hd.y+3.6*u,4.6,'#cfe6ff','right',600)
+ if(seat||screen.id==='d8')text(hhmmss(now),hd.x+hd.w,hd.y+3.6*u,4.6,'#cfe6ff','right',600)
  c.fillStyle=dot;c.beginPath();c.arc(hd.x+1.4*u,hd.y+13.4*u,1.1*u,0,7);c.fill()
  text(`ENGINE ${e.state==='up'?'UP':e.state==='down'?'OFFLINE':'…'}${e.state==='up'&&rt!==undefined?` · ${rt.toFixed(0)} ms`:''}${e.state==='up'&&!e.keys?' · NO KEYS':''}`,hd.x+3.6*u,hd.y+13.4*u,2.7,'#9fc3ee','left',600)
  text(seat?'IDLE · NO STRATEGY RUNNING':screen.id==='d8'?'MONITORING':'STANDBY',hd.x+hd.w,hd.y+8.8*u,2.9,seat?'#f3c74b':'#6d86a8','right',600)
@@ -156,7 +154,7 @@ function drawConsole(t:THREE.CanvasTexture,screen:RoomScreen,now:number){
  const logLines=(r:{x:number;y:number;w:number;h:number},keys:string[])=>{
   const lines=keys.flatMap(k=>live.log.get(k)??[]).sort().reverse(),n=Math.max(1,Math.floor(r.h/(3.6*u)))
   if(!lines.length)text('waiting for first event…',r.x,r.y+1.8*u,2.8,'#6d86a8')
-  lines.slice(0,n).forEach((l,i)=>{text(l.slice(0,8),r.x,r.y+1.8*u+i*3.6*u,2.7,'#6d86a8');text(l.slice(9),r.x+15*u,r.y+1.8*u+i*3.6*u,2.7,i?'#9fb9dc':'#d6e8ff')})
+  lines.slice(0,n).forEach((l,i)=>{text(l.slice(0,8),r.x,r.y+1.8*u+i*3.6*u,2.7,'#6d86a8');text(l.slice(9),r.x+15*u,r.y+1.8*u+i*3.6*u,2.7,i?'#9fb9dc':'#d6e8ff','left',400,true,r.w-15*u)})
  }
  if(seat&&feed){
   // chart panel: the agent's live feed
@@ -181,9 +179,9 @@ function drawConsole(t:THREE.CanvasTexture,screen:RoomScreen,now:number){
   // activity log + task status, across the wide agent-side edge
   logLines(zone(Y2,Y3,0,.62,'ACTIVITY LOG'),[seat.id,'engine'])
   const st=zone(Y2,Y3,.62,1,'TASK','#6a4fd0')
-  text('No strategy assigned',st.x,st.y+2*u,3,'#cfe3f7','left',600,false)
-  text(seat.job.toLowerCase()+' · awaiting work',st.x,st.y+7*u,2.6,'#7f9cc4','left',400,false)
-  text('Click to open this agent',st.x,st.y+12*u,2.6,'#5f7ea6','left',400,false)
+  text('No strategy assigned',st.x,st.y+2*u,3,'#cfe3f7','left',600,false,st.w)
+  text(seat.job.toLowerCase()+' · awaiting work',st.x,st.y+7*u,2.6,'#7f9cc4','left',400,false,st.w)
+  text('Click to open this agent',st.x,st.y+12*u,2.6,'#5f7ea6','left',400,false,st.w)
  }else if(screen.id==='d8'){
   // the operator's console: every agent's feed at a glance
   const tb=zone(Y0,Y1,0,.66,'AGENTS')
@@ -198,18 +196,67 @@ function drawConsole(t:THREE.CanvasTexture,screen:RoomScreen,now:number){
   const nt=zone(Y2,Y3,0,1,'STATUS');text('Not assigned yet · click to open',nt.x,nt.y+2*u,3,'#cfe3f7','left',600,false)
   text(`engine checked ${e.at?Math.max(0,Math.round((now-e.at)/1000)):'–'} s ago`,nt.x,nt.y+7*u,2.6,'#7f9cc4')
  }
+}
+// ---------------------------------------------------------------------------------------------
+// The desk top is one ring computer: a single planar texture over the whole disc, shared by every
+// desk region mesh. A static layer carries continuous data rings, tick marks and a spectrum that run
+// unbroken round the ring; each agent's live work area is composited at its bearing, oriented to
+// read from outside the ring (by the agent seated there), with feathered edges so regions blend.
+const RING={rim:2.745,inner:1.37,outer:2.66,rin:1.64,rout:2.62},RING_PX=3584
+const ringPx=(x:number,z:number):[number,number]=>[(.5+x/(2*RING.rim))*RING_PX,(.5+z/(2*RING.rim))*RING_PX] // matches the build's ringUV
+function ringBase(){
+ const cv=document.createElement('canvas');cv.width=cv.height=RING_PX;const c=cv.getContext('2d')!,k=RING_PX/(2*RING.rim),C=RING_PX/2,rand=rng(4242)
+ const g=c.createRadialGradient(C,C,RING.inner*k,C,C,RING.outer*k);g.addColorStop(0,'#071634');g.addColorStop(.5,'#041029');g.addColorStop(1,'#061637');c.fillStyle=g;c.fillRect(0,0,RING_PX,RING_PX)
+ const ring=(r:number,color:string,w:number,alpha=1)=>{c.globalAlpha=alpha;c.strokeStyle=color;c.lineWidth=w*k;c.beginPath();c.arc(C,C,r*k,0,Math.PI*2);c.stroke();c.globalAlpha=1}
+ for(let r=RING.inner+.05;r<RING.outer;r+=.06)ring(r,'#1b3d74',.003,.5)
+ ring(1.40,'#3fb4ff',.010);ring(1.40,'#3fb4ff',.03,.15);ring(1.60,'#9b6bff',.006);ring(2.64,'#46b8ff',.008);ring(2.64,'#46b8ff',.03,.15)
+ // tick marks every degree, longer every ten
+ c.strokeStyle='#4f8fd8';for(let d=0;d<360;d++){const a=d*Math.PI/180,r0=1.43,r1=d%10?1.455:1.49;c.lineWidth=(d%10?.002:.004)*k;c.beginPath();c.moveTo(C+Math.sin(a)*r0*k,C+Math.cos(a)*r0*k);c.lineTo(C+Math.sin(a)*r1*k,C+Math.cos(a)*r1*k);c.stroke()}
+ // continuous data traces circling the whole ring
+ for(const [r,amp,col,w] of [[1.70,.035,'#3d8bff',.004],[1.95,.05,'#7d5bff',.003],[2.30,.04,'#2fb6ff',.003],[2.52,.03,'#5f7dff',.003]] as [number,number,string,number][]){
+  let p=0;c.strokeStyle=col;c.globalAlpha=.55;c.lineWidth=w*k;c.beginPath()
+  for(let i=0;i<=1440;i++){const a=i/1440*Math.PI*2;p=i===1440?0:Math.max(-1,Math.min(1,p+(rand()-.5)*.35))*(i>1380?(1440-i)/60:1);const rr=r+p*amp;i?c.lineTo(C+Math.sin(a)*rr*k,C+Math.cos(a)*rr*k):c.moveTo(C+Math.sin(a)*rr*k,C+Math.cos(a)*rr*k)}
+  c.stroke();c.globalAlpha=1}
+ // spectrum round the outer edge
+ for(let i=0;i<720;i++){const a=i/720*Math.PI*2,h=.015+rand()*.06;c.strokeStyle=i%6?'#2d6fd0':'#8a6cff';c.globalAlpha=.65;c.lineWidth=.004*k;c.beginPath();c.moveTo(C+Math.sin(a)*2.58*k,C+Math.cos(a)*2.58*k);c.lineTo(C+Math.sin(a)*(2.58-h)*k,C+Math.cos(a)*(2.58-h)*k);c.stroke()}
+ c.globalAlpha=1
+ return cv
+}
+type Block={screen:RoomScreen;canvas:HTMLCanvasElement;mask:HTMLCanvasElement;theta:number;r:number}
+function ringTexture(){const cv=document.createElement('canvas');cv.width=cv.height=RING_PX;const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.NoColorSpace;t.anisotropy=16;return t}
+function ringBlocks():Block[]{
+ const k=RING_PX/(2*RING.rim)
+ return ROOM_SCREENS.filter(s=>s.kind==='desk').map(screen=>{
+  const W=Math.round((screen.shape?.outer??screen.w)*k),H=Math.round((screen.shape?.depth??RING.rout-RING.rin)*k)
+  const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H
+  const mask=document.createElement('canvas');mask.width=W;mask.height=H
+  return {screen,canvas,mask,theta:Math.atan2(screen.center[0],screen.center[2]),r:screen.shape?.r??(RING.rin+RING.rout)/2}
+ })
+}
+function drawRing(t:THREE.CanvasTexture,base:HTMLCanvasElement,blocks:Block[],now:number){
+ const c=(t.image as HTMLCanvasElement).getContext('2d')!
+ c.drawImage(base,0,0)
+ for(const b of blocks){
+  drawConsole(b.canvas,b.screen,now)
+  const m=b.mask.getContext('2d')!,W=b.mask.width,H=b.mask.height
+  m.globalCompositeOperation='copy';m.drawImage(b.canvas,0,0);m.globalCompositeOperation='destination-in'
+  const fx=m.createLinearGradient(0,0,W,0);fx.addColorStop(0,'#0000');fx.addColorStop(.09,'#000f');fx.addColorStop(.91,'#000f');fx.addColorStop(1,'#0000');m.fillStyle=fx;m.fillRect(0,0,W,H)
+  const fy=m.createLinearGradient(0,0,0,H);fy.addColorStop(0,'#0000');fy.addColorStop(.05,'#000f');fy.addColorStop(.97,'#000f');fy.addColorStop(1,'#0000');m.fillStyle=fy;m.fillRect(0,0,W,H)
+  const [x,y]=ringPx(Math.sin(b.theta)*b.r,Math.cos(b.theta)*b.r)
+  c.save();c.translate(x,y);c.rotate(-b.theta);c.drawImage(b.mask,-W/2,-H/2);c.restore() // top of the block toward the CEO
+ }
  t.needsUpdate=true
 }
-/** Polls the engine read-only and redraws every desk console's own texture once a second. */
-function useLiveConsoles(maps:Map<string,THREE.CanvasTexture>){
+/** Polls the engine read-only and redraws the ring computer (every agent's area) once a second. */
+function useLiveConsoles(ring:THREE.CanvasTexture){
  useEffect(()=>{
-  const desks=ROOM_SCREENS.filter(s=>s.kind==='desk')
-  const draw=()=>{const now=Date.now();for(const s of desks){const t=maps.get(s.id);if(t)drawConsole(t,s,now)}}
+  const base=ringBase(),blocks=ringBlocks()
+  const draw=()=>drawRing(ring,base,blocks,Date.now())
   const feeds=()=>{for(const id of Object.keys(FEEDS))pollFeed(id).then(draw)}
   pollHealth().then(draw);feeds();draw()
   const a=setInterval(draw,1000),b=setInterval(pollHealth,3000),f=setInterval(feeds,15000)
   return()=>{clearInterval(a);clearInterval(b);clearInterval(f)}
- },[maps])
+ },[ring])
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -266,8 +313,8 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
  const setInspect=(v:Inspecting|null)=>{inspect.current=v;setInspecting(v?.screen.id??null)}
  const startInspect=(s:RoomScreen)=>{
   const c=new THREE.Vector3(...s.center),n=new THREE.Vector3(...s.normal)
-  const sw=s.shape?.outer??s.w // a desk console is framed by its whole trapezoid
-  let d=inspectDistance(sw,s.h,aspect())
+  const sw=s.shape?.outer??s.w,sh=s.shape?.depth??s.h // a ring region is framed by its whole work area
+  let d=inspectDistance(sw,sh,aspect(),s.kind==='desk'?.85:INSPECT.fill)
   const hit=cast(c.clone().addScaledVector(n,.02),n,d+INSPECT.clearance) // keep the eye clear of heads and furniture
   if(hit)d=Math.max(INSPECT.minDistance,hit.distance+.02-INSPECT.clearance)
   const off=cam.view?.enabled?2*cam.view.offsetY/cam.view.fullHeight:0
@@ -275,7 +322,7 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
   const back=inspect.current?.back??anchor.current
   setInspect(null);gesture.current={screen:undefined,sum:0}
   const q=new THREE.Quaternion(...s.quaternion),K=READING_CUT // the reading window that dissolves hands in front of the screen
-  K.uCutC.value.copy(c);K.uCutN.value.copy(n);K.uCutR.value.set(1,0,0).applyQuaternion(q);K.uCutU.value.set(0,1,0).applyQuaternion(q);K.uCutS.value.set(sw/2,s.h/2,d)
+  K.uCutC.value.copy(c);K.uCutN.value.copy(n);K.uCutR.value.set(1,0,0).applyQuaternion(q);K.uCutU.value.set(0,1,0).applyQuaternion(q);K.uCutS.value.set(sw/2,sh/2,d)
   fly(to,true,()=>setInspect({screen:s,pose:to,back,out:0}))
  }
  const leave=(to:Pose)=>{setInspect(null);gesture.current={screen:undefined,sum:0};fly(to,false,()=>{anchor.current=to})}
@@ -301,7 +348,7 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
     const g=gesture.current
     if(g.screen?.id===s.id)g.sum-=amount;else{g.screen=s;g.sum=-amount}
     const D=camera.position.distanceTo(new THREE.Vector3(...s.center))
-    if(g.sum>=INSPECT.gesture||screenFraction(s.shape?.outer??s.w,s.h,D,aspect())>=INSPECT.fraction){startInspect(s);return}
+    if(g.sum>=INSPECT.gesture||screenFraction(s.shape?.outer??s.w,s.shape?.depth??s.h,D,aspect())>=INSPECT.fraction){startInspect(s);return}
    }else if(amount>0)gesture.current.sum=0
    pending.current=THREE.MathUtils.clamp(pending.current+amount,-1.2,1.2)
   }
@@ -400,8 +447,9 @@ function Assets({panel,dispatch,host,onReady}:Props){
  const {scene}=useGLTF('/models/reference-room.glb')
  const tableMap=useTexture('/textures/desk-reference-material.png')
  tableMap.colorSpace=THREE.NoColorSpace;tableMap.anisotropy=16
- const sharpMap=useMemo(()=>new Map(ROOM_SCREENS.map((s,i)=>[s.id,displayTexture(s,i)])),[])
- useLiveConsoles(sharpMap)
+ const ring=useMemo(()=>ringTexture(),[])
+ const sharpMap=useMemo(()=>new Map(ROOM_SCREENS.map((s,i)=>[s.id,s.kind==='desk'?ring:displayTexture(s,i)])),[ring])
+ useLiveConsoles(ring)
  const wallMap=sharpMap.get('s5')!
  const wireMaterial=useMemo(()=>new THREE.MeshBasicMaterial({color:'#49baff',wireframe:true,transparent:true,opacity:.012,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-1}),[])
  const assets=useMemo(()=>{

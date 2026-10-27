@@ -122,7 +122,7 @@ void main(){
   // monitor housings: satin dark shell, catching the room's blue haze on its edges
   base=vec3(.0016,.003,.009)*relief+vec3(.006,.02,.06)*pow(fres,2.)+glow*.05;
  }
- if(uKind>11.5){
+ if(uKind>11.5&&uKind<12.5){
   // architecture trim: pillars with edge light strips, the wall console ledge with a lit lip
   vec3 radial=normalize(vec3(vWorld.x,0.,vWorld.z));
   float front=step(.6,-dot(n,radial));
@@ -137,22 +137,37 @@ void main(){
    base+=vec3(.03,.22,.6)*line(r-7.45,.008)*step(.5,n.y)+vec3(.16,.04,.36)*line(vWorld.y-.62,.008)*step(.5,front)*step(r,7.6);
   }
  }
+ if(uKind>12.5){
+  // the ring desk's one unbroken lit outer rim: cyan lip, purple light dashes, slow travelling pulse
+  float dash=line(fract(a*72./6.2831853)-.5,.12)*step(.5,n.y);
+  float pulse=.75+.25*sin(a*6.-uTime*.8);
+  base=vec3(.02,.20,.62)*pulse*(n.y>.5?1.:.35)+vec3(.30,.06,.62)*dash*.8;
+ }
  vec3 color=base;
  if(uKind>5.5&&uKind<6.5){
   vec3 chart=lin(texture2D(uSharp,mix(vUv,1.-vUv,uFlip)).rgb);
   // distant wall displays sit back in the dark like the reference; full contrast when focused
   color=chart*mix(.42,1.,uDetail)*vec3(.8,.9,1.1);
-  if(uDesk>.5)color=mix(lin(texture2D(uPhoto,deskUV(vWorld)).rgb)*.35,chart,uDetail);
+  if(uDesk>.5){
+   color=mix(lin(texture2D(uPhoto,deskUV(vWorld)).rgb)*.35,chart,uDetail);
+   // data flowing round the one ring computer: dashes streaming along the inner band, a slow sweep
+   // of light travelling round the whole ring (continuous in world space, so region borders vanish)
+   float flow=line(fract(a*90./6.2831853-uTime*.35)-.5,.08)*line(r-1.47,.035);
+   float flow2=line(fract(a*140./6.2831853+uTime*.22)-.5,.06)*line(r-1.55,.02);
+   float sweep=pow(max(0.,cos(a-uTime*.25)),24.);
+   color+=vec3(.02,.20,.55)*flow+vec3(.18,.05,.40)*flow2+vec3(.004,.03,.08)*sweep*step(1.4,r);
+   color+=uHot*vec3(.008,.035,.08);
+  }
   float edge=min(min(vUv.x,1.-vUv.x),min(vUv.y,1.-vUv.y));
   if(uDesk<.5)color+=vec3(.02,.09,.24)*(1.-smoothstep(.002,.008,edge));
-  color+=uHot*(vec3(.015,.05,.1)+vec3(.08,.32,.65)*(1.-smoothstep(.005,.04,edge)));
+  if(uDesk<.5)color+=uHot*(vec3(.015,.05,.1)+vec3(.08,.32,.65)*(1.-smoothstep(.005,.04,edge)));
  }
  if(alpha<.015)discard;
  gl_FragColor=vec4(color,alpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
 }`
-export const KIND: Record<string,number> = {wall:0,floor:7,ceiling:8,desk:1,chair:2,hologram:3,operator:4,ceo:5,monitor:11,screen:6,cloth:9,hair:10,trim:12}
+export const KIND: Record<string,number> = {wall:0,floor:7,ceiling:8,desk:1,chair:2,hologram:3,operator:4,ceo:5,monitor:11,screen:6,cloth:9,hair:10,trim:12,rim:13}
 /** Shared by every room material: the reading window the zoom sets while a screen is read head-on. */
 export const READING_CUT={uCut:{value:0},uCutC:{value:new THREE.Vector3()},uCutR:{value:new THREE.Vector3(1,0,0)},uCutU:{value:new THREE.Vector3(0,1,0)},uCutN:{value:new THREE.Vector3(0,0,1)},uCutS:{value:new THREE.Vector3(.5,.5,1)}}
 const blank=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1)

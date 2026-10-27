@@ -127,6 +127,24 @@ function fixedSeat(id,profile,initial,yaw,target,scale){
  console.log('FIXED SEAT',id,'scale',scale,'r',pick.toFixed(2),'lift',lift.toFixed(2),'head',headPx(posed,x,z,scale,yaw).map(v=>+v.toFixed(1)),'clip',c)
  return{posed,fit:[x,z,scale]}
 }
+// v6: the agents sit evenly around the ring like the original concept: seven places (six agents and
+// the operator) 360/7 = 51.4 degrees apart, each facing the CEO. The per-agent landmark fit to the
+// wide reference crowded the six into a 110-degree arc (32 degrees apart at the front).
+const SEAT_STEP=360/7
+const SEAT_ANGLE={regime:-SEAT_STEP,risk:SEAT_STEP,scanner:-2*SEAT_STEP,auditor:2*SEAT_STEP,strategist:-3*SEAT_STEP,backtester:3*SEAT_STEP}
+/** Walk outward from the desk edge on the seat's bearing to the first radius where body and chair clear the desk. */
+function evenSeat(id,profile,theta,scale){
+ const yaw=theta+Math.PI,posed0=poseBody(profile,0,0);let pick=null
+ for(let r=2.75;r<4.8&&!pick;r+=.02){const x=Math.sin(theta)*r,z=Math.cos(theta)*r
+  if(deskClip(place(posed0,x,z,scale,yaw)).torso)continue
+  const cc=deskClip(makeChair(id,x,z,scale,yaw));if(cc.torso||cc.arms)continue
+  pick=r}
+ if(!pick)throw Error('No desk-clear seat for '+id)
+ const x=Math.sin(theta)*pick,z=Math.cos(theta)*pick;let lift=0,posed=posed0,c=deskClip(place(posed,x,z,scale,yaw))
+ for(;c.arms&&lift<.6;){lift+=.02;posed=poseBody(profile,lift,0);c=deskClip(place(posed,x,z,scale,yaw))}
+ console.log('EVEN SEAT',id,'deg',(theta*180/Math.PI).toFixed(1),'r',pick.toFixed(2),'lift',lift.toFixed(2),'clip',c)
+ return{posed,fit:[x,z,scale],yaw}
+}
 const SEAT_SCALE=1.95
 const seatSpecs=[
  ['scanner',-3.15,-1.3,1.90,1.20],['strategist',-1.85,-2,2.06,.70],
@@ -137,12 +155,12 @@ const seatSpecs=[
 // shoulders. The former 0.67 back scale cut them to waist height behind the regime/risk agents.
 const NEAR_BACK=+(process.env.NEAR_BACK??1.12)
 const seatLayout=new Map()
-for(const[id,initialX,initialZ,initialScale,yaw]of [...seatSpecs,['operator',0,4.3,1.95,Math.PI]]){
+for(let[id,initialX,initialZ,initialScale,yaw]of [...seatSpecs,['operator',0,4.3,1.95,Math.PI]]){
  const profile=['regime','risk'].includes(id)?'near':['scanner','auditor'].includes(id)?'mid':id==='operator'?'operator':'far'
  const HEAD={scanner:[357,338],auditor:[923,338],strategist:[486,310],backtester:[794,310],regime:[id==='regime'?281:999,467,710],risk:[999,467,710]}
  let posed,x,z,scale
  if(id==='operator'){posed=poseBody(profile);[x,z,scale]=landmarkFit(posed,[initialX,initialZ,initialScale],yaw,[640,559,53])}
- else{const s=fixedSeat(id,profile,[initialX,initialZ],yaw,HEAD[id],SEAT_SCALE);posed=s.posed;[x,z,scale]=s.fit}
+ else{const s=evenSeat(id,profile,SEAT_ANGLE[id]*Math.PI/180,SEAT_SCALE);posed=s.posed;[x,z,scale]=s.fit;yaw=s.yaw}
  const person=place(posed,x,z,scale,yaw)
  const furniture=makeChair(id,x,z,scale,yaw)
  if(id==='operator'){
@@ -218,16 +236,34 @@ const enclosure=flat(monitorScene,o=>o.name==='Display_enclosure'),glass=flat(mo
 if(!enclosure||!glass)throw Error('Monitor model did not expose its enclosure and glass')
 enclosure.computeBoundingBox();glass.computeBoundingBox()
 const glassBox=glass.boundingBox,glassCenter=glassBox.getCenter(new T.Vector3()),glassSize=glassBox.getSize(new T.Vector3())
-const desk={agent:{half:14.5*Math.PI/180,rin:1.82,rout:2.6},d8:{half:12*Math.PI/180,rin:1.85,rout:2.6},d7:{half:10*Math.PI/180,rin:2.05,rout:2.6},d9:{half:10*Math.PI/180,rin:2.05,rout:2.6}}
+// v6: the desk top is ONE ring computer. Each desk screen id owns an angular region of a single
+// continuous annulus (r RING.inner..RING.outer, boundaries halfway to its neighbours); all regions
+// share one material and one planar texture, so there are no bezels, gaps or seams. The id's
+// w x h is the clickable/flight rectangle inside its region (kept clear of its neighbours'), and
+// `shape` is the region's live content block (outer width x depth) that the reading view frames.
+const RING={inner:1.37,outer:2.66,rim:2.745,y:1.608}
+// d7/d9 (unassigned aux) sit half-way between the operator and the front agents, so their blocks
+// use only the outer band, where the ring is wide enough for both without overlap.
+const AGENT={width:1.15,rin:1.64,rout:2.62},AUX={width:.5,rin:2.1,rout:2.6}
+const REGION={agent:AGENT,d8:{...AGENT,width:1.1},d7:AUX,d9:AUX}
+const RECTS={agent:{half:12*Math.PI/180,rin:1.86,rout:2.46},aux:{half:7*Math.PI/180,rin:2.1,rout:2.6}}
+const rectOf=s=>RECTS[s.id==='d7'||s.id==='d9'?'aux':'agent']
+const deskAngle=s=>s.seat?seatLayout.get(s.seat).theta:({d7:-SEAT_STEP/2,d8:0,d9:SEAT_STEP/2}[s.id]*Math.PI/180)
+const deskIds=readArray('DESK_SCREENS').map(s=>({id:s.id,a:deskAngle(s)})).sort((p,q)=>p.a-q.a)
+const regionSpan=id=>{const i=deskIds.findIndex(d=>d.id===id),n=deskIds.length,a=deskIds[i].a
+ const prev=deskIds[(i+n-1)%n].a,next=deskIds[(i+1)%n].a,wrap=v=>Math.atan2(Math.sin(v),Math.cos(v))
+ return[a+wrap(prev-a)/2,a+wrap(next-a)/2]}
+/** Planar disc UVs shared by every ring region and its rim: one texture covers the whole desk top. */
+const ringUV=(x,z)=>[.5+x/(2*RING.rim),.5-z/(2*RING.rim)]
+function annulus(a0,a1,r0,r1,y,steps){const pos=[],uv=[],idx=[],n=Math.max(2,Math.ceil(steps))
+ for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n;for(const r of[r0,r1]){const x=Math.sin(a)*r,z=Math.cos(a)*r;pos.push(x,y,z);uv.push(...ringUV(x,z))}}
+ for(let i=0;i<n;i++){const q=i*2;idx.push(q,q+1,q+2,q+1,q+3,q+2)} // faces up (+y)
+ const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(idx);return g}
 for(const s of screenSource){const r=s.rect,cx=r.x+r.w/2,cy=r.y+r.h/2;let centre,normal;
  if(s.kind==='wall'){const rr=ray(cx,cy),o=rr.origin,d=rr.direction;const A=d.x*d.x+d.z*d.z,B=2*(o.x*d.x+o.z*d.z),C=o.x*o.x+o.z*o.z-7.95*7.95;const t=(-B+Math.sqrt(B*B-4*A*C))/(2*A);centre=rr.at(t,new T.Vector3());normal=new T.Vector3(-centre.x,0,-centre.z).normalize();if(cy>300)normal.y=.48;normal.normalize()}
  else {
-  const theta=s.seat?seatLayout.get(s.seat).theta:({d7:-62,d8:0,d9:62}[s.id]*Math.PI/180) // d7/d9 moved out from ±20° so the full-size near pair's consoles (±32°) keep clear of them
-  // One built-in trapezoid console per seat sector (straight-edged ring segment, flush with the
-  // desk top). The baked desk texture used to carry printed screens under small separate monitors,
-  // so every station showed two computers; now the console face IS the station's computer.
-  const k=desk[s.seat?'agent':s.id]
-  centre=new T.Vector3(Math.sin(theta),0,Math.cos(theta)).multiplyScalar((k.rin+k.rout)/2*Math.cos(k.half)).setY(1.608)
+  const theta=deskAngle(s)
+  const RECT=rectOf(s);centre=new T.Vector3(Math.sin(theta),0,Math.cos(theta)).multiplyScalar((RECT.rin+RECT.rout)/2*Math.cos(RECT.half)).setY(RING.y)
   normal=new T.Vector3(0,1,0)
  }
  const theta=s.kind==='desk'?Math.atan2(centre.x,centre.z):0
@@ -236,24 +272,14 @@ for(const s of screenSource){const r=s.rect,cx=r.x+r.w/2,cy=r.y+r.h/2;let centre
  const lr=ray(r.x,cy).intersectPlane(plane,new T.Vector3()),rr=ray(r.x+r.w,cy).intersectPlane(plane,new T.Vector3());const tr=ray(cx,r.y).intersectPlane(plane,new T.Vector3()),br=ray(cx,r.y+r.h).intersectPlane(plane,new T.Vector3())
  const rotation=new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(right,up,normal))
  if(s.kind==='desk'){
-  // Trapezoid in the console's own plane: x along the ring (right), y toward the room centre (up).
-  // w/h describe the inscribed rectangle (the part every flight/pick contract relies on); `shape`
-  // carries the full outer (agent-side) and inner (centre-side) widths of the glass.
-  const k=desk[s.seat?'agent':s.id],h=(k.rout-k.rin)*Math.cos(k.half),outer=2*k.rout*Math.sin(k.half),inner=2*k.rin*Math.sin(k.half)
-  const at=(x,y,lift)=>centre.clone().addScaledVector(right,x).addScaledVector(up,y).addScaledVector(normal,lift)
-  const quad=[[-outer/2,-h/2],[outer/2,-h/2],[inner/2,h/2],[-inner/2,h/2]]
-  const face=new T.BufferGeometry();face.setAttribute('position',new T.Float32BufferAttribute(quad.flatMap(([x,y])=>at(x,y,.004).toArray()),3))
-  face.setAttribute('uv',new T.Float32BufferAttribute(quad.flatMap(([x,y])=>[x/outer+.5,y/h+.5]),2));face.setIndex([0,1,2,0,2,3])
-  // Flush bezel: a 2.5 cm lip around the glass with a short skirt into the desk, so the console
-  // reads as inset into the desk top rather than a monitor standing on it.
-  const grow=.025,outerRing=quad.map(([x,y])=>[x+Math.sign(x)*grow*(y<0?1:1.1),y+Math.sign(y)*grow]),pos=[],idx=[]
-  for(const[x,y]of quad)pos.push(...at(x,y,.003).toArray())
-  for(const[x,y]of outerRing)pos.push(...at(x,y,.003).toArray())
-  for(const[x,y]of outerRing)pos.push(...at(x,y,-.022).toArray())
-  for(let i=0;i<4;i++){const j=(i+1)%4;idx.push(i,4+i,4+j,i,4+j,j, 4+i,8+i,8+j,4+i,8+j,4+j)}
-  const bezel=new T.BufferGeometry();bezel.setAttribute('position',new T.Float32BufferAttribute(pos,3));bezel.setIndex(idx)
-  add('frame_'+s.id,bezel,'monitor');add('screen_'+s.id,face,'screen')
-  meta.screens.push({...s,center:centre.toArray(),normal:normal.toArray(),quaternion:rotation.toArray(),w:inner,h,shape:{outer,inner}})
+  const[a0,a1]=regionSpan(s.id),steps=(a1-a0)*180/Math.PI
+  add('screen_'+s.id,annulus(a0,a1,RING.inner,RING.outer,RING.y+.004,steps),'screen')
+  // this region's share of the desk's one unbroken lit outer rim (top lip plus its outer face)
+  const lip=annulus(a0,a1,RING.outer,RING.rim,RING.y+.002,steps),face=annulus(a0,a1,RING.rim,RING.rim+.0001,RING.y+.002,steps),fp=face.attributes.position
+  for(let i=0;i<fp.count;i++)if(i%2)fp.setY(i,RING.y-.05)
+  add('frame_'+s.id,mergeGeometries([lip,face]),'rim')
+  const RECT=rectOf(s),w=2*RECT.rin*Math.sin(RECT.half),h=(RECT.rout-RECT.rin)*Math.cos(RECT.half),region=REGION[s.seat?'agent':s.id]
+  meta.screens.push({...s,center:centre.toArray(),normal:normal.toArray(),quaternion:rotation.toArray(),w,h,shape:{outer:region.width,inner:region.width,depth:region.rout-region.rin,r:(region.rin+region.rout)/2}})
   continue
  }
  const w=Math.abs(rr.clone().sub(lr).dot(right)),h=Math.abs(tr.clone().sub(br).dot(up))

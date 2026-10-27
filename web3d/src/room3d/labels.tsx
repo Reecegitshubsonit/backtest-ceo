@@ -1,7 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { SEATS } from '../config/seats'
-import { CEO_LABEL, SEAT_SPOTS, SUMMARY_LABEL } from '../config/imageRoom'
+import { CEO_LABEL, SUMMARY_LABEL } from '../config/imageRoom'
 import { ROOM_OBJECTS } from '../config/roomObjects'
 import { screenById, screenName } from '../config/roomScreens'
 import { referencePoint } from './camera'
@@ -19,12 +19,13 @@ const anchors=[
  {id:'ceo',point:middle(CEO_LABEL),z:.14,lines:['CEO AI','STRATEGIC OVERSIGHT','FINAL DECISION AUTHORITY']},
  {id:'summary',point:middle(SUMMARY_LABEL),z:1.2,lines:['EXECUTIVE SUMMARY','SYNTHESIZING AGENT REPORTS']},
  ...SEATS.map(s=>{
-  const o=ROOM_OBJECTS.find(o=>o.name===`agent_${s.id}`)!;const z=(o.bounds[0][2]+o.bounds[1][2])/2
-  return{id:s.id,point:middle(SEAT_SPOTS[s.id].label),z,lines:[s.name,s.job,'● Live Feed']}
+  // agents sit evenly round the ring: each label floats just above its own figure's head
+  const o=ROOM_OBJECTS.find(o=>o.name===`agent_${s.id}`)!,b=o.bounds
+  return{id:s.id,point:[0,0],z:0,at:new THREE.Vector3((b[0][0]+b[1][0])/2,b[1][1]+.32,(b[0][2]+b[1][2])/2),lines:[s.name,s.job,'● Live Feed']}
  }),
 ].map(a=>{
  // Canonical reference label positions, anchored at each object's real depth.
- const world=referencePoint(a.point[0],a.point[1],a.z)
+ const world=('at' in a&&a.at)?a.at:referencePoint(a.point[0],a.point[1],a.z)
  return {...a,world,homeDistance:world.distanceTo(new THREE.Vector3(0,3.844,7.04))}
 })
 export function RoomLabels(){return <div className="room-labels" aria-hidden>
@@ -48,11 +49,13 @@ export function LabelProjector({hidden}:{hidden:boolean}){
    el.style.display=off?'none':''
    if(off)continue
    const w=el.offsetWidth*scale,h=el.offsetHeight*scale
-   const rect={left:x-w/2-4,right:x+w/2+4,top:y-h/2-3,bottom:y+h/2+3}
-   const overlaps=occupied.some(b=>rect.left<b.right&&rect.right>b.left&&rect.top<b.bottom&&rect.bottom>b.top)
+   // with the agents spread round the ring, labels of figures behind one another can collide:
+   // lift a colliding label above the one in front (twice at most) before giving up on it
+   let yy=y,rect={left:0,right:0,top:0,bottom:0},overlaps=true
+   for(let k=0;k<3&&overlaps;k++){rect={left:x-w/2-4,right:x+w/2+4,top:yy-h/2-3,bottom:yy+h/2+3};overlaps=occupied.some(b=>rect.left<b.right&&rect.right>b.left&&rect.top<b.bottom&&rect.bottom>b.top);if(overlaps)yy=Math.min(...occupied.filter(b=>rect.left<b.right&&rect.right>b.left).map(b=>b.top))-h/2-4}
    el.style.display=overlaps?'none':''
    if(!overlaps)occupied.push(rect)
-   el.style.transform=`translate(-50%,-50%) translate(${x}px,${y}px) scale(${scale})`
+   el.style.transform=`translate(-50%,-50%) translate(${x}px,${yy}px) scale(${scale})`
   }
   const hint=nodes.get('inspect');if(hint)hint.style.display=inspecting&&!hidden?'':'none'
   const el=nodes.get('hover');if(el&&hovered&&hovered!==inspecting){const s=screenById(hovered)!;const v=new THREE.Vector3(...s.center).project(camera);el.style.transform=`translate(-50%,-100%) translate(${(v.x+1)*size.width/2}px,${(1-v.y)*size.height/2-16}px)`}
