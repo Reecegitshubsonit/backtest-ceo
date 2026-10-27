@@ -13,7 +13,7 @@ void main() {
 }`
 const FRAGMENT = `
 uniform sampler2D uSharp,uPhoto;
-uniform float uKind,uTime,uHot,uDetail,uDesk;
+uniform float uKind,uTime,uHot,uDetail,uDesk,uFlip;
 varying vec3 vWorld,vNormal;
 varying vec2 vUv;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -131,7 +131,7 @@ void main(){
  }
  vec3 color=base;
  if(uKind>5.5&&uKind<6.5){
-  vec3 chart=lin(texture2D(uSharp,vUv).rgb);
+  vec3 chart=lin(texture2D(uSharp,mix(vUv,1.-vUv,uFlip)).rgb);
   // distant wall displays sit back in the dark like the reference; full contrast when focused
   color=chart*mix(.42,1.,uDetail)*vec3(.8,.9,1.1);
   if(uDesk>.5)color=mix(lin(texture2D(uPhoto,deskUV(vWorld)).rgb)*.35,chart,uDetail);
@@ -151,7 +151,7 @@ export function roomMaterial(kind: string,sharp?: THREE.Texture) {
  return new THREE.ShaderMaterial({
    vertexShader:VERTEX,fragmentShader:FRAGMENT,
    uniforms:{uSharp:{value:sharp??blank},uKind:{value:KIND[kind]??0},
-    uTime:{value:0},uHot:{value:0},uDetail:{value:0},uDesk:{value:0},uPhoto:{value:blank}},
+    uTime:{value:0},uHot:{value:0},uDetail:{value:0},uDesk:{value:0},uFlip:{value:0},uPhoto:{value:blank}},
    side:THREE.DoubleSide,transparent:kind==='ceo',depthWrite:true,toneMapped:false,
  })
 }

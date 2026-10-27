@@ -99,32 +99,35 @@ function deskClip(g,margin=.03){const p=g.attributes.position,arm=g.attributes.a
  for(let i=0;i<p.count;i++){const y=p.getY(i),r=Math.hypot(p.getX(i),p.getZ(i)),R=deskRadius(y-margin)+margin;if(R>0&&r<R&&y<1.6+margin){if(arm&&arm.getX(i)>.5)arms++;else torso++;depth=Math.max(depth,R-r)}}
  return{torso,arms,depth}}
 function place(g,x,z,scale,yaw){return g.clone().translate(0,0,-pelvis.z).scale(scale,scale,scale).rotateY(yaw).translate(x,0,z)}
-// Seated agents were sitting inside the desk: the far pair 1.25 m deep (torso through the slab),
-// the mid pair with forearms 0.5 m into it, the near pair's knees through the bevel. Each figure
-// is now pushed back along its seat direction until the torso and its chair clear the desk edge,
-// its forearms are raised until they rest on the desk top, and its scale/position are re-solved
-// so the head still lands on the measured reference landmark.
-function seatClear(id,profile,initial,yaw,target,feet){
- quietFit=true
- const dir=Math.hypot(initial[0],initial[1]),ux=initial[0]/dir,uz=initial[1]/dir
- let best=null
- for(let push=0;push<=1.6;push+=.05){
-  let posed=poseBody(profile,0,0),fit
-  if(feet){fit=landmarkFit(posed,[initial[0]+ux*push,initial[1]+uz*push,initial[2]],yaw,target,true)}
-  else fit=landmarkFit(posed,[initial[0]+ux*push,initial[1]+uz*push,initial[2]],yaw,[target[0],target[1],dir+push],false,true)
-  let c=deskClip(place(posed,...fit,yaw))
-  if(feet&&c.torso){for(let drop=.02;drop<=.2&&c.torso;drop+=.02){posed=poseBody(profile,0,drop);fit=landmarkFit(posed,fit,yaw,target,true);c=deskClip(place(posed,...fit,yaw))}}
-  const cc=deskClip(makeChair(id,...fit,yaw));c.torso+=cc.torso+cc.arms
-  if(c.torso)continue
-  let lift=0
-  for(;lift<=.6&&c.arms;lift+=.02){posed=poseBody(profile,lift,0);fit=feet?landmarkFit(posed,fit,yaw,target,true):landmarkFit(posed,fit,yaw,[target[0],target[1],dir+push],false,true);c=deskClip(place(posed,...fit,yaw))}
-  best={posed,fit,push,lift,c};break
+// Seated agents were sitting inside the desk (far pair 1.25 m deep, mid forearms 0.5 m, near
+// knees through the bevel). fixedSeat() below now walks each seat outward from the desk edge and
+// takes the first radius where body and chair clear the desk and the head is on its landmark.
+function headPx(g,x,z,scale,yaw){
+ g.computeBoundingBox();const p=g.attributes.position,high=g.boundingBox.max.y;let x0=Infinity,x1=-Infinity,y0=Infinity
+ for(let i=0;i<p.count;i+=2){if(p.getY(i)<high-.06)continue;const v=new T.Vector3().fromBufferAttribute(p,i);v.z-=pelvis.z;v.multiplyScalar(scale).applyAxisAngle(new T.Vector3(0,1,0),yaw).add(new T.Vector3(x,0,z));const[a,b]=project(v);x0=Math.min(x0,a);x1=Math.max(x1,a);y0=Math.min(y0,b)}
+ return[(x0+x1)/2,y0,x1-x0]}
+// One body scale for every seated agent. Earlier fits let the near pair shrink to 1.32 (forced
+// perspective) so from any orbit angle they read as children next to 1.9-2.0 neighbours.
+// Scale is now shared (1.95); each seat keeps its bearing solved for head x and moves out from the
+// desk edge to the first desk-clear radius whose head top is within 7.5 px of the landmark.
+function fixedSeat(id,profile,initial,yaw,target,scale){
+ let theta=Math.atan2(initial[0],initial[1]),posed=poseBody(profile,0,0),pick=null
+ const at=r=>[Math.sin(theta)*r,Math.cos(theta)*r]
+ for(let r=2.7;r<4.8&&!pick;r+=.02){
+  for(let it=0;it<4;it++){const[x,z]=at(r),h=headPx(posed,x,z,scale,yaw),[x2,z2]=[Math.sin(theta+.002)*r,Math.cos(theta+.002)*r],h2=headPx(posed,x2,z2,scale,yaw);theta+=T.MathUtils.clamp((target[0]-h[0])/((h2[0]-h[0])/.002),-.1,.1)}
+  const[x,z]=at(r),h=headPx(posed,x,z,scale,yaw)
+  if(Math.abs(h[1]-target[1])>7.5)continue
+  if(deskClip(place(posed,x,z,scale,yaw)).torso)continue
+  const cc=deskClip(makeChair(id,x,z,scale,yaw));if(cc.torso||cc.arms)continue
+  pick=r
  }
- quietFit=false
- if(!best)throw Error('No desk-clear seat for '+id)
- best.fit=landmarkFit(best.posed,best.fit,yaw,[target[0],target[1],dir+best.push],false,true);best.c=deskClip(place(best.posed,...best.fit,yaw));console.log('SEAT',id,'push',best.push.toFixed(2),'lift',best.lift.toFixed(2),'fit',best.fit.map(v=>+v.toFixed(3)),'clip',best.c)
- return best
+ if(!pick)throw Error('No desk-clear landmark seat for '+id+' at scale '+scale)
+ const[x,z]=at(pick);let lift=0,c=deskClip(place(posed,x,z,scale,yaw))
+ for(;c.arms&&lift<.6;){lift+=.02;posed=poseBody(profile,lift,0);c=deskClip(place(posed,x,z,scale,yaw))}
+ console.log('FIXED SEAT',id,'scale',scale,'r',pick.toFixed(2),'lift',lift.toFixed(2),'head',headPx(posed,x,z,scale,yaw).map(v=>+v.toFixed(1)),'clip',c)
+ return{posed,fit:[x,z,scale]}
 }
+const SEAT_SCALE=1.95
 const seatSpecs=[
  ['scanner',-3.15,-1.3,1.90,1.20],['strategist',-1.85,-2,2.06,.70],
  ['backtester',1.85,-2,2.06,-.70],['auditor',3.15,-1.3,1.90,-1.20],
@@ -139,7 +142,7 @@ for(const[id,initialX,initialZ,initialScale,yaw]of [...seatSpecs,['operator',0,4
  const HEAD={scanner:[357,338],auditor:[923,338],strategist:[486,310],backtester:[794,310],regime:[id==='regime'?281:999,467,710],risk:[999,467,710]}
  let posed,x,z,scale
  if(id==='operator'){posed=poseBody(profile);[x,z,scale]=landmarkFit(posed,[initialX,initialZ,initialScale],yaw,[640,559,53])}
- else{const s=seatClear(id,profile,[initialX,initialZ,initialScale],yaw,HEAD[id],false);posed=s.posed;[x,z,scale]=s.fit}
+ else{const s=fixedSeat(id,profile,[initialX,initialZ],yaw,HEAD[id],SEAT_SCALE);posed=s.posed;[x,z,scale]=s.fit}
  const person=place(posed,x,z,scale,yaw)
  const furniture=makeChair(id,x,z,scale,yaw)
  if(id==='operator'){
@@ -218,7 +221,7 @@ const glassBox=glass.boundingBox,glassCenter=glassBox.getCenter(new T.Vector3())
 for(const s of screenSource){const r=s.rect,cx=r.x+r.w/2,cy=r.y+r.h/2;let centre,normal;
  if(s.kind==='wall'){const rr=ray(cx,cy),o=rr.origin,d=rr.direction;const A=d.x*d.x+d.z*d.z,B=2*(o.x*d.x+o.z*d.z),C=o.x*o.x+o.z*o.z-7.95*7.95;const t=(-B+Math.sqrt(B*B-4*A*C))/(2*A);centre=rr.at(t,new T.Vector3());normal=new T.Vector3(-centre.x,0,-centre.z).normalize();if(cy>300)normal.y=.48;normal.normalize()}
  else {
-  const theta=s.seat?seatLayout.get(s.seat).theta:({d7:-20,d8:0,d9:20}[s.id]*Math.PI/180)
+  const theta=s.seat?seatLayout.get(s.seat).theta:({d7:-62,d8:0,d9:62}[s.id]*Math.PI/180) // d7/d9 moved out from ±20° so the full-size near pair's consoles (±32°) keep clear of them
   const radius=s.seat?2.10:2.18
   centre=new T.Vector3(Math.sin(theta)*radius,1.608,Math.cos(theta)*radius)
   normal=new T.Vector3(0,1,0)

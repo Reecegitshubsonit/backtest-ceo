@@ -36,30 +36,3 @@
 .room-loading-poster { position:absolute; inset:0; z-index:5; display:grid; place-items:center; background:#02040a; }
 .room-loading-poster img { position:absolute; inset:0; width:100%; height:100%; filter:brightness(.4); }
 .room-loading-poster span { position:relative; color:#a8cde5; padding:10px 16px; border-radius:4px; background:#051025dd; font-size:13px; }
-
-/* Live desk consoles: real DOM mapped onto the 3D console face, mounted only when the camera is close. */
-.live-layer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1; }
-.live-layer .live-console { position:absolute; left:0; top:0; transform-origin:0 0; visibility:hidden; }
-.live-console { display:flex; flex-direction:column; overflow:hidden; background:#050d20f5; border:2px solid #2f6aa3; box-shadow:inset 0 0 30px #1b5d9a55; font:24px/1.35 system-ui,sans-serif; color:#cfe3f7; pointer-events:none; }
-.live-console .screenview { border:0; background:transparent; height:auto; font-size:1em; }
-.live-console .screenview > header { padding:.4em .6em; }
-.live-console .screenview h2 { font-size:1.15em; }
-.live-console .panelbody { padding:.5em .7em; overflow:hidden; flex:none; }
-.live-console .panelbody p { margin:.2em 0; font-size:.8em; }
-.live-console h3 { margin:0 0 .2em; font-size:1.1em; color:#9fdcff; letter-spacing:.05em; }
-.live-body { flex:none; }
-.live-strip { display:flex; align-items:center; gap:.7em; padding:.35em .6em; background:#081a33; border-bottom:1px solid #1d3f68; font:600 .7em/1.2 ui-monospace,monospace; letter-spacing:.08em; color:#8fb8de; }
-.live-strip time { margin-left:auto; color:#e6f3ff; font-size:1.25em; }
-.live-state { color:#b9a6ff; }
-.live-dot { width:.7em; height:.7em; border-radius:50%; background:#6b7f99; box-shadow:0 0 8px currentColor; }
-.live-dot.up { background:#36e39a; color:#36e39a; animation:live-pulse 1.6s ease-in-out infinite; }
-.live-dot.down { background:#ff5d7a; color:#ff5d7a; }
-.live-tag { margin-left:auto; font:600 .7em/1 ui-monospace,monospace; color:#7fe3b6; letter-spacing:.08em; }
-.live-idle { flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:auto 1fr; gap:.5em; padding:.6em .7em; border-top:1px solid #1d3f68; }
-.live-idle > div { display:flex; flex-direction:column; gap:.2em; padding:.4em .5em; border:1px solid #17345a; background:#06142a; }
-.live-idle > div.wide { grid-column:1 / -1; }
-.live-idle span { font:600 .6em/1.2 ui-monospace,monospace; letter-spacing:.1em; color:#6f93bd; }
-.live-idle b { font-weight:600; font-size:.85em; color:#d7eaff; }
-.live-idle > div.wide { min-height:0; }
-.live-spark { width:100%; flex:1; min-height:2.6em; }
-@keyframes live-pulse { 50% { opacity:.35; } }

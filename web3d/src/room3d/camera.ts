@@ -5,7 +5,7 @@ export const HOME = { position: [0, 3.844, 7.04] as XYZ, target: [0, 3.3, 0] as 
 export const LIMITS = { radius: 8, floor: 0.18, ceiling: 7.0 }
 /** Zoom tuning: wheel sensitivity (log-distance per wheel pixel), damping rate, closest approach to the
  * surface under the cursor, farthest camera-to-focus distance. */
-export const ZOOM = { wheel: 0.0011, smoothing: 11, minSurface: 0.32, maxDistance: 11, assistFar: 2.6, assistNear: 1.3, readDistance: 1.0 }
+export const ZOOM = { wheel: 0.0011, smoothing: 11, minSurface: 0.32, maxDistance: 11 }
 /** Free space for the camera: inside the wall/monitor ring, above the floor, below the ceiling,
  * out of the command desk and the wall console ledge. */
 export function inRoom(p: THREE.Vector3) {
