@@ -10,6 +10,8 @@
 .room-label.summary b { font-size:1.55cqh; color:white; letter-spacing:.08em; }
 .room-label.summary span { font-size:1.15cqh; color:#8fd2ff; letter-spacing:.1em; }
 .room-hover-name { position:absolute; top:0; left:0; white-space:nowrap; padding:5px 9px; border:1px solid #5fa6d7; border-radius:3px; background:#041022ed; color:#e7f6ff; font:600 12px/1.2 system-ui; letter-spacing:.12em; box-shadow:0 0 15px #2da5dd60; }
+.room-inspect-hint { position:absolute; left:50%; top:12px; transform:translateX(-50%); display:flex; gap:10px; align-items:center; white-space:nowrap; padding:5px 11px; border:1px solid #2f5f8f; border-radius:3px; background:#041022d8; color:#8fb4da; font:12px/1.2 system-ui; }
+.room-inspect-hint b { color:#e7f6ff; font-weight:600; letter-spacing:.1em; }
 .room-controls { position:absolute; bottom:12px; left:16px; z-index:10; display:flex; align-items:center; gap:8px; color:#7f9cc4; font-size:12px; }
 .room-controls button { padding:3px 7px; font-size:12px; background:#061125dc; }
 .room-focus-hint { position:absolute; bottom:12px; left:16px; color:#7f9cc4; font-size:12px; }

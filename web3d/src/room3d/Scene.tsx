@@ -9,14 +9,14 @@ import { ROOM_SCREENS, screenById, screenName, type RoomScreen } from '../config
 import type { PanelAction, PanelState } from '../model/roomPanel'
 import { deskScreenAt } from '../model/deskPicking'
 import { Slot } from '../panels/Slot'
-import { HOME, flightDistance, inRoom, ZOOM } from './camera'
+import { HOME, INSPECT, LIMITS, flightDistance, inRoom, inspectDistance, inspectPose, readableUp, screenFraction, ZOOM } from './camera'
 import type { Asset, Bar, Timeframe } from '../model/types'
 import { SEATS } from '../config/seats'
 import { api } from '../net/api'
 import { CameraRig } from './CameraRig'
-import { roomMaterial } from './material'
+import { READING_CUT, roomMaterial } from './material'
 import { Beam } from './Beam'
-import { LabelProjector, setHovered, getHovered } from './labels'
+import { LabelProjector, setHovered, getHovered, getInspecting, setInspecting } from './labels'
 
 THREE.Mesh.prototype.raycast=acceleratedRaycast
 type Props={panel:PanelState;dispatch:(a:PanelAction)=>void;host:HTMLElement;resetKey:number;onReady:(ready:boolean)=>void}
@@ -182,41 +182,154 @@ function useLiveConsoles(maps:Map<string,THREE.CanvasTexture>){
 }
 
 // ---------------------------------------------------------------------------------------------
-// Plain smooth zoom. Wheel, trackpad pinch (ctrl+wheel) and two-finger touch pinch feed one damped
-// log-distance accumulator. Camera and orbit target scale together toward the 3D point under the
-// cursor, so the view direction never changes: no auto-rotate, no auto re-centre. It stops a
-// fixed distance before the surface under the cursor and never leaves the room on the way out.
-function SmoothZoom({controls,enabled}:{controls:RefObject<Controls|null>;enabled:boolean}){
+// Zoom. Wheel, trackpad pinch (ctrl+wheel) and two-finger touch pinch feed one damped log-distance
+// accumulator that moves camera and orbit target toward the 3D point under the pointer.
+// Reading a screen: when the pointer is on a screen (its frame, an agent's desk station, the agent or
+// its chair all count as that agent's console) and the user deliberately scrolls toward it, the camera
+// glides to a head-on pose where the screen fills ~70% of the view, upright to its readable side.
+// Scrolling out from there (or Esc / double-click on empty space) glides back. Every glide follows a
+// path that is ray-checked against the room, so the camera never passes through people or furniture.
+type Pose={position:THREE.Vector3;target:THREE.Vector3}
+type Flight={from:Pose;to:Pose;path:(k:number)=>THREE.Vector3;t:number;dur:number;done:()=>void;inward:boolean}
+type Inspecting={screen:RoomScreen;pose:Pose;back:Pose;out:number}
+const HOME_POSE=():Pose=>({position:new THREE.Vector3(...HOME.position),target:new THREE.Vector3(...HOME.target)})
+/** The screen a hit belongs to, for aiming: the face, its frame, a desk station, or the seated agent/chair. */
+function screenFromHit(hit:THREE.Intersection):RoomScreen|undefined{
+ const n=hit.object.name
+ if(n.startsWith('screen_'))return screenById(n.slice(7))
+ if(n.startsWith('frame_'))return screenById(n.slice(6))
+ const seat=/^(?:agent|chair)_(.+)$/.exec(n)?.[1]
+ if(seat)return ROOM_SCREENS.find(s=>s.seat===seat)
+ return deskScreenAt(hit.point)??undefined
+}
+const solid=(h:THREE.Intersection)=>h.object.visible&&(h.object as THREE.Mesh).isMesh&&!((h.object as THREE.Mesh).material as THREE.MeshBasicMaterial)?.wireframe
+function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|null>;enabled:boolean;resetKey:number}){
  const {camera,gl,scene}=useThree()
- const pending=useRef(0),focus=useRef(new THREE.Vector3(...HOME.target)),surface=useRef(Infinity)
- const ray=useMemo(()=>new THREE.Raycaster(),[])
+ const cam=camera as THREE.PerspectiveCamera
+ const pending=useRef(0),focus=useRef(new THREE.Vector3(...HOME.target)),under=useRef<RoomScreen|undefined>(undefined)
+ const flight=useRef<Flight|null>(null),inspect=useRef<Inspecting|null>(null),anchor=useRef<Pose>(HOME_POSE())
+ const gesture=useRef({screen:undefined as RoomScreen|undefined,sum:0})
+ const ray=useMemo(()=>{const r=new THREE.Raycaster();(r as THREE.Raycaster&{firstHitOnly?:boolean}).firstHitOnly=false;return r},[])
  const live=useRef(enabled);live.current=enabled
+ const pose=():Pose=>({position:camera.position.clone(),target:(controls.current?.target??new THREE.Vector3(...HOME.target)).clone()})
+ const aspect=()=>{const r=gl.domElement.getBoundingClientRect();return r.width/Math.max(1,r.height)}
+ /** First solid hit along a ray, ignoring hologram wireframe overlays. */
+ const cast=(from:THREE.Vector3,dir:THREE.Vector3,far:number)=>{ray.set(from,dir.clone().normalize());ray.near=0;ray.far=far;return ray.intersectObjects(scene.children,true).find(solid)}
+ const blocked=(a:THREE.Vector3,b:THREE.Vector3)=>{const d=b.clone().sub(a),l=d.length();return l>1e-4&&!!cast(a,d,l)}
+ /** Pick a collision-free path: straight, around the room's axis (clears the CEO hologram), or either raised. */
+ const route=(from:THREE.Vector3,to:THREE.Vector3)=>{
+  const straight=(k:number)=>from.clone().lerp(to,k)
+  const ra=Math.hypot(from.x,from.z),rb=Math.hypot(to.x,to.z),aa=Math.atan2(from.x,from.z)
+  let da=Math.atan2(to.x,to.z)-aa;da=Math.atan2(Math.sin(da),Math.cos(da))
+  const around=(k:number)=>{const r=THREE.MathUtils.lerp(ra,rb,k),a=aa+da*k;return new THREE.Vector3(Math.sin(a)*r,THREE.MathUtils.lerp(from.y,to.y,k),Math.cos(a)*r)}
+  const raise=(f:(k:number)=>THREE.Vector3,h:number)=>(k:number)=>{const p=f(k);p.y=Math.min(LIMITS.ceiling-.3,p.y+Math.sin(Math.PI*k)*h);return p}
+  const clear=(f:(k:number)=>THREE.Vector3)=>{let prev=f(0);for(let i=1;i<=32;i++){const p=f(i/32);if(blocked(prev,p))return false;prev=p}return true}
+  for(const f of [straight,around,raise(straight,.8),raise(around,.8),raise(straight,1.6),raise(around,1.6)])if(clear(f))return f
+  return straight
+ }
+ const fly=(to:Pose,inward:boolean,done:()=>void=()=>{})=>{
+  const from=pose(),len=from.position.distanceTo(to.position)+.5*from.target.distanceTo(to.target)
+  pending.current=0
+  flight.current={from,to,path:route(from.position,to.position),t:0,dur:THREE.MathUtils.clamp(.45+len*.07,.5,1.1),done,inward}
+ }
+ const setInspect=(v:Inspecting|null)=>{inspect.current=v;setInspecting(v?.screen.id??null)}
+ const startInspect=(s:RoomScreen)=>{
+  const c=new THREE.Vector3(...s.center),n=new THREE.Vector3(...s.normal)
+  let d=inspectDistance(s.w,s.h,aspect())
+  const hit=cast(c.clone().addScaledVector(n,.02),n,d+INSPECT.clearance) // keep the eye clear of heads and furniture
+  if(hit)d=Math.max(INSPECT.minDistance,hit.distance+.02-INSPECT.clearance)
+  const off=cam.view?.enabled?2*cam.view.offsetY/cam.view.fullHeight:0
+  const to=inspectPose(s,d,readableUp(s,camera.position),off,cam.fov)
+  const back=inspect.current?.back??anchor.current
+  setInspect(null);gesture.current={screen:undefined,sum:0}
+  const q=new THREE.Quaternion(...s.quaternion),K=READING_CUT // the reading window that dissolves hands in front of the screen
+  K.uCutC.value.copy(c);K.uCutN.value.copy(n);K.uCutR.value.set(1,0,0).applyQuaternion(q);K.uCutU.value.set(0,1,0).applyQuaternion(q);K.uCutS.value.set(s.w/2,s.h/2,d)
+  fly(to,true,()=>setInspect({screen:s,pose:to,back,out:0}))
+ }
+ const leave=(to:Pose)=>{setInspect(null);gesture.current={screen:undefined,sum:0};fly(to,false,()=>{anchor.current=to})}
+ const atHome=()=>camera.position.distanceTo(new THREE.Vector3(...HOME.position))<.02&&(controls.current?.target.distanceTo(new THREE.Vector3(...HOME.target))??0)<.02
+ useEffect(()=>{flight.current=null;pending.current=0;anchor.current=HOME_POSE();setInspect(null)},[resetKey]) // eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(()=>{if(!enabled){flight.current=null;pending.current=0}},[enabled])
  useEffect(()=>{
   const el=gl.domElement
   const aim=(cx:number,cy:number)=>{
-   const r=el.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1),camera);ray.far=60
-   const hit=ray.intersectObjects(scene.children,true).find(h=>h.object.visible&&!((h.object as THREE.Mesh).material as THREE.MeshBasicMaterial)?.wireframe)
-   if(hit){focus.current.copy(hit.point);surface.current=hit.distance}
-   else{const t=controls.current?.target??new THREE.Vector3(...HOME.target);focus.current.copy(ray.ray.at(camera.position.distanceTo(t),new THREE.Vector3()));surface.current=Infinity}
+   const r=el.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1),camera);ray.near=0;ray.far=60
+   const hit=ray.intersectObjects(scene.children,true).find(solid)
+   if(import.meta.env.DEV)(window as unknown as {__zoom?:unknown}).__zoom={hit:hit?.object.name,point:hit?.point.toArray(),under:hit?screenFromHit(hit)?.id:undefined,gesture:gesture.current.sum,inspect:inspect.current?.screen.id}
+   if(hit){focus.current.copy(hit.point);under.current=screenFromHit(hit);return hit}
+   const t=controls.current?.target??new THREE.Vector3(...HOME.target);focus.current.copy(ray.ray.at(camera.position.distanceTo(t),new THREE.Vector3()));under.current=undefined
+  }
+  const zoom=(amount:number)=>{ // amount in log-distance; negative = in
+   if(flight.current){ // a wheel-out during a glide in turns it around
+    if(amount>0&&flight.current.inward){flight.current=null;leave(anchor.current)}
+    return
+   }
+   const s=under.current,insp=inspect.current
+   if(amount<0&&s&&(!insp||insp.screen.id!==s.id)){
+    const g=gesture.current
+    if(g.screen?.id===s.id)g.sum-=amount;else{g.screen=s;g.sum=-amount}
+    const D=camera.position.distanceTo(new THREE.Vector3(...s.center))
+    if(g.sum>=INSPECT.gesture||screenFraction(s.w,s.h,D,aspect())>=INSPECT.fraction){startInspect(s);return}
+   }else if(amount>0)gesture.current.sum=0
+   pending.current=THREE.MathUtils.clamp(pending.current+amount,-1.2,1.2)
   }
   const wheel=(e:WheelEvent)=>{if(!live.current)return;e.preventDefault();aim(e.clientX,e.clientY)
-   let dy=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?400:1);if(e.ctrlKey)dy*=3
-   pending.current=THREE.MathUtils.clamp(pending.current+dy*ZOOM.wheel,-1.2,1.2)}
+   let dy=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?400:1);if(e.ctrlKey)dy*=3 // trackpad pinch arrives as ctrl+wheel with small deltas
+   zoom(THREE.MathUtils.clamp(dy,-240,240)*ZOOM.wheel)} // one coarse notch never jumps more than ~two
   let pinch=0
-  const touches=(e:TouchEvent)=>{if(e.touches.length!==2){pinch=0;return}const [a,b]=[e.touches[0],e.touches[1]],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pinch&&live.current){aim((a.clientX+b.clientX)/2,(a.clientY+b.clientY)/2);pending.current=THREE.MathUtils.clamp(pending.current+Math.log(pinch/d),-1.2,1.2)}pinch=d}
+  const touches=(e:TouchEvent)=>{if(e.touches.length!==2){pinch=0;return}const [a,b]=[e.touches[0],e.touches[1]],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pinch&&live.current){aim((a.clientX+b.clientX)/2,(a.clientY+b.clientY)/2);zoom(Math.log(pinch/d))}pinch=d}
+  const home=()=>{if(!live.current)return;if(inspect.current||flight.current||!atHome())leave(HOME_POSE())}
+  const key=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!document.querySelector('.room-screen-menu'))home()}
+  const dbl=(e:MouseEvent)=>{if(!live.current)return;const hit=aim(e.clientX,e.clientY);const n=hit?.object.name??'';if(!n.startsWith('screen_')&&!n.startsWith('frame_'))home()}
   el.addEventListener('wheel',wheel,{passive:false});el.addEventListener('touchstart',touches,{passive:true});el.addEventListener('touchmove',touches,{passive:true});el.addEventListener('touchend',touches)
-  return()=>{el.removeEventListener('wheel',wheel);el.removeEventListener('touchstart',touches);el.removeEventListener('touchmove',touches);el.removeEventListener('touchend',touches)}
- },[gl,camera,scene,controls,ray])
+  el.addEventListener('dblclick',dbl);window.addEventListener('keydown',key)
+  return()=>{el.removeEventListener('wheel',wheel);el.removeEventListener('touchstart',touches);el.removeEventListener('touchmove',touches);el.removeEventListener('touchend',touches);el.removeEventListener('dblclick',dbl);window.removeEventListener('keydown',key)}
+ },[gl,camera,scene,controls,ray]) // eslint-disable-line react-hooks/exhaustive-deps
+ // A drag (orbit or pan) hands the camera back to the user: cancel any glide, and remember where they settle.
+ const bound=useRef<Controls|null>(null),unbind=useRef<(()=>void)|null>(null)
+ useEffect(()=>()=>{unbind.current?.()},[])
  useFrame((_,dt)=>{
   const c=controls.current
+  if(c&&bound.current!==c){
+   let grab:Pose|null=null
+   const start=()=>{flight.current=null;pending.current=0;grab=pose()}
+   const end=()=>{const now=pose() // a plain click (e.g. to open the screen) is not a drag and keeps the reading pose
+    if(grab&&now.position.distanceTo(grab.position)+now.target.distanceTo(grab.target)>.005){setInspect(null);gesture.current={screen:undefined,sum:0};anchor.current=now}
+    grab=null}
+   unbind.current?.();c.addEventListener('start',start);c.addEventListener('end',end);unbind.current=()=>{c.removeEventListener('start',start);c.removeEventListener('end',end)};bound.current=c
+  }
   if(!c||!enabled){pending.current=0;return}
+  if(import.meta.env.DEV){const w=window as unknown as {__zoom?:Record<string,unknown>};w.__zoom={...w.__zoom,flying:!!flight.current,inspect:inspect.current?.screen.id}}
+  { // fade the reading window in while gliding to a screen / reading it, out otherwise
+   const want=inspect.current||flight.current?.inward?1:0,u=READING_CUT.uCut
+   u.value=THREE.MathUtils.clamp(u.value+(want?1:-1)*Math.min(dt,.05)*2.5,0,1)}
+  const f=flight.current
+  if(f){
+   f.t=Math.min(1,f.t+Math.min(dt,.05)/f.dur)
+   const k=f.t<.5?4*f.t**3:1-(-2*f.t+2)**3/2 // ease in-out
+   camera.position.copy(f.path(k));c.target.copy(f.from.target).lerp(f.to.target,k);camera.lookAt(c.target);c.update()
+   if(f.t===1){flight.current=null;f.done()}
+   return
+  }
   if(Math.abs(pending.current)<1e-4){pending.current=0;return}
   const step=pending.current*(1-Math.exp(-Math.min(dt,.1)*ZOOM.smoothing));pending.current-=step
+  const insp=inspect.current
+  if(insp&&step>0){ // out of a reading pose: first settle back onto it, then glide back to where you came from
+   const gap=camera.position.distanceTo(insp.pose.position)+c.target.distanceTo(insp.pose.target)
+   if(gap>.01){const a=1-Math.exp(-step*7);camera.position.lerp(insp.pose.position,a);c.target.lerp(insp.pose.target,a);c.update();return}
+   insp.out+=step
+   if(insp.out>=.06){pending.current=0;leave(insp.back)}
+   return
+  }
   let k=Math.exp(step)
   const F=focus.current,pos=camera.position,dist=pos.distanceTo(F)
   const at=(kk:number)=>F.clone().add(pos.clone().sub(F).multiplyScalar(kk))
   if(k<1&&dist*k<ZOOM.minSurface){k=Math.min(1,ZOOM.minSurface/dist);pending.current=0}
-  if(k>1&&(!inRoom(at(k))||dist*k>ZOOM.maxDistance)){let lo=1,hi=k;for(let i=0;i<14;i++){const mid=(lo+hi)/2;if(inRoom(at(mid))&&dist*mid<=ZOOM.maxDistance)lo=mid;else hi=mid}k=lo;pending.current=0}
+  if(k>1){
+   if(!inRoom(at(k))||dist*k>ZOOM.maxDistance){let lo=1,hi=k;for(let i=0;i<14;i++){const mid=(lo+hi)/2;if(inRoom(at(mid))&&dist*mid<=ZOOM.maxDistance)lo=mid;else hi=mid}k=lo;pending.current=0}
+   const back=cast(pos,pos.clone().sub(F),dist*(k-1)+INSPECT.clearance) // never back into a person or chair
+   if(back){k=Math.max(1,1+(back.distance-INSPECT.clearance)/dist);pending.current=0}
+  }
   if(Math.abs(k-1)<1e-6)return
   pos.sub(F).multiplyScalar(k).add(F);c.target.sub(F).multiplyScalar(k).add(F)
   c.update()
@@ -246,7 +359,7 @@ function Screen({mesh,screen,panel,dispatch,onHover,tableMap,sharp}:{sharp:THREE
     const q=new THREE.Quaternion(...screen.quaternion),up=new THREE.Vector3(0,1,0).applyQuaternion(q),side=camera.position.clone().sub(new THREE.Vector3(...screen.center)).dot(up)
     if(Math.abs(side)>.05)material.uniforms.uFlip.value=side>0?1:0
    }
-   material.uniforms.uHot.value=hot||getHovered()===screen.id?1:0
+   material.uniforms.uHot.value=(hot||getHovered()===screen.id)&&getInspecting()!==screen.id?1:0 // no glow over a screen being read
  })
  useEffect(()=>()=>{material.dispose()},[material])
  const enabled=panel.phase==='closed'||panel.phase==='focused'
@@ -292,7 +405,7 @@ function Assets({panel,dispatch,host,onReady}:Props){
 // Development-only handle for headless visual checks (camera poses, raycast click tests).
 function DevHandle({controls}:{controls:React.RefObject<Controls|null>}){
  const state=useThree()
- useEffect(()=>{if(!import.meta.env.DEV)return;(window as unknown as {__room3d?:unknown}).__room3d={camera:state.camera,scene:state.scene,gl:state.gl,controls:controls.current};return()=>{delete (window as unknown as {__room3d?:unknown}).__room3d}},[state.camera,state.scene,state.gl,controls])
+ useEffect(()=>{if(!import.meta.env.DEV)return;(window as unknown as {__room3d?:unknown}).__room3d={camera:state.camera,scene:state.scene,gl:state.gl,controls:controls.current,THREE};return()=>{delete (window as unknown as {__room3d?:unknown}).__room3d}},[state.camera,state.scene,state.gl,controls])
  return null
 }
 export function RoomScene(props:Props){
@@ -303,7 +416,7 @@ export function RoomScene(props:Props){
   <Suspense fallback={null}><Assets {...props}/></Suspense>
   <OrbitControls ref={controls} makeDefault target={HOME.target} enablePan enableZoom={false} screenSpacePanning enableDamping dampingFactor={.10}
    minDistance={.05} maxDistance={ZOOM.maxDistance} minPolarAngle={.05} maxPolarAngle={2.0} enabled={props.panel.phase==='closed'}/>
-  <SmoothZoom controls={controls} enabled={props.panel.phase==='closed'}/>
+  <SmoothZoom controls={controls} enabled={props.panel.phase==='closed'} resetKey={props.resetKey}/>
   <CameraRig panel={props.panel} dispatch={props.dispatch} controls={controls} resetKey={props.resetKey}/>
   {import.meta.env.DEV&&<DevHandle controls={controls}/>}
   <LabelProjector hidden={props.panel.phase!=='closed'}/>

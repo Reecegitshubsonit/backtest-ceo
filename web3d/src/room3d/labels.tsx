@@ -9,7 +9,11 @@ import { referencePoint } from './camera'
 const nodes=new Map<string,HTMLDivElement>()
 let hovered:string|null=null
 export function getHovered(){return hovered}
-export function setHovered(id:string|null){hovered=id;const el=nodes.get('hover');if(el){el.textContent=id?screenName(screenById(id)!):'';el.style.display=id?'':'none'}}
+let inspecting:string|null=null
+export function getInspecting(){return inspecting}
+export function setHovered(id:string|null){hovered=id;const show=id&&id!==inspecting,el=nodes.get('hover');if(el){el.textContent=show?screenName(screenById(id)!):'';el.style.display=show?'':'none'}}
+/** While a screen is being read head-on, room labels step aside and a short hint says how to get out. */
+export function setInspecting(id:string|null){inspecting=id;setHovered(hovered);const el=nodes.get('inspect');if(el){el.style.display=id?'':'none';const name=el.querySelector('b');if(name)name.textContent=id?screenName(screenById(id)!):''}}
 const middle=(r:{x:number;y:number;w:number;h:number})=>[r.x+r.w/2,r.y+r.h/2]
 const anchors=[
  {id:'ceo',point:middle(CEO_LABEL),z:.14,lines:['CEO AI','STRATEGIC OVERSIGHT','FINAL DECISION AUTHORITY']},
@@ -28,6 +32,7 @@ export function RoomLabels(){return <div className="room-labels" aria-hidden>
   <b>{a.lines[0]}</b>{a.lines.slice(1).map((l,i)=><span key={i}>{l}</span>)}
  </div>)}
  <div className="room-hover-name" style={{display:'none'}} ref={el=>{if(el)nodes.set('hover',el);else nodes.delete('hover')}}/>
+ <div className="room-inspect-hint" style={{display:'none'}} ref={el=>{if(el)nodes.set('inspect',el);else nodes.delete('inspect')}}><b/><span>Scroll out, Esc or double-click to step back · click to open</span></div>
  </div>}
 export function LabelProjector({hidden}:{hidden:boolean}){
  const {camera,size}=useThree()
@@ -39,8 +44,9 @@ export function LabelProjector({hidden}:{hidden:boolean}){
    const v=a.world.clone().project(camera),behind=v.z>1||v.z< -1
    const scale=THREE.MathUtils.clamp(a.homeDistance/camera.position.distanceTo(a.world),.4,1.3)
    const x=(v.x+1)*size.width/2,y=(1-v.y)*size.height/2
-   el.style.display=hidden||behind?'none':''
-   if(hidden||behind)continue
+   const off=hidden||behind||inspecting!==null
+   el.style.display=off?'none':''
+   if(off)continue
    const w=el.offsetWidth*scale,h=el.offsetHeight*scale
    const rect={left:x-w/2-4,right:x+w/2+4,top:y-h/2-3,bottom:y+h/2+3}
    const overlaps=occupied.some(b=>rect.left<b.right&&rect.right>b.left&&rect.top<b.bottom&&rect.bottom>b.top)
@@ -48,7 +54,8 @@ export function LabelProjector({hidden}:{hidden:boolean}){
    if(!overlaps)occupied.push(rect)
    el.style.transform=`translate(-50%,-50%) translate(${x}px,${y}px) scale(${scale})`
   }
-  const el=nodes.get('hover');if(el&&hovered){const s=screenById(hovered)!;const v=new THREE.Vector3(...s.center).project(camera);el.style.transform=`translate(-50%,-100%) translate(${(v.x+1)*size.width/2}px,${(1-v.y)*size.height/2-16}px)`}
+  const hint=nodes.get('inspect');if(hint)hint.style.display=inspecting&&!hidden?'':'none'
+  const el=nodes.get('hover');if(el&&hovered&&hovered!==inspecting){const s=screenById(hovered)!;const v=new THREE.Vector3(...s.center).project(camera);el.style.transform=`translate(-50%,-100%) translate(${(v.x+1)*size.width/2}px,${(1-v.y)*size.height/2-16}px)`}
  })
  return null
 }
