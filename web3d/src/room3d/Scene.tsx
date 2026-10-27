@@ -15,7 +15,9 @@ import { api } from '../net/api'
 import { CameraRig } from './CameraRig'
 import { roomMaterial } from './material'
 import { Beam } from './Beam'
-import { liveAgents, startLiveAgents, STATUS_LABEL, type AgentStatus } from './strategies'
+import { decisionsBy, feed, LIVE_URL, STAGE_LABEL, startFeed, verdictFor, type AgentState, type Slot as AgentSlot } from './liveFeed'
+import { drawWall, pct, shownStage, wallAssignment, wallCanvas, wallKey, wallTexture } from './wallStrategies'
+import { CeoLedger, setLedgerOpen } from './ledger'
 import { LabelProjector, setHovered, getHovered, getInspecting, setInspecting } from './labels'
 
 THREE.Mesh.prototype.raycast=acceleratedRaycast
@@ -66,27 +68,29 @@ function displayTexture(screen:RoomScreen,index:number){
 }
 
 // ---------------------------------------------------------------------------------------------
-// Live desk consoles, drawn into the ring computer (no DOM overlay). One agent = one strategy: each
-// agent's region is a strategy tile (name, status, equity curve, stats, recent trades, log) fed by
-// ./strategies (engine /api/agents/live when it exists, ?demo=1 for a labelled simulation, honest
-// empty states otherwise). The engine heartbeat comes from /api/health. Nothing here is invented:
-// a value the source did not send is drawn as "—".
+// Live desk consoles, drawn into the ring computer (no DOM overlay). Each agent's region is its role
+// screen: what that agent is doing right now (task, strategy/symbol, progress, streaming activity log)
+// from ./liveFeed (the live-events service at ?live=, default http://127.0.0.1:8030; ?demo=1 for a
+// labelled simulation; an honest "NO LIVE FEED" otherwise). d8 summarises all six. The engine heartbeat
+// still comes from /api/health. Nothing here is invented: a value the source did not send is "—".
 type Engine={state:'checking'|'up'|'down';keys:boolean;at:number;latency:number[]}
 const live={engine:{state:'checking',keys:false,at:0,latency:[]} as Engine,log:new Map<string,string[]>()}
-/** Engine events as they happen, shown in the logs when a strategy has nothing of its own yet. */
+/** Engine events as they happen, shown in the logs when an agent has nothing of its own yet. */
 function note(key:string,line:string){const l=live.log.get(key)??[];if(l[0]?.slice(9)===line)return;l.unshift(`${hhmmss(Date.now())} ${line}`);live.log.set(key,l.slice(0,8))}
 async function pollHealth(){const t0=performance.now()
  try{const h=await api.health();const e=live.engine;live.engine={state:'up',keys:h.alpaca_keys_present,at:Date.now(),latency:[...e.latency,performance.now()-t0].slice(-40)};if(e.state!=='up')note('engine',`engine up${h.alpaca_keys_present?'':' · alpaca keys missing'}`)}
  catch{if(live.engine.state!=='down')note('engine','engine unreachable');live.engine={...live.engine,state:'down',at:Date.now()}}}
 const hhmmss=(ms:number)=>new Date(ms).toLocaleTimeString([],{hour12:false})
 const hhmm=(iso:string)=>{const t=Date.parse(iso);return Number.isFinite(t)?hhmmss(t):'--:--:--'}
-const GREEN='#3ddc84',RED='#ff5a6a',ORANGE='#ff8a3d'
-const STATUS_COLOR:Record<AgentStatus,string>={idle:'#6d86a8',researching:'#9b7bff',coding:'#5fd0ff',backtesting:ORANGE,live_paper:GREEN,error:RED}
-const signR=(v:number)=>(v>0?'+':'')+v.toFixed(1)+'R'
+const GREEN='#3ddc84',RED='#ff5a6a',ORANGE='#ff8a3d',AMBER='#f3c74b'
+const STATE_COLOR:Record<AgentState,string>={idle:'#6d86a8',working:CYAN,waiting:AMBER,error:RED}
+const sumVersions=(m:Map<string,number>)=>{let n=0;for(const v of m.values())n+=v;return n}
+const sourceText=()=>feed.source==='demo'?'DEMO · SIMULATED ACTIVITY · NOT REAL':feed.source==='live'?feed.detail:feed.source==='none'?`NO LIVE FEED · ${LIVE_URL}`:'CONNECTING TO LIVE FEED…'
+const sourceColor=()=>feed.source==='demo'?ORANGE:feed.source==='live'?GREEN:AMBER
 /** What a region's pixels depend on; it is redrawn and re-uploaded only when this changes. */
 function consoleKey(screen:RoomScreen,now:number){
- const slot=screen.seat,e=live.engine
- if(slot)return `${liveAgents.version.get(slot)}|${liveAgents.sourceVersion}|${e.state}|${e.keys}`
+ const slot=screen.seat as AgentSlot|undefined,e=live.engine
+ if(slot)return `${feed.version.agents.get(slot)}|${feed.version.source}|${feed.version.decisions}|${sumVersions(feed.version.strategies)}|${e.state}|${e.keys}`
  if(screen.id==='d8')return `${Math.floor(now/1000)}` // the operator console carries a clock
  return `${e.at}|${e.state}`
 }
@@ -106,74 +110,69 @@ function drawConsole(canvas:HTMLCanvasElement,screen:RoomScreen,now:number){
  const text=(v:string,x:number,y:number,size:number,color:string,align:CanvasTextAlign='left',weight=400,mono=true,max?:number)=>{c.textAlign=align;c.fillStyle=color;c.font=`${weight} ${size*u}px ${mono?'ui-monospace,monospace':'system-ui,sans-serif'}`;c.fillText(v,x,y,max)}
  const chip=(label:string,color:string,x:number,y:number,size=2.6)=>{c.font=`700 ${size*u}px ui-monospace,monospace`;const w=c.measureText(label).width+2.4*u
   c.beginPath();c.roundRect(x-w,y-2.2*u,w,4.4*u,.9*u);c.fillStyle=color+'33';c.fill();c.strokeStyle=color;c.lineWidth=.25*u;c.stroke();text(label,x-1.2*u,y,size,color,'right',700);return w}
+ /** Word-wrap into at most `lines` lines that fit `w`. */
+ const wrap=(v:string,size:number,w:number,lines:number,weight=600,mono=false)=>{c.font=`${weight} ${size*u}px ${mono?'ui-monospace,monospace':'system-ui,sans-serif'}`;const out:string[]=[];let cur=''
+  for(const word of v.split(/\s+/)){const t=cur?cur+' '+word:word;if(c.measureText(t).width>w&&cur){out.push(cur);cur=word}else cur=t}if(cur)out.push(cur)
+  if(out.length>lines){out.length=lines;out[lines-1]=out[lines-1].replace(/\s*\S*$/,'')+' …'}return out}
+ const bar=(x:number,y:number,w:number,h:number,p:number,col:string)=>{c.beginPath();c.roundRect(x,y,w,h,h/2);c.fillStyle='#ffffff14';c.fill();if(p>0){c.beginPath();c.roundRect(x,y,Math.max(h,w*p),h,h/2);c.fillStyle=col;c.fill()}}
  const engineLine=()=>`ENGINE ${e.state==='up'?'UP':e.state==='down'?'OFFLINE':'…'}${e.state==='up'&&!e.keys?' · NO KEYS':''}`
+ const logLines=(slot:AgentSlot):[string,string,string][]=>feed.agents.get(slot)!.log.map(l=>[hhmm(l.t),l.msg,l.level==='error'?RED:l.level==='warn'?AMBER:'#d6e8ff'])
  c.clearRect(0,0,W,H);c.textBaseline='middle'
  const g=c.createRadialGradient(W/2,H*.55,H*.1,W/2,H*.55,Math.max(W,H)*.75);g.addColorStop(0,'#0b2a5ccc');g.addColorStop(1,'#04102a55');c.fillStyle=g;c.fillRect(0,0,W,H)
+ const demo=feed.source==='demo',src=feed.source
  if(seat){
-  const a=liveAgents.slots.get(seat.id)!,src=liveAgents.source,demo=src==='demo',st=a.strategy,s=a.stats
-  // header: strategy name, agent and strategy id, status, data source
+  const slot=seat.id as AgentSlot,a=feed.agents.get(slot)!,has=!!a.updated
+  // header: agent, role, state, data source
   const hd=zone(2.5*u,18*u,0,1,undefined,demo?ORANGE:'#3d8bff')
-  const cw=chip(STATUS_LABEL[a.status],STATUS_COLOR[a.status],hd.x+hd.w,hd.y+2.6*u,2.8)
-  text(st?.name??'NO STRATEGY ASSIGNED',hd.x+.3*u,hd.y+2.8*u,4.4,st?'#f2f7ff':'#8fa9cc','left',700,false,hd.w-cw-2*u)
-  text([seat.name,...(st?[st.id,st.version,st.market,st.timeframe].filter(Boolean):[seat.job.toLowerCase()])].join(' · '),hd.x+.3*u,hd.y+7.6*u,2.4,'#7fa6d6','left',400,true,hd.w)
-  const srcText=demo?'DEMO · SIMULATED DATA · NOT A REAL RESULT':src==='engine'?`LIVE FROM ENGINE${a.updated?` · updated ${hhmmss(a.updated)}`:''}`:src==='unavailable'?'NO LIVE FEED · engine has no /api/agents/live yet':src==='down'?'ENGINE OFFLINE · no live data':'CHECKING ENGINE…'
-  text(srcText,hd.x+.3*u,hd.y+11.6*u,2.4,demo?ORANGE:src==='engine'?GREEN:'#f3c74b','left',700,true,hd.w*.72)
-  if(a.progress!==null){const pw=hd.w*.25,px=hd.x+hd.w-pw,py=hd.y+11.1*u;c.fillStyle='#ffffff14';c.fillRect(px,py,pw,1*u);c.fillStyle=STATUS_COLOR[a.status];c.fillRect(px,py,pw*Math.min(1,Math.max(0,a.progress)),1*u)}
-  // key stats, RHerman tile style
-  const stats:[string,string,string][]=[
-   ['TRADES',s?String(s.trades):'—','#e4f0ff'],
-   ['WR',s?.wr!=null?(s.wr*100).toFixed(1)+'%':'—','#e4f0ff'],
-   ['PF',s?.pf!=null?s.pf.toFixed(2):'—',s?.pf!=null?(s.pf>=1?GREEN:RED):'#e4f0ff'],
-   ['NET R',s?signR(s.netR):'—',s?(s.netR>0?GREEN:s.netR<0?RED:'#e4f0ff'):'#e4f0ff'],
-   ['MAX DD R',s?s.maxDD.toFixed(1)+'R':'—',s&&s.maxDD<0?RED:'#e4f0ff']]
-  stats.forEach(([k,v,col],i)=>{const z=zone(20*u,33*u,i/5,(i+1)/5,k,'#2b6fc0');text(v,z.x,z.y+3*u,4.2,col,'left',700,true,z.w)})
-  // equity curve (cumulative net R)
-  const eq=zone(35*u,69*u,0,.6,'EQUITY · NET R',demo?ORANGE:'#2b6fc0')
-  c.strokeStyle=GRID;c.lineWidth=.2*u;for(let i=0;i<=4;i++){const y=eq.y+eq.h*i/4;c.beginPath();c.moveTo(eq.x,y);c.lineTo(eq.x+eq.w,y);c.stroke()}
-  if(a.equity.length>1){
-   const v=a.equity,lo=Math.min(0,...v),hi=Math.max(0,...v),Y=(r:number)=>eq.y+eq.h*(1-(r-lo)/Math.max(1e-9,hi-lo)),X=(i:number)=>eq.x+i/(v.length-1)*(eq.w-8*u),up=v.at(-1)!>=0
-   c.setLineDash([.8*u,.8*u]);c.strokeStyle='#7f9cc4';c.lineWidth=.2*u;c.beginPath();c.moveTo(eq.x,Y(0));c.lineTo(eq.x+eq.w-8*u,Y(0));c.stroke();c.setLineDash([])
-   const fill=c.createLinearGradient(0,eq.y,0,eq.y+eq.h);fill.addColorStop(0,(up?GREEN:RED)+'55');fill.addColorStop(1,(up?GREEN:RED)+'05')
-   c.beginPath();v.forEach((r,i)=>i?c.lineTo(X(i),Y(r)):c.moveTo(X(i),Y(r)));c.lineTo(X(v.length-1),Y(0));c.lineTo(X(0),Y(0));c.closePath();c.fillStyle=fill;c.fill()
-   c.beginPath();v.forEach((r,i)=>i?c.lineTo(X(i),Y(r)):c.moveTo(X(i),Y(r)));c.strokeStyle=up?GREEN:RED;c.lineWidth=.45*u;c.stroke()
-   const marks:[number,string][]=[[Y(hi),signR(hi)],[Y(0),'0R'],[Y(lo),signR(lo)]]
-   marks.forEach(([y,l],i)=>{if(marks.slice(0,i).every(([yy])=>Math.abs(yy-y)>3*u))text(l,eq.x+eq.w,Math.min(eq.y+eq.h-1*u,Math.max(eq.y+1*u,y)),2.3,'#7f9cc4','right')})
-  }else{
-   c.setLineDash([.8*u,.8*u]);c.strokeStyle='#3a5a88';c.lineWidth=.25*u;c.beginPath();c.moveTo(eq.x,eq.y+eq.h/2);c.lineTo(eq.x+eq.w,eq.y+eq.h/2);c.stroke();c.setLineDash([])
-   text(st?'awaiting run':'no strategy · no equity',eq.x+eq.w/2,eq.y+eq.h/2-3*u,3,'#7f9cc4','center',600,false)
-  }
-  if(demo)text('DEMO · SIMULATED',eq.x+eq.w,eq.y-2.6*u,2.3,ORANGE,'right',700)
-  // recent trades
-  const tr=zone(35*u,69*u,.6,1,'RECENT TRADES'),rows=Math.max(1,Math.floor(tr.h/(3.7*u)))
-  if(!a.trades.length)text(st?'no trades yet':'—',tr.x,tr.y+1.8*u,2.6,'#6d86a8')
-  a.trades.slice(0,rows).forEach((t,i)=>{const y=tr.y+1.8*u+i*3.7*u;text(hhmm(t.t),tr.x,y,2.4,'#6d86a8');text(t.side==='long'?'LONG':'SHORT',tr.x+tr.w*.48,y,2.4,t.side==='long'?'#8fd0ff':'#c9b8ff','left',600)
-   text((t.r>=0?'+':'')+t.r.toFixed(2)+'R',tr.x+tr.w,y,2.6,t.r>=0?GREEN:RED,'right',700)})
-  // log: the strategy's own lines; until it has any, the data source and engine events
-  const lg=zone(71*u,97*u,0,1,'LOG'),n=Math.max(1,Math.floor(lg.h/(3.5*u)))
-  const lines:[string,string,string][]=a.log.length?a.log.map(l=>[hhmm(l.t),l.msg,l.level==='error'?RED:l.level==='warn'?'#f3c74b':'#d6e8ff']):[
-   [hhmmss(liveAgents.checked||now),liveAgents.detail||'checking engine for live agent data',demo?ORANGE:'#f3c74b'],
-   ...(live.log.get('engine')??[]).map(l=>[l.slice(0,8),l.slice(9),'#9fb9dc'] as [string,string,string])]
-  lines.slice(0,n).forEach(([t,msg,col],i)=>{const y=lg.y+1.6*u+i*3.5*u;text(t,lg.x,y,2.5,'#6d86a8');text(msg,lg.x+14*u,y,2.5,i?col+'cc':col,'left',400,true,lg.w-14*u)})
-  text(engineLine(),lg.x+lg.w,lg.y-3.6*u,2.3,e.state==='up'?GREEN:e.state==='down'?RED:'#f3c74b','right',600)
+  const state=has?a.state:src==='live'?'idle':null
+  const cw=chip(state?state.toUpperCase():'NO DATA',state?STATE_COLOR[state]:'#6d86a8',hd.x+hd.w,hd.y+2.6*u,2.8)
+  text(seat.name,hd.x+.3*u,hd.y+2.8*u,4.6,'#f2f7ff','left',700,false,hd.w-cw-2*u)
+  text(seat.job,hd.x+.3*u,hd.y+7.6*u,2.5,'#7fa6d6','left',400,true,hd.w)
+  text(sourceText()+(src==='live'&&a.updated?` · updated ${hhmm(a.updated)}`:''),hd.x+.3*u,hd.y+11.6*u,2.4,sourceColor(),'left',700,true,hd.w)
+  // current task, what it is on, progress
+  const tk=zone(20*u,47*u,0,1,'CURRENT TASK',state?STATE_COLOR[state]:'#2b6fc0')
+  const task=a.task??(src==='none'?'— no live feed, so no current task to show':src==='live'?'— idle, no task reported yet':'—')
+  wrap(task,4.2,tk.w,2,a.task?700:400).forEach((l,i)=>text(l,tk.x,tk.y+2.4*u+i*5*u,4.2,a.task?'#f2f7ff':'#7f9cc4','left',a.task?700:400,false,tk.w))
+  const on=[a.strategy,a.symbol].filter(Boolean).join(' · ')
+  text('WORKING ON',tk.x,tk.y+12.8*u,2.3,'#6d86a8','left',600);text(on||'—',tk.x+15*u,tk.y+12.8*u,2.8,on?'#9fd8ff':'#6d86a8','left',600,true,tk.w-15*u)
+  text('PROGRESS',tk.x,tk.y+17.4*u,2.3,'#6d86a8','left',600)
+  if(a.progress!==null){bar(tk.x+15*u,tk.y+16.6*u,tk.w-27*u,1.8*u,a.progress,state?STATE_COLOR[state]:CYAN);text(`${Math.round(a.progress*100)}%`,tk.x+tk.w,tk.y+17.4*u,3,'#e4f0ff','right',700)}
+  else text('—',tk.x+15*u,tk.y+17.4*u,2.8,'#6d86a8')
+  // sent to the CEO, and what the strategy it is on looks like
+  const ce=zone(49*u,69*u,0,.45,'SENT TO CEO'),n=decisionsBy(slot)
+  ;([['PENDING',n.pending,AMBER],['APPROVED',n.approved,GREEN],['REJECTED',n.rejected,RED]] as [string,number,string][]).forEach(([k,v,col],i)=>{const x=ce.x+i*ce.w/3;text(String(v),x,ce.y+3.4*u,5,v?col:'#6d86a8','left',700);text(k,x,ce.y+8.6*u,2.1,'#7f9cc4','left',600)})
+  const last=[...feed.decisions.values()].filter(d=>d.agent===slot).sort((p,q)=>q.time.localeCompare(p.time))[0]
+  text(last?`last: ${last.outcome} · ${last.strategy}`:'nothing sent yet',ce.x,ce.y+12.6*u,2.3,last?'#cfe3f7':'#6d86a8','left',400,true,ce.w)
+  const st=a.strategy?[...feed.strategies.values()].find(s=>s.name===a.strategy||s.strategy===a.strategy):undefined
+  const sz=zone(49*u,69*u,.45,1,'STRATEGY ON THE WALL')
+  if(st){text(st.name,sz.x,sz.y+1.8*u,2.7,'#e4f0ff','left',700,false,sz.w)
+   const vals:[string,string,string][]=[['NET',pct(st.stats.net_return_pct,0),st.stats.net_return_pct>=0?GREEN:RED],['PF',st.stats.profit_factor.toFixed(2),st.stats.profit_factor>=1?GREEN:RED],['STAGE',STAGE_LABEL[shownStage(st,verdictFor(st))],'#9fd8ff']]
+   vals.forEach(([k,v,col],i)=>{const x=sz.x+i*sz.w/3;text(v,x,sz.y+6.6*u,3.4,col,'left',700,true,sz.w/3-u);text(k,x,sz.y+10.6*u,2.1,'#7f9cc4','left',600)})}
+  else text(a.strategy?'not on the wall yet':'no strategy in hand',sz.x,sz.y+3*u,2.6,'#6d86a8')
+  // streaming activity log; until the agent has any, the feed status and engine events
+  const lg=zone(71*u,97*u,0,1,'ACTIVITY LOG'),rows=Math.max(1,Math.floor(lg.h/(3.5*u)))
+  const lines:[string,string,string][]=a.log.length?logLines(slot):[[hhmmss(now),sourceText(),sourceColor()],...(live.log.get('engine')??[]).map(l=>[l.slice(0,8),l.slice(9),'#9fb9dc'] as [string,string,string])]
+  lines.slice(0,rows).forEach(([t,msg,col],i)=>{const y=lg.y+1.6*u+i*3.5*u;text(t,lg.x,y,2.5,'#6d86a8');text(msg,lg.x+14*u,y,2.5,i?col+'cc':col,'left',400,true,lg.w-14*u)})
+  text(engineLine(),lg.x+lg.w,lg.y-3.6*u,2.3,e.state==='up'?GREEN:e.state==='down'?RED:AMBER,'right',600)
  }else if(screen.id==='d8'){
-  // the operator's console: every agent's strategy at a glance
-  const hd=zone(2.5*u,18*u,0,1,undefined,'#3d8bff')
+  // the operator's console: all six agents at a glance
+  const hd=zone(2.5*u,18*u,0,1,undefined,demo?ORANGE:'#3d8bff')
   text('COMMAND CONSOLE',hd.x+.3*u,hd.y+2.8*u,4.6,'#e8f3ff','left',700,false);text(hhmmss(now),hd.x+hd.w,hd.y+2.8*u,4.4,'#cfe6ff','right',600)
-  text('OPERATOR · ONE AGENT PER STRATEGY',hd.x+.3*u,hd.y+7.6*u,2.5,'#7fa6d6')
-  const src=liveAgents.source
-  text(src==='demo'?'DEMO · SIMULATED DATA':src==='engine'?'LIVE FROM ENGINE':src==='unavailable'?'NO LIVE AGENT FEED ON THIS ENGINE':src==='down'?'ENGINE OFFLINE':'CHECKING…',hd.x+.3*u,hd.y+11.6*u,2.4,src==='demo'?ORANGE:src==='engine'?GREEN:'#f3c74b','left',700)
-  text(engineLine(),hd.x+hd.w,hd.y+11.6*u,2.4,e.state==='up'?GREEN:e.state==='down'?RED:'#f3c74b','right',600)
-  const tb=zone(20*u,69*u,0,1,'STRATEGIES')
-  const cols=[0,.24,.62,.82,1],head=['AGENT','STRATEGY','STATUS','NET R']
-  head.forEach((h,i)=>text(h,tb.x+tb.w*cols[i]+(i===3?tb.w*.18:0),tb.y+1.2*u,2.3,'#6d86a8',i===3?'right':'left',600))
-  SEATS.forEach((sx,i)=>{const a=liveAgents.slots.get(sx.id)!,y=tb.y+6*u+i*(tb.h-6*u)/6
-   text(sx.name.replace(' AGENT',''),tb.x,y,2.5,'#d6e8ff','left',600,false,tb.w*.23)
-   text(a.strategy?.name??'—',tb.x+tb.w*cols[1],y,2.5,a.strategy?'#e4f0ff':'#6d86a8','left',400,false,tb.w*.37)
-   text(STATUS_LABEL[a.status],tb.x+tb.w*cols[2],y,2.4,STATUS_COLOR[a.status],'left',700)
-   text(a.stats?signR(a.stats.netR):'—',tb.x+tb.w,y,2.6,a.stats?(a.stats.netR>=0?GREEN:RED):'#6d86a8','right',700)})
+  const all=[...feed.decisions.values()],k=(o:string)=>all.filter(d=>d.outcome===o).length
+  text(`OPERATOR · CEO: ${k('pending')} pending · ${k('approved')} approved · ${k('rejected')} rejected`,hd.x+.3*u,hd.y+7.6*u,2.5,'#7fa6d6','left',400,true,hd.w)
+  text(sourceText(),hd.x+.3*u,hd.y+11.6*u,2.4,sourceColor(),'left',700,true,hd.w*.7)
+  text(engineLine(),hd.x+hd.w,hd.y+11.6*u,2.4,e.state==='up'?GREEN:e.state==='down'?RED:AMBER,'right',600)
+  const tb=zone(20*u,69*u,0,1,'AGENTS · NOW')
+  const cols=[0,.2,.62,.8];['AGENT','TASK','ON','PROGRESS'].forEach((h,i)=>text(h,tb.x+tb.w*cols[i],tb.y+1.2*u,2.3,'#6d86a8','left',600))
+  SEATS.forEach((sx,i)=>{const a=feed.agents.get(sx.id as AgentSlot)!,y=tb.y+6*u+i*(tb.h-6*u)/6
+   text(sx.name.replace(' AGENT',''),tb.x,y,2.5,'#d6e8ff','left',600,false,tb.w*.19)
+   text(a.task??'—',tb.x+tb.w*cols[1],y,2.4,a.task?'#e4f0ff':'#6d86a8','left',400,false,tb.w*.41)
+   text([a.strategy,a.symbol].filter(Boolean).join(' · ')||'—',tb.x+tb.w*cols[2],y,2.2,'#9fd8ff','left',400,true,tb.w*.17)
+   if(a.progress!==null){bar(tb.x+tb.w*cols[3],y-.7*u,tb.w*.13,1.4*u,a.progress,STATE_COLOR[a.state]);text(`${Math.round(a.progress*100)}%`,tb.x+tb.w,y,2.4,'#e4f0ff','right',700)}
+   else text(a.updated?a.state.toUpperCase():'—',tb.x+tb.w*cols[3],y,2.3,'#6d86a8')})
   const lg=zone(71*u,97*u,0,1,'ACTIVITY LOG'),n=Math.max(1,Math.floor(lg.h/(3.5*u)))
-  const lines=[...SEATS.flatMap(sx=>(liveAgents.slots.get(sx.id)!.log.slice(0,2)).map(l=>[hhmm(l.t),`${sx.id} · ${l.msg}`])),...(live.log.get('engine')??[]).map(l=>[l.slice(0,8),l.slice(9)])].sort((p,q)=>p[0]<q[0]?1:-1)
-  if(!lines.length)text('waiting for first event…',lg.x,lg.y+1.6*u,2.6,'#6d86a8')
+  const lines=[...SEATS.flatMap(sx=>feed.agents.get(sx.id as AgentSlot)!.log.slice(0,2).map(l=>[hhmm(l.t),`${sx.id} · ${l.msg}`])),...(live.log.get('engine')??[]).map(l=>[l.slice(0,8),l.slice(9)])].sort((p,q)=>p[0]<q[0]?1:-1)
+  if(!lines.length)text(src==='none'?`no live feed at ${LIVE_URL}`:'waiting for first event…',lg.x,lg.y+1.6*u,2.6,'#6d86a8')
   lines.slice(0,n).forEach(([t,msg],i)=>{const y=lg.y+1.6*u+i*3.5*u;text(t,lg.x,y,2.5,'#6d86a8');text(msg,lg.x+14*u,y,2.5,i?'#9fb9dc':'#d6e8ff','left',400,true,lg.w-14*u)})
  }else{
   const rt=e.latency.at(-1)
@@ -261,12 +260,12 @@ function useLiveConsoles(ring:THREE.CanvasTexture,gl:THREE.WebGLRenderer){
    if(import.meta.env.DEV)Object.assign(window,{__ringTickMs:{draw:t1-t0,uploadCall:performance.now()-t1}})
   }
   if(import.meta.env.DEV)Object.assign(window,{__ringTick:tick,__ringBoxes:blocks.map(b=>[b.box.w,b.box.h]),__ringUploads:uploads}) // perf probes
-  const stopAgents=startLiveAgents()
+  startFeed()
   pollHealth()
   // up to ~9 dirty regions a second, in the idle time after a frame so a redraw never lands mid-frame
   const idle=(window as unknown as {requestIdleCallback?:(f:()=>void,o:{timeout:number})=>number}).requestIdleCallback
   const a=setInterval(()=>idle?idle(tick,{timeout:200}):tick(),Math.round(1000/blocks.length)),h=setInterval(pollHealth,3000)
-  return()=>{stopAgents();clearInterval(a);clearInterval(h);for(const b of blocks)b.patch.dispose()}
+  return()=>{clearInterval(a);clearInterval(h);for(const b of blocks)b.patch.dispose()}
  },[ring,gl])
 }
 
@@ -372,7 +371,7 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
   let pinch=0
   const touches=(e:TouchEvent)=>{if(e.touches.length!==2){pinch=0;return}const [a,b]=[e.touches[0],e.touches[1]],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pinch&&live.current){aim((a.clientX+b.clientX)/2,(a.clientY+b.clientY)/2);zoom(Math.log(pinch/d))}pinch=d}
   const home=()=>{if(!live.current)return;if(inspect.current||flight.current||!atHome())leave(HOME_POSE())}
-  const key=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!document.querySelector('.room-screen-menu'))home()}
+  const key=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!document.querySelector('.room-screen-menu,.room-ledger'))home()}
   const dbl=(e:MouseEvent)=>{if(!live.current)return;const hit=aim(e.clientX,e.clientY);const n=hit?.object.name??'';if(!n.startsWith('screen_')&&!n.startsWith('frame_'))home()}
   el.addEventListener('wheel',wheel,{passive:false});el.addEventListener('touchstart',touches,{passive:true});el.addEventListener('touchmove',touches,{passive:true});el.addEventListener('touchend',touches)
   el.addEventListener('dblclick',dbl);window.addEventListener('keydown',key)
@@ -460,21 +459,34 @@ function Screen({mesh,screen,panel,dispatch,onHover,tableMap,sharp}:{sharp:THREE
  return <mesh name={mesh.name} geometry={mesh.geometry} material={material} visible={!(panel.phase==='focused'&&panel.screen===screen.id)}
    onPointerOver={e=>{e.stopPropagation();hover(true)}} onPointerOut={()=>hover(false)} onClick={pick}/>
 }
+type Wall={screen:RoomScreen;canvas:HTMLCanvasElement;texture:THREE.CanvasTexture;key:string}
+/** Wall bank: one strategy per screen. A screen is redrawn (and its texture re-uploaded) only when its strategy, verdict or feed source changed; at most two per tick. */
+function useWallScreens(walls:Wall[]){
+ useEffect(()=>{
+  startFeed()
+  const tick=()=>{const assign=wallAssignment();let n=0
+   for(const w of walls){const k=wallKey(w.screen,assign);if(k===w.key)continue;w.key=k;drawWall(w.canvas,w.screen,assign);w.texture.needsUpdate=true;if(++n>=2&&walls.some(x=>x.key===''))break}}
+  for(const w of walls){w.key=wallKey(w.screen,wallAssignment());drawWall(w.canvas,w.screen,wallAssignment());w.texture.needsUpdate=true}
+  const t=setInterval(tick,500);return()=>clearInterval(t)
+ },[walls])
+}
 function Assets({panel,dispatch,host,onReady}:Props){
  const {scene}=useGLTF('/models/reference-room.glb')
  const tableMap=useTexture('/textures/desk-reference-material.png')
  tableMap.colorSpace=THREE.NoColorSpace;tableMap.anisotropy=16
  const ring=useMemo(()=>ringTexture(),[])
- const sharpMap=useMemo(()=>new Map(ROOM_SCREENS.map((s,i)=>[s.id,s.kind==='desk'?ring:displayTexture(s,i)])),[ring])
+ const walls=useMemo(()=>ROOM_SCREENS.filter(s=>s.kind!=='desk').map(screen=>{const canvas=wallCanvas(screen);return{screen,canvas,texture:wallTexture(canvas),key:''}}),[])
+ const sharpMap=useMemo(()=>new Map(ROOM_SCREENS.map(s=>[s.id,s.kind==='desk'?ring:walls.find(w=>w.screen.id===s.id)!.texture])),[ring,walls])
+ useWallScreens(walls)
  const gl=useThree(s=>s.gl)
  useLiveConsoles(ring,gl)
- const wallMap=sharpMap.get('s5')!
+ const wallMap=useMemo(()=>{const i=ROOM_SCREENS.findIndex(s=>s.id==='s5');return displayTexture(ROOM_SCREENS[i],i)},[]) // the room shell's material keeps its v9 source texture
  const assets=useMemo(()=>{
    const result:{mesh:THREE.Mesh;kind:string;material:THREE.ShaderMaterial}[]=[]
    scene.traverse(o=>{if(!(o instanceof THREE.Mesh))return;const geometry=o.geometry as Geo;if(!geometry.boundsTree)geometry.boundsTree=new MeshBVH(geometry,{maxLeafTris:12});const kind=o.userData.kind??'wall';result.push({mesh:o,kind,material:roomMaterial(kind,kind==='desk'?tableMap:kind==='wall'?wallMap:undefined)})})
    return result
  },[scene,tableMap,wallMap])
- useEffect(()=>()=>{for(const a of assets)a.material.dispose();tableMap.dispose();for(const texture of sharpMap.values())texture.dispose();document.body.style.cursor=''},[assets,tableMap,sharpMap])
+ useEffect(()=>()=>{for(const a of assets)a.material.dispose();tableMap.dispose();for(const texture of sharpMap.values())texture.dispose();wallMap.dispose();document.body.style.cursor=''},[assets,tableMap,sharpMap,wallMap])
  useFrame(({clock})=>{
    const t=clock.getElapsedTime();for(const a of assets)a.material.uniforms.uTime.value=t
  })
@@ -487,9 +499,9 @@ function Assets({panel,dispatch,host,onReady}:Props){
     const s=mesh.name.startsWith('screen_')?screenById(mesh.name.slice(7)):undefined
     const frameScreen=mesh.name.startsWith('frame_')?screenById(mesh.name.slice(6)):undefined
     return s?<Screen key={mesh.name} mesh={mesh} screen={s} panel={panel} dispatch={dispatch} onHover={setHovered} tableMap={tableMap} sharp={sharpMap.get(s.canonicalId??s.id)!}/>
-     :<group key={mesh.name}><mesh name={mesh.name} geometry={mesh.geometry} material={material} onClick={e=>{e.stopPropagation();const s=frameScreen&&panel.phase==='closed'?frameScreen:kind==='desk'?deskStation(e):null;if(s&&e.delta<=6){setHovered(null);dispatch({type:'click',id:s.id})}}}
-        onPointerMove={e=>{if(kind!=='desk'&&!frameScreen)return;e.stopPropagation();const s=frameScreen&&panel.phase==='closed'?frameScreen:deskStation(e);setHovered(s?.id??null);document.body.style.cursor=s?'pointer':''}}
-        onPointerOut={()=>{if(kind==='desk'||frameScreen){setHovered(null);document.body.style.cursor=''}}} onPointerOver={e=>e.stopPropagation()}/></group>
+     :<group key={mesh.name}><mesh name={mesh.name} geometry={mesh.geometry} material={material} onClick={e=>{e.stopPropagation();if(kind==='ceo'){if(panel.phase==='closed'&&e.delta<=6){setHovered(null);setLedgerOpen(true)}return}const s=frameScreen&&panel.phase==='closed'?frameScreen:kind==='desk'?deskStation(e):null;if(s&&e.delta<=6){setHovered(null);dispatch({type:'click',id:s.id})}}}
+        onPointerMove={e=>{if(kind==='ceo'){e.stopPropagation();document.body.style.cursor=panel.phase==='closed'?'pointer':'';return}if(kind!=='desk'&&!frameScreen)return;e.stopPropagation();const s=frameScreen&&panel.phase==='closed'?frameScreen:deskStation(e);setHovered(s?.id??null);document.body.style.cursor=s?'pointer':''}}
+        onPointerOut={()=>{if(kind==='desk'||kind==='ceo'||frameScreen){setHovered(null);document.body.style.cursor=''}}} onPointerOver={e=>e.stopPropagation()}/></group>
   })}
   {focused&&<Preview screen={focused} host={host}/>}
 
@@ -517,5 +529,5 @@ export function RoomScene(props:Props){
    <Beam/>
    {fx?<Bloom intensity={.55} luminanceThreshold={.20} mipmapBlur resolutionScale={.5}/>:<></>}
   </EffectComposer>
- </Canvas></>
+ </Canvas><CeoLedger/></>
 }
