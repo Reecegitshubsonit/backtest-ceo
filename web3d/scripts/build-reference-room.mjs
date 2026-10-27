@@ -218,20 +218,45 @@ const enclosure=flat(monitorScene,o=>o.name==='Display_enclosure'),glass=flat(mo
 if(!enclosure||!glass)throw Error('Monitor model did not expose its enclosure and glass')
 enclosure.computeBoundingBox();glass.computeBoundingBox()
 const glassBox=glass.boundingBox,glassCenter=glassBox.getCenter(new T.Vector3()),glassSize=glassBox.getSize(new T.Vector3())
+const desk={agent:{half:14.5*Math.PI/180,rin:1.82,rout:2.6},d8:{half:12*Math.PI/180,rin:1.85,rout:2.6},d7:{half:10*Math.PI/180,rin:2.05,rout:2.6},d9:{half:10*Math.PI/180,rin:2.05,rout:2.6}}
 for(const s of screenSource){const r=s.rect,cx=r.x+r.w/2,cy=r.y+r.h/2;let centre,normal;
  if(s.kind==='wall'){const rr=ray(cx,cy),o=rr.origin,d=rr.direction;const A=d.x*d.x+d.z*d.z,B=2*(o.x*d.x+o.z*d.z),C=o.x*o.x+o.z*o.z-7.95*7.95;const t=(-B+Math.sqrt(B*B-4*A*C))/(2*A);centre=rr.at(t,new T.Vector3());normal=new T.Vector3(-centre.x,0,-centre.z).normalize();if(cy>300)normal.y=.48;normal.normalize()}
  else {
   const theta=s.seat?seatLayout.get(s.seat).theta:({d7:-62,d8:0,d9:62}[s.id]*Math.PI/180) // d7/d9 moved out from ±20° so the full-size near pair's consoles (±32°) keep clear of them
-  const radius=s.seat?2.10:2.18
-  centre=new T.Vector3(Math.sin(theta)*radius,1.608,Math.cos(theta)*radius)
+  // One built-in trapezoid console per seat sector (straight-edged ring segment, flush with the
+  // desk top). The baked desk texture used to carry printed screens under small separate monitors,
+  // so every station showed two computers; now the console face IS the station's computer.
+  const k=desk[s.seat?'agent':s.id]
+  centre=new T.Vector3(Math.sin(theta),0,Math.cos(theta)).multiplyScalar((k.rin+k.rout)/2*Math.cos(k.half)).setY(1.608)
   normal=new T.Vector3(0,1,0)
  }
  const theta=s.kind==='desk'?Math.atan2(centre.x,centre.z):0
  const right=s.kind==='desk'?new T.Vector3(Math.cos(theta),0,-Math.sin(theta)):new T.Vector3(0,1,0).cross(normal).normalize(),up=normal.clone().cross(right).normalize()
  const plane=new T.Plane().setFromNormalAndCoplanarPoint(normal,centre)
  const lr=ray(r.x,cy).intersectPlane(plane,new T.Vector3()),rr=ray(r.x+r.w,cy).intersectPlane(plane,new T.Vector3());const tr=ray(cx,r.y).intersectPlane(plane,new T.Vector3()),br=ray(cx,r.y+r.h).intersectPlane(plane,new T.Vector3())
- const w=s.kind==='desk'?(s.seat?.70:.65):Math.abs(rr.clone().sub(lr).dot(right)),h=s.kind==='desk'?(s.seat?.55:.50):Math.abs(tr.clone().sub(br).dot(up))
  const rotation=new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(right,up,normal))
+ if(s.kind==='desk'){
+  // Trapezoid in the console's own plane: x along the ring (right), y toward the room centre (up).
+  // w/h describe the inscribed rectangle (the part every flight/pick contract relies on); `shape`
+  // carries the full outer (agent-side) and inner (centre-side) widths of the glass.
+  const k=desk[s.seat?'agent':s.id],h=(k.rout-k.rin)*Math.cos(k.half),outer=2*k.rout*Math.sin(k.half),inner=2*k.rin*Math.sin(k.half)
+  const at=(x,y,lift)=>centre.clone().addScaledVector(right,x).addScaledVector(up,y).addScaledVector(normal,lift)
+  const quad=[[-outer/2,-h/2],[outer/2,-h/2],[inner/2,h/2],[-inner/2,h/2]]
+  const face=new T.BufferGeometry();face.setAttribute('position',new T.Float32BufferAttribute(quad.flatMap(([x,y])=>at(x,y,.004).toArray()),3))
+  face.setAttribute('uv',new T.Float32BufferAttribute(quad.flatMap(([x,y])=>[x/outer+.5,y/h+.5]),2));face.setIndex([0,1,2,0,2,3])
+  // Flush bezel: a 2.5 cm lip around the glass with a short skirt into the desk, so the console
+  // reads as inset into the desk top rather than a monitor standing on it.
+  const grow=.025,outerRing=quad.map(([x,y])=>[x+Math.sign(x)*grow*(y<0?1:1.1),y+Math.sign(y)*grow]),pos=[],idx=[]
+  for(const[x,y]of quad)pos.push(...at(x,y,.003).toArray())
+  for(const[x,y]of outerRing)pos.push(...at(x,y,.003).toArray())
+  for(const[x,y]of outerRing)pos.push(...at(x,y,-.022).toArray())
+  for(let i=0;i<4;i++){const j=(i+1)%4;idx.push(i,4+i,4+j,i,4+j,j, 4+i,8+i,8+j,4+i,8+j,4+j)}
+  const bezel=new T.BufferGeometry();bezel.setAttribute('position',new T.Float32BufferAttribute(pos,3));bezel.setIndex(idx)
+  add('frame_'+s.id,bezel,'monitor');add('screen_'+s.id,face,'screen')
+  meta.screens.push({...s,center:centre.toArray(),normal:normal.toArray(),quaternion:rotation.toArray(),w:inner,h,shape:{outer,inner}})
+  continue
+ }
+ const w=Math.abs(rr.clone().sub(lr).dot(right)),h=Math.abs(tr.clone().sub(br).dot(up))
  const frame=enclosure.clone(),p=frame.attributes.position
  for(let i=0;i<p.count;i++){let v=new T.Vector3().fromBufferAttribute(p,i).sub(glassCenter);v.set(v.x*w/glassSize.x,v.y*h/glassSize.y,(v.z-(glassSize.z/2))*.8).applyQuaternion(rotation).add(centre);p.setXYZ(i,v.x,v.y,v.z)}
  add('frame_'+s.id,frame,'monitor')

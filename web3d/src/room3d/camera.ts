@@ -52,12 +52,10 @@ export function screenFraction(w: number, h: number, d: number, aspect: number, 
   const view = 2 * Math.max(d, 1e-3) * Math.tan(fov * Math.PI / 360)
   return Math.max(w / (view * aspect), h / view)
 }
-/** The screen's readable "up" in world space. Flat desk consoles are drawn rotated 180° when seen from
- * their far side (Scene.tsx uFlip), so their readable up depends on which side the viewer is on. */
-export function readableUp(s: RoomScreen, from: THREE.Vector3) {
-  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(...s.quaternion))
-  if (s.kind === 'desk' && from.clone().sub(new THREE.Vector3(...s.center)).dot(up) > 0.05) up.negate()
-  return up
+/** The screen's readable "up" in world space. Desk consoles read upright for the agent seated at them
+ * (their up points to the room centre), so the reading view always looks over that agent's shoulder. */
+export function readableUp(s: RoomScreen, _from?: THREE.Vector3) {
+  return new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(...s.quaternion))
 }
 /** Head-on reading pose: the camera sits on the screen normal at distance `d`, upright to the screen's
  * readable up. `viewOffset` is the vertical projection offset in NDC (the calibrated home view shifts

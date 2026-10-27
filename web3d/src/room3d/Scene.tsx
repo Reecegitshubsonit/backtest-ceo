@@ -28,7 +28,7 @@ type Geo=THREE.BufferGeometry&{boundsTree?:MeshBVH}
 function rng(seed:number){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}}
 const PURPLE='#9b7bff',BLUE='#3d8bff',CYAN='#5fd0ff',TEXT='#86a9d6',GRID='#0d1d38'
 function displayTexture(screen:RoomScreen,index:number){
- const aspect=screen.w/screen.h,long=1536
+ const aspect=(screen.shape?.outer??screen.w)/screen.h,long=1536
  const W=Math.round(aspect>=1?long:long*aspect),H=Math.round(aspect>=1?long/aspect:long)
  const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H
  const c=canvas.getContext('2d')!,rand=rng(index*977+31),u=Math.min(W,H)/100
@@ -82,17 +82,20 @@ const FEEDS:Record<string,Feed>={
 }
 const STEP_MS:Record<Timeframe,number>={'1Min':6e4,'5Min':3e5,'15Min':9e5,'1Hour':36e5,'1Day':864e5}
 type FeedState={bars:Bar[];at:number;error?:string}
-const live={engine:{state:'checking',keys:false,at:0,latency:[]} as Engine,feeds:new Map<string,FeedState>()}
+const live={engine:{state:'checking',keys:false,at:0,latency:[]} as Engine,feeds:new Map<string,FeedState>(),log:new Map<string,string[]>()}
+/** Per-console activity log (engine and feed events as they happen); 'engine' is shared by every console. */
+function note(key:string,line:string){const l=live.log.get(key)??[];if(l[0]?.slice(9)===line)return;l.unshift(`${hhmmss(Date.now())} ${line}`);live.log.set(key,l.slice(0,8))}
 const day=(ms:number)=>new Date(ms).toISOString().slice(0,10)
 async function pollFeed(seat:string){
  const f=FEEDS[seat],now=Date.now()
  try{const r=await api.bars(f.asset,f.symbol,f.tf,day(now-f.days*864e5),day(now))
-  live.feeds.set(seat,{bars:r.bars.filter(b=>Date.parse(b.t)<=now).slice(-90),at:Date.now()})} // never show bars from the future
- catch(e){live.feeds.set(seat,{bars:live.feeds.get(seat)?.bars??[],at:Date.now(),error:(e as {code?:string}).code??'ERROR'})}
+  const bars=r.bars.filter(b=>Date.parse(b.t)<=now).slice(-90) // never show bars from the future
+  live.feeds.set(seat,{bars,at:Date.now()});note(seat,bars.length?`${f.symbol} ${f.tf} · ${bars.length} bars · last ${fmt(bars.at(-1)!.c)}`:`${f.symbol} ${f.tf} · no bars in window`)}
+ catch(e){const code=(e as {code?:string}).code??'ERROR';live.feeds.set(seat,{bars:live.feeds.get(seat)?.bars??[],at:Date.now(),error:code});note(seat,`${f.symbol} feed failed (${code})`)}
 }
 async function pollHealth(){const t0=performance.now()
- try{const h=await api.health();const e=live.engine;live.engine={state:'up',keys:h.alpaca_keys_present,at:Date.now(),latency:[...e.latency,performance.now()-t0].slice(-40)}}
- catch{live.engine={...live.engine,state:'down',at:Date.now()}}}
+ try{const h=await api.health();const e=live.engine;live.engine={state:'up',keys:h.alpaca_keys_present,at:Date.now(),latency:[...e.latency,performance.now()-t0].slice(-40)};if(e.state!=='up')note('engine',`engine up${h.alpaca_keys_present?'':' · alpaca keys missing'}`)}
+ catch{if(live.engine.state!=='down')note('engine','engine unreachable');live.engine={...live.engine,state:'down',at:Date.now()}}}
 const sma=(v:number[],n:number)=>v.map((_,i)=>i+1<n?NaN:v.slice(i+1-n,i+1).reduce((a,b)=>a+b)/n)
 const stdev=(v:number[])=>{const m=v.reduce((a,b)=>a+b,0)/v.length;return Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/Math.max(1,v.length-1))}
 const hhmmss=(ms:number)=>new Date(ms).toLocaleTimeString([],{hour12:false})
@@ -116,57 +119,85 @@ function readouts(seat:string,bars:Bar[],tf:Timeframe,now:number):[string,string
    return[['Max drawdown',(dd*100).toFixed(2)+'%',PURPLE],['Bar σ',(stdev(ret)*100).toFixed(3)+'%'],['Limits','none set']]}
  }
 }
+// One integrated computer per desk sector. The canvas spans the trapezoid's bounding box; the glass
+// is narrower toward the room centre (canvas top), so every panel follows the slanted side edges.
 function drawConsole(t:THREE.CanvasTexture,screen:RoomScreen,now:number){
  const canvas=t.image as HTMLCanvasElement,c=canvas.getContext('2d')!,W=canvas.width,H=canvas.height,u=H/100,e=live.engine
  const seat=screen.seat?SEATS.find(x=>x.id===screen.seat):undefined,feed=seat?FEEDS[seat.id]:undefined,fs=seat?live.feeds.get(seat.id):undefined
- c.fillStyle='#040a1a';c.fillRect(0,0,W,H)
- c.textBaseline='middle';c.textAlign='left'
- // header: agent, state, clock
- c.fillStyle='#0b1a36';c.fillRect(0,0,W,10*u)
- c.fillStyle='#e4f0ff';c.font=`700 ${5*u}px system-ui,sans-serif`;c.fillText(seat?seat.name:`DESK SCREEN ${screen.n}`,2.5*u,5.2*u)
- c.textAlign='right';c.font=`600 ${4.4*u}px ui-monospace,monospace`;c.fillStyle='#cfe6ff';c.fillText(hhmmss(now),W-2.5*u,5.2*u)
- // engine strip
- const dot=e.state==='up'?'#38e6a0':e.state==='down'?'#ff5a7a':'#f3c74b'
- c.textAlign='left';c.fillStyle=dot;c.beginPath();c.arc(3.6*u,14.5*u,1.3*u,0,7);c.fill()
- c.font=`600 ${3.4*u}px ui-monospace,monospace`;c.fillStyle='#9fc3ee'
- const rt=e.latency.at(-1)
- c.fillText(`ENGINE ${e.state==='up'?'UP':e.state==='down'?'OFFLINE':'…'}${e.state==='up'&&!e.keys?' · NO KEYS':''}${rt!==undefined&&e.state==='up'?` · ${rt.toFixed(0)} ms`:''}`,6*u,14.5*u)
- c.textAlign='right';c.fillStyle=seat?'#f3c74b':'#6d86a8';c.fillText(seat?'IDLE · NO STRATEGY RUNNING':'UNASSIGNED',W-2.5*u,14.5*u)
- c.textAlign='left'
- const box=(x:number,y:number,w:number,h:number)=>{c.strokeStyle='#1d3d6c';c.lineWidth=.35*u;c.strokeRect(x,y,w,h)}
- if(!seat||!feed){
-  box(2.5*u,20*u,W-5*u,H-23*u)
-  c.fillStyle='#cfe3f7';c.font=`600 ${4.6*u}px system-ui,sans-serif`;c.fillText('Not assigned yet',6*u,30*u)
-  c.fillStyle='#7f9cc4';c.font=`${3.4*u}px system-ui,sans-serif`;c.fillText('Click to open this screen.',6*u,38*u)
-  c.fillText(`Engine checked ${e.at?Math.max(0,Math.round((now-e.at)/1000)):'–'} s ago`,6*u,45*u)
-  const L=e.latency;if(L.length>1){const max=Math.max(...L,1);c.strokeStyle=CYAN;c.lineWidth=.4*u;c.beginPath();L.forEach((v,i)=>{const x=6*u+i/(L.length-1)*(W-12*u),y=H-8*u-v/max*25*u;i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();c.fillStyle='#7f9cc4';c.font=`${2.8*u}px ui-monospace,monospace`;c.fillText('ENGINE ROUND TRIP',6*u,H-38*u)}
-  t.needsUpdate=true;return
+ const inset=screen.shape?(1-screen.shape.inner/screen.shape.outer)/2*W:0,m=1.6*u
+ const xl=(y:number)=>inset*(1-y/H)+m,xr=(y:number)=>W-xl(y)
+ /** A panel between rows y0..y1 spanning fractions a..b of the usable width; returns its inscribed rect. */
+ const zone=(y0:number,y1:number,a:number,b:number,label?:string,accent='#2b6fc0')=>{
+  const L=(y:number)=>xl(y)+a*(xr(y)-xl(y))+(a>0?.6*u:0),R=(y:number)=>xl(y)+b*(xr(y)-xl(y))-(b<1?.6*u:0)
+  c.beginPath();c.moveTo(L(y0),y0);c.lineTo(R(y0),y0);c.lineTo(R(y1),y1);c.lineTo(L(y1),y1);c.closePath()
+  c.fillStyle='#06132acc';c.fill();c.strokeStyle=accent;c.lineWidth=.3*u;c.stroke()
+  const x0=Math.max(L(y0),L(y1)),x1=Math.min(R(y0),R(y1))
+  if(label){c.fillStyle='#8fb4e0';c.font=`600 ${2.8*u}px ui-monospace,monospace`;c.textAlign='left';c.fillText(label,x0+1.4*u,y0+3.2*u)}
+  return {x:x0+1.4*u,y:y0+(label?6*u:1.5*u),w:x1-x0-2.8*u,h:y1-y0-(label?7.5*u:3*u)}
  }
- // feed panel
- const px=2.5*u,py=20*u,pw=W*.64-px,ph=H-py-3*u
- box(px,py,pw,ph)
- c.fillStyle='#9fc3ee';c.font=`600 ${3.4*u}px ui-monospace,monospace`;c.fillText(`${feed.symbol} · ${feed.tf}`,px+2*u,py+4*u)
- const bars=fs?.bars??[]
- if(bars.length>1){
-  const last=bars.at(-1)!,lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h)),cx=px+2*u,cw=pw-12*u,cy=py+9*u,ch=ph-17*u
-  const Y=(v:number)=>cy+ch*(1-(v-lo)/Math.max(1e-9,hi-lo))
-  c.textAlign='right';c.fillStyle=last.c>=bars[0].c?CYAN:PURPLE;c.font=`700 ${4.2*u}px ui-monospace,monospace`;c.fillText(fmt(last.c),px+pw-2*u,py+4*u);c.textAlign='left'
-  c.strokeStyle=GRID;c.lineWidth=.2*u;for(let i=0;i<=4;i++){const y=cy+ch*i/4;c.beginPath();c.moveTo(cx,y);c.lineTo(cx+cw,y);c.stroke()}
-  const n=bars.length,bw=cw/n
-  bars.forEach((b,i)=>{const x=cx+(i+.5)*bw,up=b.c>=b.o;c.strokeStyle=c.fillStyle=up?CYAN:PURPLE;c.lineWidth=Math.max(1,.18*u);c.beginPath();c.moveTo(x,Y(b.h));c.lineTo(x,Y(b.l));c.stroke();c.fillRect(x-bw*.32,Math.min(Y(b.o),Y(b.c)),bw*.64,Math.max(1,Math.abs(Y(b.o)-Y(b.c))))})
-  if(seat.id==='strategist'){for(const [nn,col] of [[9,'#f3c74b'],[21,'#c9b8ff']] as [number,string][]){const m=sma(bars.map(b=>b.c),nn);c.strokeStyle=col;c.lineWidth=.4*u;c.beginPath();let on=false;m.forEach((v,i)=>{if(isNaN(v))return;const x=cx+(i+.5)*bw;on?c.lineTo(x,Y(v)):c.moveTo(x,Y(v));on=true});c.stroke()}}
-  c.fillStyle='#7f9cc4';c.font=`${2.7*u}px ui-monospace,monospace`;c.textAlign='right';c.fillText(fmt(hi),px+pw-1.2*u,cy+1.5*u);c.fillText(fmt(lo),px+pw-1.2*u,cy+ch-1.5*u);c.textAlign='left'
-  c.fillText(`last bar ${new Date(last.t).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}`,cx,py+ph-3.5*u)
- }else{c.fillStyle='#7f9cc4';c.font=`${3.4*u}px system-ui,sans-serif`;c.fillText(fs?.error?`Feed unavailable (${fs.error})`:'Waiting for engine feed…',px+2*u,py+16*u)}
- // read-outs
- const rx=W*.64+2*u,rw=W-rx-2.5*u
- box(rx,py,rw,ph)
- c.fillStyle='#9fc3ee';c.font=`600 ${3.4*u}px ui-monospace,monospace`;c.fillText(feed.focus,rx+2*u,py+4*u)
- const rows=bars.length>1?readouts(seat.id,bars,feed.tf,now):[]
- rows.forEach(([k,v,col],i)=>{const y=py+13*u+i*13*u;c.fillStyle='#7f9cc4';c.font=`${2.9*u}px system-ui,sans-serif`;c.fillText(k,rx+2*u,y);c.fillStyle=col??'#e4f0ff';c.font=`700 ${4.1*u}px ui-monospace,monospace`;c.fillText(v,rx+2*u,y+5*u)})
- c.fillStyle='#6d86a8';c.font=`${2.7*u}px ui-monospace,monospace`
- c.fillText(fs?`feed ${Math.max(0,Math.round((now-fs.at)/1000))} s ago`:'feed …',rx+2*u,py+ph-9*u)
- c.fillText(seat.job.toLowerCase()+' · awaiting',rx+2*u,py+ph-3.5*u)
+ const text=(v:string,x:number,y:number,size:number,color:string,align:CanvasTextAlign='left',weight=400,mono=true)=>{c.textAlign=align;c.fillStyle=color;c.font=`${weight} ${size*u}px ${mono?'ui-monospace,monospace':'system-ui,sans-serif'}`;c.fillText(v,x,y)}
+ // glass body and its lit bezel
+ c.clearRect(0,0,W,H);c.textBaseline='middle'
+ const glass=()=>{c.beginPath();c.moveTo(inset,0);c.lineTo(W-inset,0);c.lineTo(W,H);c.lineTo(0,H);c.closePath()}
+ const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#020814');g.addColorStop(1,'#04102a');glass();c.fillStyle=g;c.fill()
+ glass();c.strokeStyle='#3d8bff';c.lineWidth=.9*u;c.stroke()
+ // header strip: agent, state, engine, clock
+ const dot=e.state==='up'?'#38e6a0':e.state==='down'?'#ff5a7a':'#f3c74b',rt=e.latency.at(-1)
+ const hd=zone(2.5*u,19.5*u,0,1,undefined,'#3d8bff')
+ const title=seat?seat.name:screen.id==='d8'?'COMMAND CONSOLE':`AUX CONSOLE ${screen.n}`
+ text(title,hd.x+.5*u,hd.y+3.6*u,5.4*u/u,'#e8f3ff','left',700,false)
+ text(seat?seat.job.toUpperCase():screen.id==='d8'?'OPERATOR · ALL AGENTS':'UNASSIGNED',hd.x+.5*u,hd.y+8.8*u,2.7,'#7fa6d6')
+ text(hhmmss(now),hd.x+hd.w,hd.y+3.6*u,4.6,'#cfe6ff','right',600)
+ c.fillStyle=dot;c.beginPath();c.arc(hd.x+1.4*u,hd.y+13.4*u,1.1*u,0,7);c.fill()
+ text(`ENGINE ${e.state==='up'?'UP':e.state==='down'?'OFFLINE':'…'}${e.state==='up'&&rt!==undefined?` · ${rt.toFixed(0)} ms`:''}${e.state==='up'&&!e.keys?' · NO KEYS':''}`,hd.x+3.6*u,hd.y+13.4*u,2.7,'#9fc3ee','left',600)
+ text(seat?'IDLE · NO STRATEGY RUNNING':screen.id==='d8'?'MONITORING':'STANDBY',hd.x+hd.w,hd.y+8.8*u,2.9,seat?'#f3c74b':'#6d86a8','right',600)
+ const Y0=22*u,Y1=70*u,Y2=73*u,Y3=97*u
+ const latency=(r:{x:number;y:number;w:number;h:number})=>{const L=e.latency;if(L.length<2)return;const max=Math.max(...L,1);c.strokeStyle=CYAN;c.lineWidth=.4*u;c.beginPath();L.forEach((v,i)=>{const x=r.x+i/(L.length-1)*r.w,y=r.y+r.h-v/max*r.h*.9;i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();text(`max ${max.toFixed(0)} ms`,r.x+r.w,r.y+1.5*u,2.4,'#7f9cc4','right')}
+ const logLines=(r:{x:number;y:number;w:number;h:number},keys:string[])=>{
+  const lines=keys.flatMap(k=>live.log.get(k)??[]).sort().reverse(),n=Math.max(1,Math.floor(r.h/(3.6*u)))
+  if(!lines.length)text('waiting for first event…',r.x,r.y+1.8*u,2.8,'#6d86a8')
+  lines.slice(0,n).forEach((l,i)=>{text(l.slice(0,8),r.x,r.y+1.8*u+i*3.6*u,2.7,'#6d86a8');text(l.slice(9),r.x+15*u,r.y+1.8*u+i*3.6*u,2.7,i?'#9fb9dc':'#d6e8ff')})
+ }
+ if(seat&&feed){
+  // chart panel: the agent's live feed
+  const ch=zone(Y0,Y1,0,.64,`${feed.symbol} · ${feed.tf}`)
+  const bars=fs?.bars??[]
+  if(bars.length>1){
+   const last=bars.at(-1)!,lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h)),cw=ch.w-9*u,cy=ch.y+1*u,chh=ch.h-6*u
+   const Y=(v:number)=>cy+chh*(1-(v-lo)/Math.max(1e-9,hi-lo))
+   text(fmt(last.c),ch.x+ch.w,ch.y-2.8*u,4,last.c>=bars[0].c?CYAN:PURPLE,'right',700)
+   c.strokeStyle=GRID;c.lineWidth=.2*u;for(let i=0;i<=4;i++){const y=cy+chh*i/4;c.beginPath();c.moveTo(ch.x,y);c.lineTo(ch.x+cw,y);c.stroke()}
+   const n=bars.length,bw=cw/n
+   bars.forEach((b,i)=>{const x=ch.x+(i+.5)*bw,up=b.c>=b.o;c.strokeStyle=c.fillStyle=up?CYAN:PURPLE;c.lineWidth=Math.max(1,.18*u);c.beginPath();c.moveTo(x,Y(b.h));c.lineTo(x,Y(b.l));c.stroke();c.fillRect(x-bw*.32,Math.min(Y(b.o),Y(b.c)),bw*.64,Math.max(1,Math.abs(Y(b.o)-Y(b.c))))})
+   if(seat.id==='strategist')for(const [nn,col] of [[9,'#f3c74b'],[21,'#c9b8ff']] as [number,string][]){const mm=sma(bars.map(b=>b.c),nn);c.strokeStyle=col;c.lineWidth=.4*u;c.beginPath();let on=false;mm.forEach((v,i)=>{if(isNaN(v))return;const x=ch.x+(i+.5)*bw;on?c.lineTo(x,Y(v)):c.moveTo(x,Y(v));on=true});c.stroke()}
+   text(fmt(hi),ch.x+ch.w,cy+1.2*u,2.5,'#7f9cc4','right');text(fmt(lo),ch.x+ch.w,cy+chh-1.2*u,2.5,'#7f9cc4','right')
+   text(`last bar ${new Date(last.t).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}`,ch.x,ch.y+ch.h-1.5*u,2.5,'#7f9cc4')
+  }else text(fs?.error?`Feed unavailable (${fs.error})`:'Waiting for engine feed…',ch.x,ch.y+6*u,3.2,'#7f9cc4','left',400,false)
+  // key numbers
+  const kn=zone(Y0,Y1,.64,1,feed.focus,'#6a4fd0')
+  const rows=bars.length>1?readouts(seat.id,bars,feed.tf,now):[]
+  rows.forEach(([k,v,col],i)=>{const y=kn.y+2*u+i*12*u;text(k,kn.x,y,2.7,'#7f9cc4','left',400,false);text(v,kn.x,y+5*u,4.2,col??'#e4f0ff','left',700)})
+  text(fs?`feed ${Math.max(0,Math.round((now-fs.at)/1000))} s ago`:'feed …',kn.x,kn.y+kn.h-1*u,2.5,'#6d86a8')
+  // activity log + task status, across the wide agent-side edge
+  logLines(zone(Y2,Y3,0,.62,'ACTIVITY LOG'),[seat.id,'engine'])
+  const st=zone(Y2,Y3,.62,1,'TASK','#6a4fd0')
+  text('No strategy assigned',st.x,st.y+2*u,3,'#cfe3f7','left',600,false)
+  text(seat.job.toLowerCase()+' · awaiting work',st.x,st.y+7*u,2.6,'#7f9cc4','left',400,false)
+  text('Click to open this agent',st.x,st.y+12*u,2.6,'#5f7ea6','left',400,false)
+ }else if(screen.id==='d8'){
+  // the operator's console: every agent's feed at a glance
+  const tb=zone(Y0,Y1,0,.66,'AGENTS')
+  SEATS.forEach((a,i)=>{const f=FEEDS[a.id],b=live.feeds.get(a.id)?.bars??[],y=tb.y+2*u+i*(tb.h-2*u)/6,last=b.at(-1),ch=b.length>1?(last!.c/b[0].c-1)*100:NaN
+   text(a.name,tb.x,y,2.8,'#d6e8ff','left',600,false);text(`${f.symbol} ${f.tf}`,tb.x+tb.w*.45,y,2.6,'#8fb4e0')
+   text(last?fmt(last.c):'—',tb.x+tb.w*.78,y,2.8,'#e4f0ff','right',700);text(isNaN(ch)?'':(ch>=0?'+':'')+ch.toFixed(2)+'%',tb.x+tb.w,y,2.6,ch>=0?CYAN:PURPLE,'right')})
+  const lt=zone(Y0,Y1,.66,1,'ENGINE ROUND TRIP','#6a4fd0');latency({x:lt.x,y:lt.y+2*u,w:lt.w,h:lt.h-6*u})
+  text(e.keys?'Alpaca keys present':'Alpaca keys missing',lt.x,lt.y+lt.h-1*u,2.5,e.keys?'#38e6a0':'#f3c74b')
+  logLines(zone(Y2,Y3,0,1,'ACTIVITY LOG'),['engine',...SEATS.map(a=>a.id)])
+ }else{
+  const lt=zone(Y0,Y1,0,1,'ENGINE ROUND TRIP');latency({x:lt.x,y:lt.y+2*u,w:lt.w,h:lt.h-4*u})
+  const nt=zone(Y2,Y3,0,1,'STATUS');text('Not assigned yet · click to open',nt.x,nt.y+2*u,3,'#cfe3f7','left',600,false)
+  text(`engine checked ${e.at?Math.max(0,Math.round((now-e.at)/1000)):'–'} s ago`,nt.x,nt.y+7*u,2.6,'#7f9cc4')
+ }
  t.needsUpdate=true
 }
 /** Polls the engine read-only and redraws every desk console's own texture once a second. */
@@ -235,7 +266,8 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
  const setInspect=(v:Inspecting|null)=>{inspect.current=v;setInspecting(v?.screen.id??null)}
  const startInspect=(s:RoomScreen)=>{
   const c=new THREE.Vector3(...s.center),n=new THREE.Vector3(...s.normal)
-  let d=inspectDistance(s.w,s.h,aspect())
+  const sw=s.shape?.outer??s.w // a desk console is framed by its whole trapezoid
+  let d=inspectDistance(sw,s.h,aspect())
   const hit=cast(c.clone().addScaledVector(n,.02),n,d+INSPECT.clearance) // keep the eye clear of heads and furniture
   if(hit)d=Math.max(INSPECT.minDistance,hit.distance+.02-INSPECT.clearance)
   const off=cam.view?.enabled?2*cam.view.offsetY/cam.view.fullHeight:0
@@ -243,7 +275,7 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
   const back=inspect.current?.back??anchor.current
   setInspect(null);gesture.current={screen:undefined,sum:0}
   const q=new THREE.Quaternion(...s.quaternion),K=READING_CUT // the reading window that dissolves hands in front of the screen
-  K.uCutC.value.copy(c);K.uCutN.value.copy(n);K.uCutR.value.set(1,0,0).applyQuaternion(q);K.uCutU.value.set(0,1,0).applyQuaternion(q);K.uCutS.value.set(s.w/2,s.h/2,d)
+  K.uCutC.value.copy(c);K.uCutN.value.copy(n);K.uCutR.value.set(1,0,0).applyQuaternion(q);K.uCutU.value.set(0,1,0).applyQuaternion(q);K.uCutS.value.set(sw/2,s.h/2,d)
   fly(to,true,()=>setInspect({screen:s,pose:to,back,out:0}))
  }
  const leave=(to:Pose)=>{setInspect(null);gesture.current={screen:undefined,sum:0};fly(to,false,()=>{anchor.current=to})}
@@ -269,7 +301,7 @@ function SmoothZoom({controls,enabled,resetKey}:{controls:RefObject<Controls|nul
     const g=gesture.current
     if(g.screen?.id===s.id)g.sum-=amount;else{g.screen=s;g.sum=-amount}
     const D=camera.position.distanceTo(new THREE.Vector3(...s.center))
-    if(g.sum>=INSPECT.gesture||screenFraction(s.w,s.h,D,aspect())>=INSPECT.fraction){startInspect(s);return}
+    if(g.sum>=INSPECT.gesture||screenFraction(s.shape?.outer??s.w,s.h,D,aspect())>=INSPECT.fraction){startInspect(s);return}
    }else if(amount>0)gesture.current.sum=0
    pending.current=THREE.MathUtils.clamp(pending.current+amount,-1.2,1.2)
   }
@@ -355,10 +387,6 @@ function Screen({mesh,screen,panel,dispatch,onHover,tableMap,sharp}:{sharp:THREE
    const projected=screen.w/(2*camera.position.distanceTo(new THREE.Vector3(...screen.center))*Math.tan(48*Math.PI/360)*(size.width/size.height))*size.width
    // desk consoles always show their live texture; wall displays stay dim until approached
    material.uniforms.uDetail.value=screen.kind==='desk'?1:THREE.MathUtils.smoothstep(projected,screen.rect.w*1.5,screen.rect.w*2.5)
-   if(screen.kind==='desk'){ // a flat console reads upright from whichever side of the desk you look at it
-    const q=new THREE.Quaternion(...screen.quaternion),up=new THREE.Vector3(0,1,0).applyQuaternion(q),side=camera.position.clone().sub(new THREE.Vector3(...screen.center)).dot(up)
-    if(Math.abs(side)>.05)material.uniforms.uFlip.value=side>0?1:0
-   }
    material.uniforms.uHot.value=(hot||getHovered()===screen.id)&&getInspecting()!==screen.id?1:0 // no glow over a screen being read
  })
  useEffect(()=>()=>{material.dispose()},[material])
@@ -384,6 +412,7 @@ function Assets({panel,dispatch,host,onReady}:Props){
  useEffect(()=>()=>{for(const a of assets)a.material.dispose();tableMap.dispose();for(const texture of sharpMap.values())texture.dispose();wireMaterial.dispose();document.body.style.cursor=''},[assets,tableMap,sharpMap,wireMaterial])
  useFrame(({clock})=>{
    for(const a of assets)a.material.uniforms.uTime.value=clock.getElapsedTime()
+   wireMaterial.opacity=.012*(1-.97*READING_CUT.uCut.value) // the hologram mesh lines fade with the reading window too
  })
  useEffect(()=>{if(panel.phase!=='closed'&&panel.phase!=='focused'){setHovered(null);document.body.style.cursor=''}},[panel.phase])
  useEffect(()=>{onReady(true)},[onReady])

@@ -6,6 +6,9 @@ export interface RoomScreen {
  id: string; canonicalId?: string; n: number; kind: 'wall' | 'desk'; computer?: ComputerId; seat?: string;
  rect: {x:number;y:number;w:number;h:number}; center: XYZ; normal: XYZ;
  quaternion: [number,number,number,number]; w:number; h:number;
+ /** Desk consoles are trapezoids built into the ring desk: full outer (agent-side) and inner widths.
+  * `w`×`h` is then the inscribed rectangle. */
+ shape?: {outer:number; inner:number};
 }
 /** Generated from the canonical ids/mappings in imageRoom.ts and the calibrated 3D asset. */
 export const ROOM_SCREENS: RoomScreen[] = [
@@ -517,9 +520,9 @@ export const ROOM_SCREENS: RoomScreen[] = [
     },
     "kind": "desk",
     "center": [
-      -1.9917901614935523,
+      -2.0293555944771766,
       1.608,
-      -0.6654111154598255
+      -0.6779608594778505
     ],
     "normal": [
       0,
@@ -532,8 +535,12 @@ export const ROOM_SCREENS: RoomScreen[] = [
       0.5737731337238723,
       -0.41326068167282426
     ],
-    "w": 0.7,
-    "h": 0.55
+    "w": 0.9113832147581669,
+    "h": 0.7551551594949241,
+    "shape": {
+      "outer": 1.3019760210830955,
+      "inner": 0.9113832147581669
+    }
   },
   {
     "id": "d-strategist",
@@ -547,9 +554,9 @@ export const ROOM_SCREENS: RoomScreen[] = [
     },
     "kind": "desk",
     "center": [
-      -1.282384477857405,
+      -1.3065704232915711,
       1.608,
-      -1.66297626289445
+      -1.6943402210888592
     ],
     "normal": [
       0,
@@ -562,8 +569,12 @@ export const ROOM_SCREENS: RoomScreen[] = [
       0.6693081238340767,
       -0.228093479454605
     ],
-    "w": 0.7,
-    "h": 0.55
+    "w": 0.9113832147581669,
+    "h": 0.7551551594949241,
+    "shape": {
+      "outer": 1.3019760210830955,
+      "inner": 0.9113832147581669
+    }
   },
   {
     "id": "d-backtester",
@@ -577,9 +588,9 @@ export const ROOM_SCREENS: RoomScreen[] = [
     },
     "kind": "desk",
     "center": [
-      1.281889440105583,
+      1.3060660490605105,
       1.608,
-      -1.6633578879320576
+      -1.6947290436265108
     ],
     "normal": [
       0,
@@ -592,8 +603,12 @@ export const ROOM_SCREENS: RoomScreen[] = [
       0.6693420621643226,
       0.22799386793861845
     ],
-    "w": 0.7,
-    "h": 0.55
+    "w": 0.9113832147581669,
+    "h": 0.7551551594949241,
+    "shape": {
+      "outer": 1.3019760210830955,
+      "inner": 0.9113832147581669
+    }
   },
   {
     "id": "d-auditor",
@@ -607,9 +622,9 @@ export const ROOM_SCREENS: RoomScreen[] = [
     },
     "kind": "desk",
     "center": [
-      1.9917901613613807,
+      2.029355594342512,
       1.608,
-      -0.6654111158554578
+      -0.6779608598809445
     ],
     "normal": [
       0,
@@ -622,8 +637,12 @@ export const ROOM_SCREENS: RoomScreen[] = [
       0.5737731337649156,
       0.41326068161583956
     ],
-    "w": 0.7,
-    "h": 0.55
+    "w": 0.9113832147581669,
+    "h": 0.7551551594949241,
+    "shape": {
+      "outer": 1.3019760210830955,
+      "inner": 0.9113832147581669
+    }
   },
   {
     "id": "d-regime",
@@ -637,9 +656,9 @@ export const ROOM_SCREENS: RoomScreen[] = [
     },
     "kind": "desk",
     "center": [
-      -1.1216180509809348,
+      -1.1427719197678723,
       1.608,
-      1.7753796629773952
+      1.8088635645647275
     ],
     "normal": [
       0,
@@ -652,8 +671,12 @@ export const ROOM_SCREENS: RoomScreen[] = [
       -0.1965840233004116,
       0.6792309782268645
     ],
-    "w": 0.7,
-    "h": 0.55
+    "w": 0.9113832147581669,
+    "h": 0.7551551594949241,
+    "shape": {
+      "outer": 1.3019760210830955,
+      "inner": 0.9113832147581669
+    }
   },
   {
     "id": "d-risk",
@@ -667,9 +690,9 @@ export const ROOM_SCREENS: RoomScreen[] = [
     },
     "kind": "desk",
     "center": [
-      1.1216887088676837,
+      1.1428439102719623,
       1.608,
-      1.775335022016619
+      1.8088180816693677
     ],
     "normal": [
       0,
@@ -682,8 +705,12 @@ export const ROOM_SCREENS: RoomScreen[] = [
       0.19659753970248248,
       0.679227066144254
     ],
-    "w": 0.7,
-    "h": 0.55
+    "w": 0.9113832147581669,
+    "h": 0.7551551594949241,
+    "shape": {
+      "outer": 1.3019760210830955,
+      "inner": 0.9113832147581669
+    }
   },
   {
     "id": "d7",
@@ -696,9 +723,9 @@ export const ROOM_SCREENS: RoomScreen[] = [
     },
     "kind": "desk",
     "center": [
-      -1.9248257524324608,
+      -2.0216657012609303,
       1.608,
-      1.023448006873242
+      1.0749387210269543
     ],
     "normal": [
       0,
@@ -711,8 +738,12 @@ export const ROOM_SCREENS: RoomScreen[] = [
       -0.3641869153381644,
       0.6061088109378321
     ],
-    "w": 0.65,
-    "h": 0.5
+    "w": 0.7119575284344143,
+    "h": 0.5416442641567146,
+    "shape": {
+      "outer": 0.9029705238680378,
+      "inner": 0.7119575284344143
+    }
   },
   {
     "id": "d8",
@@ -727,7 +758,7 @@ export const ROOM_SCREENS: RoomScreen[] = [
     "center": [
       0,
       1.608,
-      2.18
+      2.176378411632718
     ],
     "normal": [
       0,
@@ -740,8 +771,12 @@ export const ROOM_SCREENS: RoomScreen[] = [
       0,
       0.7071067811865476
     ],
-    "w": 0.65,
-    "h": 0.5
+    "w": 0.7692732560257095,
+    "h": 0.7336107005503543,
+    "shape": {
+      "outer": 1.0811407922523484,
+      "inner": 0.7692732560257095
+    }
   },
   {
     "id": "d9",
@@ -754,9 +789,9 @@ export const ROOM_SCREENS: RoomScreen[] = [
     },
     "kind": "desk",
     "center": [
-      1.9248257524324608,
+      2.0216657012609303,
       1.608,
-      1.023448006873242
+      1.0749387210269543
     ],
     "normal": [
       0,
@@ -769,8 +804,12 @@ export const ROOM_SCREENS: RoomScreen[] = [
       0.3641869153381644,
       0.6061088109378321
     ],
-    "w": 0.65,
-    "h": 0.5
+    "w": 0.7119575284344143,
+    "h": 0.5416442641567146,
+    "shape": {
+      "outer": 0.9029705238680378,
+      "inner": 0.7119575284344143
+    }
   }
 ]
 export const screenById = (id:string) => [...ROOM_SCREENS,...WALL_SCREEN_INSTANCES].find(s=>s.id===id)
