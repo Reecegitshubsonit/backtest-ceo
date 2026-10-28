@@ -21,9 +21,9 @@ export interface LogLine { t: string; msg: string; level: 'info' | 'warn' | 'err
 export interface AgentNow { task: string | null; state: AgentState; strategy: string | null; symbol: string | null; progress: number | null; updated: string | null; log: LogLine[] }
 export interface Decision { id: string; agent: Slot; strategy: string; reason: string; outcome: Outcome; time: string }
 export interface RunStats { trades: number; win_rate: number; profit_factor: number; net_return_pct: number; max_drawdown_pct: number; sharpe?: number; start?: string; end?: string }
-export interface Trade { entry_time: string; exit_time: string; side: 'long' | 'short'; entry: number; exit: number; ret: number }
+export interface Trade { entry_time: string; exit_time: string; side: 'long' | 'short'; entry: number | null; exit: number | null; ret: number }
 export interface StrategyResult {
- strategy: string; name: string; origin?: string; market: string; primary_run?: string; source_url?: string; tuned?: boolean
+ strategy: string; family?: string; name: string; origin?: string; market: string; primary_run?: string; source_url?: string; tuned?: boolean
  stage: Stage; source?: string; split_date?: string; stats: RunStats; in_sample?: RunStats | null; out_of_sample?: RunStats | null
  equity: number[]; equity_from?: string; equity_to?: string; trades: Trade[]
  runs?: { id: string; market: string; tuned?: boolean; full: RunStats; out_of_sample?: RunStats | null }[]
