@@ -46,6 +46,8 @@ def _args(argv):
     p.add_argument("--sim-hours", type=float, default=72, help="dry run: simulated hours to run")
     p.add_argument("--sim-step-min", type=float, default=5, help="dry run: simulated minutes per tick")
     p.add_argument("--sim-sleep", type=float, default=0.02, help="dry run: real seconds per tick")
+    p.add_argument("--data-feed", choices=["iex", "sip", "delayed_sip"], default=None,
+                   help="Alpaca stock feed for 5m bars and quotes (overrides ALPACA_DATA_FEED; iex is real time on free plans)")
     p.add_argument("--confirm", action="store_true", help="smoke-test: actually send the paper orders")
     p.add_argument("--broker", choices=["alpaca", "webull", "both"], default="both", help="smoke-test: which broker(s)")
     p.add_argument("--extended-hours", action="store_true", help="smoke-test: Webull LIMIT order in the extended session (support_trading_session=ALL)")
@@ -101,7 +103,7 @@ def build(a, dry):
         brokers["webull"] = WebullSandboxBroker(env.first(envfile.WEBULL_KEY_VARS), env.first(envfile.WEBULL_SECRET_VARS),
                                                 env.first(envfile.WEBULL_ACCOUNT_VARS), kill, region=env.get("WEBULL_REGION") or "us",
                                                 token_dir=sdir / "webull-token")
-    data = AlpacaData(akey, asec, feed=env.get("ALPACA_DATA_FEED") or "iex")
+    data = AlpacaData(akey, asec, feed=a.data_feed or env.get("ALPACA_DATA_FEED") or "iex")
     feed = _feed(a, cfg, sdir, "PAPER · Alpaca paper + Webull sandbox")
     return Runner(cfg, data, brokers, feed, kill, sdir / "state.json", mode="paper"), sdir
 

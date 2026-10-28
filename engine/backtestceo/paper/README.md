@@ -46,5 +46,5 @@ position book is the runner's own (state.json), not reconciled with the broker o
 
 Stocks (2026-10-28): whole shares within the $2,000 cap (the backtests size by % of equity). Regular-session orders are market
 orders; any stock order outside 09:30-16:00 ET is a whole-share LIMIT with extended hours, cancelled if it does not fill.
-5m bars and quotes come from ALPACA_DATA_FEED (default iex; relative volume compares IEX with IEX), daily bars from sip
+5m bars and quotes come from --data-feed or ALPACA_DATA_FEED (default iex; delayed_sip is 15 min late, so run `paper.sh up --paper --data-feed iex`), daily bars from sip
 (completed days only). NYSE holidays / early closes are listed in strategies.py through 2027. Wall: one screen per active leg.

@@ -185,3 +185,11 @@ def test_webull_extended_hours_requires_limit():
     b = WebullSandboxBroker.__new__(WebullSandboxBroker)
     with pytest.raises(SafetyError):
         b.order_body("NVDA", "buy", qty=1, notional=None, order_type="market", limit_price=None, extended_hours=True, client_order_id="x")
+
+
+def test_data_feed_flag_parses():
+    from backtestceo.paper import cli
+    assert cli._args(["run", "--data-feed", "iex"]).data_feed == "iex"
+    assert cli._args(["run"]).data_feed is None
+    with pytest.raises(SystemExit):
+        cli._args(["run", "--data-feed", "bogus"])
