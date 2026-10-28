@@ -55,12 +55,18 @@ class Reference:
         p = self.family_payload(dict(fam, runs=[s.run])) if r else dict(strategy=fam["id"], name=fam["name"], origin=fam["origin"], market=s.symbol,
                                                                         stats={}, equity=[], trades=[], runs=[])
         tf = f" {s.tf_hours}h" if getattr(s, "tf_hours", 0) else ""
-        p.update(strategy=s.key, family=fam["id"], name=f"{LEG_NAMES.get(fam['id'], fam['name'])} · {s.symbol}{tf}",
+        p.update(strategy=s.key, family=fam["id"], name=leg_name(fam, s),
                  market=f"{s.symbol}{tf} · {'Alpaca paper' if s.broker == 'alpaca' else 'Webull sandbox'}")
         eq = (r or {}).get("equity_curve") or []
         if eq:
             p.update(equity_from=eq[0]["date"], equity_to=eq[-1]["date"])
         return p
+
+
+def leg_name(fam, s):
+    """Wall-screen title of one paper leg; CEO decisions carry the same name so each screen shows its own verdict."""
+    tf = f" {s.tf_hours}h" if getattr(s, "tf_hours", 0) else ""
+    return f"{LEG_NAMES.get(fam['id'], fam['name'])} · {s.symbol}{tf}"
 
 
 def family_of(run_id):

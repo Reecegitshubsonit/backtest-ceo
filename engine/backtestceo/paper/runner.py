@@ -9,7 +9,7 @@ from pathlib import Path
 from . import strategies as S
 from .feed import now_iso
 from .pipeline import Pipeline
-from .reference import FAMILIES, Reference, family_of
+from .reference import FAMILIES, Reference, family_of, leg_name
 from .safety import KillSwitchEngaged
 
 ET = S.ET
@@ -70,7 +70,7 @@ class Runner:
     def _ctx(self, s, now, **kw):
         fam = family_of(s.run)
         st = self.st[s.key]
-        ctx = dict(id=f"{s.key}-{kw['bar_ts']:%Y%m%dT%H%M}-{kw['intent']}", name=fam["name"], key=s.key, run=s.run, symbol=s.symbol,
+        ctx = dict(id=f"{s.key}-{kw['bar_ts']:%Y%m%dT%H%M}-{kw['intent']}", name=leg_name(fam, s), key=s.key, run=s.run, symbol=s.symbol,
                    broker=s.broker, long_only=s.broker == "alpaca", open_positions=1 if st["pos"] else 0,
                    entries_today=self._entries_today(s.key, now), entries_today_total=self._entries_total(now), caps=self.cfg.caps,
                    kill=self.kill_check(), reference=self.ref.run_stats(s.run), require_positive_reference=False)
@@ -80,7 +80,7 @@ class Runner:
 
     def _emit_status(self, s, msg, level="info", slot="scanner"):
         self.feed.emit(dict(kind="agent_activity", slot=slot, task=f"RULE-BASED · {s.key}: {msg}"[:200], state="error" if level == "error" else "working",
-                            strategy=family_of(s.run)["name"], symbol=s.symbol, log=msg[:300], level=level))
+                            strategy=leg_name(family_of(s.run), s), symbol=s.symbol, log=msg[:300], level=level))
 
     # ---------- orders ----------
     def _execute(self, s, now, side, reason, qty=None, notional=None, stop=None, bar_ts=None, order=None):
@@ -139,7 +139,7 @@ class Runner:
                                                   ret=(px / p["entry"] - 1) * p["dir"], pnl_usd=round(pnl, 2), reason=reason)])[-20:]
             st["pos"] = None
             st["status"] = "flat"
-        self.feed.emit(dict(kind="agent_activity", slot="risk", task=f"RULE-BASED · fill {s.key}", state="working", strategy=family_of(s.run)["name"],
+        self.feed.emit(dict(kind="agent_activity", slot="risk", task=f"RULE-BASED · fill {s.key}", state="working", strategy=leg_name(family_of(s.run), s),
                             symbol=s.symbol, log=f"{'PAPER' if self.mode == 'paper' else 'DRY RUN'} fill {side} {q:g} {s.symbol} @ {px:.2f} ({s.broker})"))
         return fill
 
