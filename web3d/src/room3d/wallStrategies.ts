@@ -13,9 +13,10 @@ export const STRATEGY_SCREENS = ['s8', 's9', 's11', 's12', 's7', 's13', 's6', 's
 const GREEN = '#3ddc84', RED = '#ff5a6a', ORANGE = '#ff8a3d', AMBER = '#f3c74b', MUTED = '#6d86a8', GRID = '#0d1d38'
 export const OUTCOME_COLOR = { approved: GREEN, rejected: RED, pending: AMBER } as const
 
-/** Which strategy each wall screen shows: snapshot strategies first (results.json order), then live-only ones as they arrive. */
+/** Which strategy each wall screen shows: the active paper legs (snapshot order), then live-only paper legs as they arrive.
+ *  Family-level events from older runs or a seeded feed (no `family` field: AEX, EMA150, first 5-min...) are not shown. */
 export function wallAssignment(): Map<string, string> {
- const out = new Map<string, string>(), ids = [...feed.strategies.keys()]
+ const out = new Map<string, string>(), ids = [...feed.strategies.keys()].filter(id => feed.strategies.get(id)?.family)
  ids.slice(0, STRATEGY_SCREENS.length).forEach((id, i) => out.set(STRATEGY_SCREENS[i], id))
  return out
 }
