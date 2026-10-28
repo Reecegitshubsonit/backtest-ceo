@@ -16,7 +16,9 @@ feed_up() {
   if curl -fs -m 2 "$FEED_URL/v1/health" >/dev/null 2>&1; then echo "live-events already answering at $FEED_URL"; return 0; fi
   command -v node >/dev/null || { echo "node not found: cannot start live-events"; return 1; }
   PORT="${FEED_URL##*:}"; PORT="${PORT%%/*}"
-  nohup node "$REPO/services/live-events/server.mjs" --port "$PORT" --seed "$DIR/backtestceo/paper/reference_results.json" \
+  # no --seed: the runner publishes one strategy_result per ACTIVE paper leg on its first tick (seeding would bring back
+  # backtest-only strategies such as AEX / EMA150 on the wall)
+  nohup node "$REPO/services/live-events/server.mjs" --port "$PORT" \
     --log "$STATE/live-events.jsonl" >>"$STATE/live-events.log" 2>&1 &
   echo $! >"$FEED_PID"
   for _ in $(seq 1 20); do curl -fs -m 1 "$FEED_URL/v1/health" >/dev/null 2>&1 && { echo "live-events started (pid $(cat "$FEED_PID")) at $FEED_URL"; return 0; }; sleep 0.25; done

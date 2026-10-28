@@ -97,8 +97,13 @@ def _sim(series, start, hours, step_min=60, cfg=None, kill=lambda: False, feed=N
     return r, feed, brokers
 
 
+# first5m_qqq left the paper set on 2026-10-28 (backtest-only now); its rule is still covered here
+FIRST5M_QQQ = C.StrategyConfig("first5m_qqq", "first5m_qqq", "first5m", "webull", "QQQ")
+
+
 def _only(cfg, *keys, **kw):
-    return replace(cfg, strategies=tuple(s for s in cfg.strategies if s.key in keys), **kw)
+    pool = cfg.strategies + ((FIRST5M_QQQ,) if "first5m_qqq" in keys else ())
+    return replace(cfg, strategies=tuple(s for s in pool if s.key in keys), **kw)
 
 
 @pytest.fixture(scope="module")
@@ -166,10 +171,19 @@ def test_pipeline_emits_every_agent_and_ceo_decision(series):
         assert seq[0] == "pending" and seq[-1] in ("approved", "rejected")
     sr = feed.kinds("strategy_result")
     names = {e["strategy"] for e in sr}
-    assert names == {"ema200_adx25_trend", "ema150_adx_trend_tuned", "adaptive_supertrend", "ema9_21_cross", "first5m_rth_direction", "aex_first_hour_vwap"}
-    f5 = [e for e in sr if e["strategy"] == "first5m_rth_direction"][-1]
-    assert f5["stats"]["trades"] and f5["paper"]["legs"][0]["fills"] and f5["paper"]["backtest_only_runs"] == ["first5m_nq"]
-    assert [e for e in sr if e["strategy"] == "aex_first_hour_vwap"][-1]["paper"]["status"] == "backtest-only (not run)"
+    assert names == {"first5m_qqq"}  # one wall screen per active paper leg, keyed by the runner key
+    f5 = sr[-1]
+    assert f5["family"] == "first5m_rth_direction" and f5["name"] == "First 5-min Candle · QQQ"
+    assert f5["stats"]["trades"] and f5["paper"]["legs"][0]["fills"]
+
+
+def test_publish_one_screen_per_default_paper_leg_and_no_backtest_only(series):
+    r, feed, _ = _sim(series, datetime(2026, 9, 1, 13, tzinfo=timezone.utc), 1, step_min=5)
+    names = {e["strategy"]: e["name"] for e in feed.kinds("strategy_result")}
+    assert set(names) == {s.key for s in C.RunnerConfig().strategies}
+    assert len(names) == 13 and "first5m_qqq" not in names
+    assert not any("AEX" in n or "EMA150" in n for n in names.values())
+    assert names["sip_pltr"] == "Stocks-in-Play ORB · PLTR" and names["supertrend_eth4h"] == "Adaptive SuperTrend · ETH/USD 4h"
 
 
 def test_events_conform_to_live_events_schema(series):

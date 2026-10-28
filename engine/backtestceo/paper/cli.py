@@ -80,6 +80,11 @@ def build(a, dry):
         kill = _kill_check(a, envfile.Env(PAPER_TRADING_KILL_SWITCH=os.environ.get("PAPER_TRADING_KILL_SWITCH", "")), sdir)
         series = {("ETH/USD", 60): load_csv(FIXTURES / "eth_1h.csv"), ("BTC/USD", 60): load_csv(FIXTURES / "btc_1h.csv"),
                   ("QQQ", 5): load_csv(FIXTURES / "qqq_5m.csv")}
+        for sym in sorted({s.symbol for s in cfg.strategies if s.rule in ("sip", "rsi2", "overnight")}):
+            for m, suffix in ((5, "5m"), (1440, "1d")):
+                f = FIXTURES / f"{sym.lower()}_{suffix}.csv"
+                if f.exists():
+                    series[(sym, m)] = load_csv(f)
         data = ReplayData(series)
         data.now = datetime.fromisoformat(a.sim_start)
         brokers = {"alpaca": FakeBroker("alpaca", data.last_price, kill, crypto_fee=0.0025), "webull": FakeBroker("webull", data.last_price, kill)}
@@ -112,6 +117,8 @@ def cmd_check(a):
                          ("Webull app secret", envfile.WEBULL_SECRET_VARS), ("Webull account id (optional)", envfile.WEBULL_ACCOUNT_VARS)):
         found = [n for n in names if env.get(n)]
         print(f"  {label}: {'present as ' + found[0] if found else 'missing (' + ' | '.join(names) + ')'}")
+    fd = (env.get("ALPACA_DATA_FEED") or "iex").strip().lower()
+    print(f"  Alpaca stock data feed (5m bars, quotes): {fd if fd in ('iex', 'sip', 'delayed_sip', 'otc', 'boats') else 'custom'}; daily bars: sip")
     sdir = _state_dir(a, False)
     print(f"  kill switch: {'ON' if _kill_check(a, env, sdir)() else 'off'}")
     return 0 if ok_all else 2

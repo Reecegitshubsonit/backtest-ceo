@@ -5,7 +5,10 @@ in `engine/tests/test_paper_parity.py`); reference stats are `reference_results.
 
 | Runner key | Strategy (results.json run) | Broker | Notes |
 |---|---|---|---|
-| first5m_qqq | First 5-min RTH candle, QQQ | Webull sandbox | long & short, stop = signal candle extreme, exit 15:58 ET |
+| sip_pltr, sip_tsla, sip_arkk | Stocks-in-Play 5-min ORB (backtest_alpaca.py `sip`) | Webull sandbox | open > $5, 14d avg vol > 1M, ATR14 > $0.50, first-5m rel vol >= 1.0; stop entry at the OR high/low in the first candle's direction (long & short); stop 10% ATR14 (entry bar: close through); exit 15:58 ET |
+| rsi2_smh, rsi2_amd | RSI(2) pullback (Connors) | Webull sandbox | 15:55 ET: close > SMA200 and RSI(2) < 10 -> buy; exit at the first close > SMA5. Long only |
+| overnight_nvda, overnight_mstr, overnight_lly | Overnight hold | Webull sandbox | buy 15:55 ET, sell at the next session's open |
+| first5m_qqq | First 5-min RTH candle, QQQ | none | removed from the paper set 2026-10-28 (failed out of sample on Alpaca data); backtest-only |
 | supertrend_eth4h / _btc4h | Adaptive SuperTrend Confluence 4h | Alpaca paper | long side only (Alpaca crypto cannot short) |
 | ai_ema_adx_eth4h / _btc4h | EMA200 + ADX25 4h | Alpaca paper | long side only |
 | ema9_21_btc1h | EMA 9/21 cross, 2% stop, 1h | Alpaca paper | long only (as tested) |
@@ -40,3 +43,8 @@ filled at the stop price); crypto uses $2,000 fixed notional instead of compound
 1h bars (200 4h-days) instead of the full 2018+ history; crypto bars come from Alpaca, not Bitstamp; first5m only enters
 between 09:35 and 09:45 ET and is capped to floor($2,000 / price) shares (backtest: $200 risk, 4x leverage); the
 position book is the runner's own (state.json), not reconciled with the broker on restart.
+
+Stocks (2026-10-28): whole shares within the $2,000 cap (the backtests size by % of equity). Regular-session orders are market
+orders; any stock order outside 09:30-16:00 ET is a whole-share LIMIT with extended hours, cancelled if it does not fill.
+5m bars and quotes come from ALPACA_DATA_FEED (default iex; relative volume compares IEX with IEX), daily bars from sip
+(completed days only). NYSE holidays / early closes are listed in strategies.py through 2027. Wall: one screen per active leg.

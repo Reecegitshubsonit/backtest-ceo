@@ -11,7 +11,15 @@ FAMILIES = [
     dict(id="ema9_21_cross", name="EMA 9/21 Cross, 2% Stop", origin="PineForge / xAI Grok", runs=["ema9_21_btc1h"]),
     dict(id="first5m_rth_direction", name="First 5-min RTH Candle Direction", origin="RHerman", runs=["first5m_nq", "first5m_qqq"]),
     dict(id="aex_first_hour_vwap", name="AEX First-Hour Range + VWAP", origin="aexopties Grok Bot", runs=["aex_first_hour"]),
+    dict(id="stocks_in_play_orb", name="Stocks-in-Play 5-min ORB", origin="Zarattini, Barbon & Aziz (SSRN 4729284)",
+         runs=["alpaca_sip_PLTR", "alpaca_sip_TSLA", "alpaca_sip_ARKK"]),
+    dict(id="rsi2_pullback", name="RSI(2) Pullback", origin="Connors", runs=["alpaca_rsi2_SMH", "alpaca_rsi2_AMD"]),
+    dict(id="overnight_hold", name="Overnight Hold", origin="close -> next open", runs=["alpaca_overnight_NVDA", "alpaca_overnight_MSTR", "alpaca_overnight_LLY"]),
 ]
+# Short wall-screen names for one paper leg (one screen per active strategy x symbol)
+LEG_NAMES = {"ema200_adx25_trend": "EMA200 + ADX25 Trend", "adaptive_supertrend": "Adaptive SuperTrend", "ema9_21_cross": "EMA 9/21 Cross",
+             "first5m_rth_direction": "First 5-min Candle", "stocks_in_play_orb": "Stocks-in-Play ORB", "rsi2_pullback": "RSI(2) Pullback",
+             "overnight_hold": "Overnight Hold"}
 STAT_KEYS = ("trades", "win_rate", "profit_factor", "net_return_pct", "max_drawdown_pct", "sharpe", "start", "end")
 
 
@@ -39,6 +47,20 @@ class Reference:
                     equity=[p["equity"] for p in main.get("equity_curve", [])],
                     trades=[{k: t[k] for k in ("entry_time", "exit_time", "side", "entry", "exit", "ret")} for t in main.get("last_trades", [])],
                     runs=[dict(id=r["id"], market=r["market"], tuned=r.get("tuned"), full=_pick(r["full"]), out_of_sample=_pick(r.get("out_of_sample"))) for r in runs])
+
+
+    def leg_payload(self, fam, s):
+        """One paper leg (strategy x symbol) as its own wall screen: strategy id = the runner key."""
+        r = self.runs.get(s.run)
+        p = self.family_payload(dict(fam, runs=[s.run])) if r else dict(strategy=fam["id"], name=fam["name"], origin=fam["origin"], market=s.symbol,
+                                                                        stats={}, equity=[], trades=[], runs=[])
+        tf = f" {s.tf_hours}h" if getattr(s, "tf_hours", 0) else ""
+        p.update(strategy=s.key, family=fam["id"], name=f"{LEG_NAMES.get(fam['id'], fam['name'])} · {s.symbol}{tf}",
+                 market=f"{s.symbol}{tf} · {'Alpaca paper' if s.broker == 'alpaca' else 'Webull sandbox'}")
+        eq = (r or {}).get("equity_curve") or []
+        if eq:
+            p.update(equity_from=eq[0]["date"], equity_to=eq[-1]["date"])
+        return p
 
 
 def family_of(run_id):

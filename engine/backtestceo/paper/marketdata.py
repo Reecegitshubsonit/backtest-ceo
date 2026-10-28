@@ -13,11 +13,12 @@ def _parse_ts(s):
 
 
 class AlpacaData:
-    def __init__(self, key, secret, feed="iex", session=None):
+    def __init__(self, key, secret, feed="iex", session=None, daily_feed="sip"):
         import requests
         self.http = session or requests.Session()
         self._headers = {"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret} if key and secret else {}
         self.feed = feed or "iex"
+        self.daily_feed = daily_feed or "sip"  # completed days only (end >= 16 min ago), so free plans may read SIP history
 
     def __repr__(self):
         return "AlpacaData(data.alpaca.markets)"
@@ -53,6 +54,17 @@ class AlpacaData:
         step = timedelta(minutes=minutes)
         return [b for b in bars if b["ts"] + step <= now]
 
+    def daily(self, symbol, now, days=1100):
+        """COMPLETED daily stock bars before today's ET date, split+dividend adjusted like backtest_alpaca's daily data."""
+        start, end = now - timedelta(days=days), now - timedelta(minutes=16)
+        rows = []
+        for body in self._get("/v2/stocks/bars", dict(symbols=symbol, timeframe="1Day", start=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                                      end=end.strftime("%Y-%m-%dT%H:%M:%SZ"), limit=10000, sort="asc", feed=self.daily_feed,
+                                                      adjustment="all")):
+            rows += (body.get("bars") or {}).get(symbol, [])
+        bars = [dict(ts=_parse_ts(b["t"]), o=float(b["o"]), h=float(b["h"]), l=float(b["l"]), c=float(b["c"]), v=float(b.get("v", 0))) for b in rows]
+        return completed_days(bars, now)
+
     def last_price(self, symbol):
         if "/" in symbol:
             body = next(self._get("/v1beta3/crypto/us/latest/trades", dict(symbols=symbol)))
@@ -67,6 +79,12 @@ class AlpacaData:
         if bid <= 0 or ask <= 0:
             raise RuntimeError(f"no usable {symbol} quote (bid/ask missing)")
         return dict(bid=bid, ask=ask, mid=round((bid + ask) / 2, 4), time=q.get("t"))
+
+
+def completed_days(bars, now):
+    from .strategies import ET
+    today = now.astimezone(ET).date()
+    return [b for b in bars if b["ts"].astimezone(ET).date() < today]
 
 
 def load_csv(path):
@@ -86,9 +104,12 @@ class ReplayData:
         step = timedelta(minutes=minutes)
         return [b for b in self.series.get((symbol, minutes), []) if now - lookback <= b["ts"] and b["ts"] + step <= now]
 
+    def daily(self, symbol, now, days=1100):
+        return completed_days([b for b in self.series.get((symbol, 1440), []) if b["ts"] >= now - timedelta(days=days)], now)
+
     def last_price(self, symbol):
         for (s, m), bars in self.series.items():
-            if s == symbol:
+            if s == symbol and m != 1440:
                 done = [b for b in bars if b["ts"] + timedelta(minutes=m) <= self.now]
                 if done:
                     return done[-1]["c"]
