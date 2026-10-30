@@ -44,7 +44,7 @@ def indicators(days):
             direction=1 if lastdiff is not None and lastdiff<=0<diff else -1 if lastdiff is not None and lastdiff>=0>diff else 0
             slot=b['t'].hour*60+b['t'].minute
             history=histories[slot]
-            b.update(signal=direction,trend=1 if ema9>ema21 else -1,atr=atr,
+            b.update(ema9=ema9,ema21=ema21,vwap=vwap,ema_vwap_gap=diff,signal=direction,trend=1 if ema9>ema21 else -1,atr=atr,
                      vol_ok=atr is not None and len(history)==20 and atr>statistics.median(history),
                      ready=n>=105)
             if atr is not None:session_atrs.append((slot,atr))

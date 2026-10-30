@@ -95,3 +95,8 @@ def test_batch_stops_at_yesterday_so_no_partial_bar_is_saved(tmp_path):
     c = Collector(Api(None), tmp_path, False, date(2026, 10, 26))
     c.batch("g", "u", ["A"], "1Day", date(2026, 1, 1), lambda s: tmp_path / f"{s}.csv.gz", 100)
     assert ends == ["2026-10-26T00:00:00Z"]
+
+
+def test_occ_pattern_rejects_adjusted_contracts():
+    from backtestceo.collect import OCC
+    assert OCC.match("TSLA240501P00187500") and not OCC.match("1TSLA240501P00187500")

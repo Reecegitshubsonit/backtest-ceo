@@ -29,7 +29,7 @@ def read_day(day,quote_dir=None):
     return events,invalid
 
 
-def run(signals,extra_slip=.01,latency=1,quote_dir=None):
+def run(signals,extra_slip=.01,latency=1,quote_dir=None,premium_budget=BUDGET):
     days=defaultdict(list)
     for e in signals:days[str(e['t'].date())].append(e)
     cash=CAPITAL;positions={};trades=[];daily=[];reject=Counter();peak=CAPITAL;dd=0;invalid=0;missing_marks=0
@@ -80,7 +80,7 @@ def run(signals,extra_slip=.01,latency=1,quote_dir=None):
                     equity+=max(0,mark[0]-extra_slip)*p['qty']*100-FEE*p['qty']
                 if not good:reject['unpriced_open_position']+=1;pending.remove((e,due,deadline));continue
                 entry=q[1]+extra_slip;unit=entry*100+FEE
-                qty=min(1,int(equity*BUDGET//(entry*100+2*FEE)),int(cash//unit),q[3])
+                qty=min(1,int(equity*premium_budget//(entry*100+2*FEE)),int(cash//unit),q[3])
                 if qty<1:reject['premium_budget_cash_or_size']+=1;pending.remove((e,due,deadline));continue
                 cash-=qty*unit
                 positions[sym]=dict(contract=e['contract'],side=e['side'],qty=qty,entry=entry,entry_time=now,

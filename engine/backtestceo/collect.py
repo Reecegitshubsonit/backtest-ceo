@@ -42,6 +42,8 @@ TICK_FIELDS = {
 }
 ACTION_SYMBOL_KEYS = ("symbol", "acquiree_symbol", "old_symbol", "source_symbol", "target_symbol")
 TICKER = re.compile(r"^[A-Z]+(\.[A-Z]+)?$")  # e.g. AAPL, BRK.B, ABR.PRA
+# the data API serves standard OCC symbols only; adjusted contracts (1TSLA...) reject the whole request
+OCC = re.compile(r"^[A-Z]{1,5}\d{6,7}[CP]\d{8}$")
 PER_MINUTE = 190  # free plan allows 200 requests a minute; keep a margin
 
 
@@ -212,7 +214,8 @@ class Collector:
                       sorted(contracts, key=lambda c: (c["expiration_date"], float(c["strike_price"]), c["type"])))
             by_exp: dict = {}
             for c in contracts:
-                by_exp.setdefault(c["expiration_date"], []).append(c["symbol"])
+                if OCC.match(c["symbol"]):
+                    by_exp.setdefault(c["expiration_date"], []).append(c["symbol"])
             print(f"[options/{u}] {len(contracts)} contracts, {len(by_exp)} expirations", flush=True)
             for exp in sorted(by_exp):
                 path = self.out / "options" / "1Day" / u / f"{exp}.csv.gz"
@@ -331,7 +334,7 @@ class Collector:
                 path = self.out / "options" / "trades" / u / f"{day}.csv.gz"
                 if not self.todo(path):
                     continue
-                listed = [c["symbol"] for c in self.read_contracts(u) if c["expiration_date"] >= str(day)]
+                listed = [c["symbol"] for c in self.read_contracts(u) if c["expiration_date"] >= str(day) and OCC.match(c["symbol"])]
                 self.tick_day(f"options/trades {u}", DATA + "/v1beta1/options/trades", "trades", listed, day, path,
                               TICK_FIELDS["options/trades"])
 
