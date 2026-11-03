@@ -9,7 +9,7 @@ Costs on traded notional. Any unallocated weight is cash earning BIL's daily tot
 Sharpe = mean/std of daily returns in excess of BIL, x sqrt(252).
 Run: python3 research/etf_strategies/backtest.py [--intraday]
 """
-import json, os, sys
+import json, os, sys, time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -34,7 +34,10 @@ def fetch(symbol, timeframe, start, end=None):
                  "feed": "sip", "limit": 10000, "sort": "asc"}
             if end: p["end"] = end
             if token: p["page_token"] = token
-            r = requests.get(URL, headers=HDR, params=p, timeout=60)
+            for attempt in range(6):
+                r = requests.get(URL, headers=HDR, params=p, timeout=60)
+                if r.status_code != 429: break
+                time.sleep(2 ** attempt)
             r.raise_for_status()
             b = r.json()
             rows += (b.get("bars") or {}).get(symbol, [])

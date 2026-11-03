@@ -98,3 +98,50 @@ On rule-chosen lists the TSMOM Sharpe falls from 0.71 to 0.55 (2017–2026). Par
 - Rotation (3 and 4) and RSI(2) underperform vol-matched SPY over the full period. The last-2-years RSI(2) Sharpe of 1.14 rests on 22 round trips,
   and its CI is [-1.07, +1.57].
 - v1 vs v2: v1 used a 0% risk-free rate, which inflated cash-heavy Sharpes (TSMOM 1.06 → 0.71). v1 also rebalanced daily for free.
+
+## Round 3: strategies from published research (`new_strategies.py`, `new_results.md`)
+Method to avoid data-mining 10 years of data: each candidate comes from a paper published **before 2017**, with
+the paper's default parameters and no tuning here. 2017–2026 is a true out-of-sample test. Leverage only through
+listed 2x/3x S&P ETFs (SSO, UPRO), so their fees, financing and daily-reset decay are included. Results are also split
+2017–21 / 2022–26 to check whether an edge holds in both halves. Holm correction runs over all 12 strategy-vs-SPY tests in the project.
+
+- N1 **Vol target** (Harvey et al. 2018 / Moreira–Muir 2017): S&P exposure = 15% / 21-day realized vol, cap 2x via SSO, re-trade on a 10-point move.
+- N2/N3 **Leveraged trend** (Gayed–Bilello 2016): SSO / UPRO while SPY > 200d SMA, else T-bills.
+- N4 **Turn of month** (Lakonishok–Smidt 1988, McConnell–Xu 2008): hold SPY on the last trading day + first 3 of each month.
+- N5 **Trend × vol target**: N1 exposure only while SPY > 200d SMA.
+
+| 2017–2026 | CAGR | Vol | Sharpe | Max DD | Longest DD (d) | Round trips | Vol-matched SPY CAGR / DD | ΔSharpe [95% CI] |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| SPY buy & hold | 14.8% | 17.8% | 0.73 | -33.8% | 709 | 0 (+1) | — | — |
+| N1. Vol target 15% | 14.4% | 16.5% | 0.76 | -19.4% | 608 | 28 (+2) | 14.0% / -31.6% | +0.02 [-0.29, +0.32] |
+| N2. 2x trend (SSO) | 16.6% | 24.2% | 0.66 | -36.0% | 788 | 25 (+1) | 18.7% / -43.7% | -0.07 [-0.49, +0.32] |
+| N3. 3x trend (UPRO) | 21.8% | 36.2% | 0.67 | -51.0% | 868 | 25 (+1) | 24.9% / -59.3% | -0.07 [-0.48, +0.32] |
+| N4. Turn of month | 5.5% | 7.8% | 0.43 | -10.7% | 522 | 118 (+1) | 8.1% / -15.9% | -0.31 [-1.03, +0.41] |
+| N5. Trend × vol target | 12.2% | 14.9% | 0.69 | -22.9% | 713 | 57 (+2) | 12.9% / -29.0% | -0.05 [-0.54, +0.42] |
+
+| Sharpe by window | SPY | N1 | N2 | N3 | N4 | N5 |
+|---|---:|---:|---:|---:|---:|---:|
+| 2017–2021 | 0.95 | 1.09 | 0.87 | 0.88 | 0.59 | 0.94 |
+| 2022–2026 | 0.50 | 0.40 | 0.41 | 0.42 | 0.23 | 0.40 |
+| Last 2 years | 0.76 | 0.41 | 0.62 | 0.62 | 0.66 | 0.40 |
+
+All Holm-adjusted p = 1.00.
+
+### Read
+- **Nothing tested in this project beats SPY on risk-adjusted return by a margin the data can detect.** That makes 12 tests,
+  all with CIs spanning 0. With 10 years of daily data, a Sharpe gap must be roughly ±0.3–0.5 before the bootstrap can see it.
+  Published edges for these ideas are 0.1–0.3.
+- **Best practical result, N1 vol targeting:** SPY-like return (14.4% vs 14.8%) with max DD -19% vs -34%, against -32% for
+  vol-matched SPY. So the drawdown cut is not just lower exposure. It held in 2017–21 (the 2020 crash, where vol spiked first)
+  but not after: in 2022–26, and especially the April 2025 V-shaped selloff, it cut exposure near the low and missed the rebound.
+  It is a drawdown tool with one good episode behind it, not a proven edge.
+- **Leveraged trend (N2/N3)** raises CAGR (UPRO 21.8%) only by adding risk (vol 36%, max DD -51%). Its Sharpe is no better than
+  SPY, and simply levering SPY to the same vol would have done better (24.9%). The 200d filter did not pay for its whipsaw here.
+- **Turn of month** keeps a positive return in only ~20% of days, but net of costs and next-open fills it trails vol-matched SPY.
+- Round 1–2 conclusions stand. Every robust result here is a **risk-shape** change (lower drawdown), not extra return per unit of risk.
+
+### What would actually move this forward
+1. **Longer history.** Ken French daily market data (1926+), FRED T-bills and stooq index data would allow these rules
+   to be tested over ~90 years, where a 0.2 Sharpe edge is detectable. The environment's network policy blocks
+   `mba.tuck.dartmouth.edu`, `fred.stlouisfed.org` and `stooq.com`.
+2. More orthogonal return sources than SPY timing (carry, value or cross-sectional factor ETFs), tested the same way.
