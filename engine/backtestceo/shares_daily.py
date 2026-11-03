@@ -17,8 +17,8 @@ UNIVERSE = ["SPY", "QQQ", "IWM", "DIA", "XLK", "XLF", "XLE", "XLV", "XLY", "XLP"
             "GLD", "TLT", "EEM", "EFA"]
 COST = 0.0002
 NOTIONAL, ACCOUNT, MAX_OPEN = 5_000.0, 25_000.0, 5
-TEST_DAYS, MIN_TRADES = 63, 30
-OUT = o.ROOT / "docs/backtests/options-v2"
+TEST_DAYS, MIN_TRADES = int(__import__("os").environ.get("TEST_DAYS", 63)), 30
+OUT = o.ROOT / ("docs/backtests/options-v2" + __import__("os").environ.get("OUT_SUFFIX", ""))
 
 
 def daily():

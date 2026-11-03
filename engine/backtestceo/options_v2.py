@@ -17,8 +17,8 @@ from datetime import date
 
 from . import options60 as o, options_fix as f
 
-TEST_DAYS = 63
-OUT = o.ROOT / "docs/backtests/options-v2"
+TEST_DAYS = int(__import__("os").environ.get("TEST_DAYS", 63))
+OUT = o.ROOT / ("docs/backtests/options-v2" + __import__("os").environ.get("OUT_SUFFIX", ""))
 MIN_TRADES = 30
 ACCOUNT = 25_000.0
 RISK_PER_TRADE = 0.02          # max loss of one structure <= 2% of account
@@ -201,7 +201,7 @@ def report(rows, top, port, picks, ncfg, nprof, train, test):
     OUT.mkdir(parents=True, exist_ok=True)
     rows.sort(key=lambda r: (not r["ok"], -r["pess"].get("sharpe", -9)))
     c = lambda m, k, fmt_="{:.2f}": fmt_.format(m.get(k, 0)) if m.get("trades") else "-"
-    L = ["# Options v2: 3-month out-of-sample, pessimistic selection, risk-sized", "",
+    L = ["# Options v2: out-of-sample, pessimistic selection, risk-sized", "",
          f"Train {train[0]}..{train[-1]} ({len(train)} sessions); test {test[0]}..{test[-1]} ({len(test)} sessions, "
          f"~3 months, untouched while tuning). SPY + QQQ 0DTE. {ncfg:,} configs; {nprof:,} profitable on train under "
          "pessimistic execution (all legs print in the entry bar, 2x half-spread). Best per family by train Sharpe.", "",
