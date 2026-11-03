@@ -2,29 +2,66 @@
 
 Rests post-only **bids on the favorite side** (80–95¢) of liquid Kalshi markets and holds to settlement.
 That captures the documented favorite-longshot bias as a **maker** (lower or zero fee, earns the spread)
-instead of a taker. **This code places no real orders**: the client implements only GET requests, and paper mode
+instead of a taker. It also has a copy-trading mode (below). **This code places no real orders**: the client implements only GET requests, and paper mode
 simulates fills against Kalshi's public trade tape.
 
-## Can you copy top Kalshi traders? No, not reliably.
+## Copy trading (paper): `kalshibot copy`
 
-- **The public trade tape is anonymous.** `GET /markets/trades` returns price, size, taker side and time.
-  It has no user, account or handle field, so you can't attribute any print to a trader.
-- **There's no official API for other users' positions.** Your own fills and positions (`/portfolio/*`) need your key.
-  Nothing in the documented API returns another account's positions.
-- **Profiles and the leaderboard are opt-in website features.** Third-party scrapers read them by nickname.
-  That's undocumented, fragile and probably against the ToS, and you only see traders who chose to be visible.
-- **The edge doesn't transfer.** Top P&L accounts are largely makers and fast or informed traders.
-  If you copy them, you are a delayed taker paying the spread plus the 7% × P × (1−P) taker fee on stale prices.
-  Bürgi, Deng & Whelan find takers lose about 32% on average and makers about 10%.
+Kalshi has a leaderboard and public, opt-in trader profiles, and you can follow traders and get notified
+when they trade. The API itself gives no way to see who traded: `GET /markets/trades` has no user field,
+and there is no documented endpoint for other users' positions. So the copy bot takes its signals from
+outside the API, through any of these routes:
 
-So the alternative is to do what the profitable side does structurally: **be a maker and lean against the
-longshot bias.**
+| Route | How |
+|---|---|
+| HTTP | `POST http://host:8787/signal`, header `X-Token`, body JSON or the notification text |
+| Inbox file | append one signal per line to `data/signals.jsonl` (for an email or notification forwarder) |
+| One-off | `kalshibot copy signal 'alice bought 120 Yes on Will the Fed cut rates in December? at 62¢'` |
+
+JSON signal: `{"trader","ticker" or "market","side","action":"buy|sell","price","contracts","ts"}`.
+A market title (from a notification) is fuzzy-matched to an open ticker.
+
+Guards on each copy:
+- The trader must be in your allowlist (`traders`, with a size multiplier).
+- The signal must be no older than 5 minutes.
+- Our ask must be within 3¢ of the leader's price.
+- The price must be between 10¢ and 95¢. Longshots are skipped because of the bias below.
+- Caps of $10 per trade, $30 per market, $150 per trader and $300 total, and the fill is limited to the
+  size offered at the best ask.
+- When the leader sells, we close at the best bid. Otherwise positions settle on the result.
+
+Fills are taker fills with the 7% fee. Every copy logs the leader's price, our fill, the slippage and the delay
+to `data/copy_journal.jsonl`. **That log is what tells you whether copying works.**
+
+```bash
+cp copy_config.example.json copy_config.json   # put leaderboard nicknames in "traders"
+```
+
+```bash
+COPY_TOKEN=change-me .venv/bin/python -m kalshibot copy serve --host 0.0.0.0
+```
+
+```bash
+.venv/bin/python -m kalshibot copy status
+```
+
+Why copies can underperform the leader:
+- Many top-P&L accounts are makers. Their fills come from resting orders, while you arrive late as a taker
+  and pay the spread plus the fee.
+- Bürgi, Deng & Whelan find takers lose about 32% on average and makers about 10%.
+- Leaderboard rank is in-sample: past P&L, survivorship and size you can't match.
+
+Paper-copy for a few weeks, then keep only the traders whose *copied* P&L (not their own P&L) is positive.
+
+**FOMO:** it's a social crypto trading app with feeds of followed traders, leaderboards and copy signals.
+As of this writing I found no Kalshi or prediction-market integration. If you mean another FOMO product,
+it can feed the same `/signal` endpoint.
 
 ## Strategy research summary
 
 | Approach | Edge source | Feasible for a retail API bot? |
 |---|---|---|
-| Copy top traders | their information | No (see above) |
+| Copy leaderboard traders (`copy`) | their information/skill | Yes via notifications/profiles; edge decays with delay and taker fees, so measure it |
 | **Favorite-side maker (this bot)** | longshot bias + spread + maker fee advantage | **Yes**: slow, rules-based, low infra |
 | Pure two-sided market making | spread capture | Partly: adverse selection on news; needs WebSocket, inventory control; Kalshi MM program terms are negotiated |
 | News speed | react before the book | Hard: competing with low-latency bots on scheduled data (CPI, jobs, weather station feeds); co-location matters |

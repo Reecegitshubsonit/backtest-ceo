@@ -34,6 +34,16 @@ def main(argv=None) -> None:
     c.add_argument("--min-volume", type=float, default=500)
     c.add_argument("--max-markets", type=int, default=1500)
     c.add_argument("--out", default=str(DATA / "calibration.json"))
+    cp = sub.add_parser("copy", help="paper copy-trading of followed traders")
+    cp.add_argument("mode", choices=["serve", "inbox", "signal", "settle", "status"])
+    cp.add_argument("text", nargs="?", help="for mode=signal: one JSON or notification text")
+    cp.add_argument("--copy-config", default="copy_config.json")
+    cp.add_argument("--host", default="127.0.0.1")
+    cp.add_argument("--port", type=int, default=8787)
+    cp.add_argument("--token", default=None, help="require X-Token header (default: $COPY_TOKEN)")
+    cp.add_argument("--inbox", default=str(DATA / "signals.jsonl"))
+    cp.add_argument("--state", default=str(DATA / "copy_state.json"))
+    cp.add_argument("--journal", default=str(DATA / "copy_journal.jsonl"))
     sub.add_parser("account", help="authenticated read-only: balance and positions (checks your keys)")
     a = ap.parse_args(argv)
 
@@ -78,6 +88,27 @@ def main(argv=None) -> None:
             print(f"{b['bin']:10} {b['n']:5d} {b['mean_longshot_price']:6.3f} {b['longshot_win_rate']:6.3f} "
                   f"{b['ratio'] or 0:6.2f} {b['fav_edge_maker']:+7.4f} {b['fav_edge_taker']:+7.4f}")
         print(f"wrote {a.out}; set \"calibration_path\" in config.json to use it")
+    elif a.cmd == "copy":
+        import os
+
+        from . import copy as cpy
+        from .runner import summary
+
+        ccfg = cpy.CopyConfig.load(a.copy_config)
+        eng = cpy.CopyEngine(client, ccfg, Path(a.state), Path(a.journal))
+        if a.mode == "serve":
+            cpy.serve(eng, a.host, a.port, a.token or os.environ.get("COPY_TOKEN"))
+        elif a.mode == "inbox":
+            cpy.tail_inbox(eng, Path(a.inbox))
+        elif a.mode == "signal":
+            print(json.dumps(eng.handle(cpy.parse_signal(a.text)), indent=1))
+        elif a.mode == "settle":
+            eng.settle_all()
+            print(summary(eng.state))
+        else:
+            print(summary(eng.state))
+            for pos in eng.state.positions.values():
+                print(f"  POS {pos.ticker} {pos.side} x{pos.contracts} cost ${pos.cost:.2f} via {eng.owner.get(pos.ticker, '?')}")
     elif a.cmd == "account":
         print(json.dumps({"balance": client.balance(), "positions": client.positions()}, indent=1))
 
