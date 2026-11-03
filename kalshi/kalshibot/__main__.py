@@ -35,7 +35,7 @@ def main(argv=None) -> None:
     c.add_argument("--max-markets", type=int, default=1500)
     c.add_argument("--out", default=str(DATA / "calibration.json"))
     cp = sub.add_parser("copy", help="paper copy-trading of followed traders")
-    cp.add_argument("mode", choices=["serve", "inbox", "signal", "settle", "status"])
+    cp.add_argument("mode", choices=["stream", "serve", "inbox", "signal", "settle", "status"])
     cp.add_argument("text", nargs="?", help="for mode=signal: one JSON or notification text")
     cp.add_argument("--copy-config", default="copy_config.json")
     cp.add_argument("--host", default="127.0.0.1")
@@ -102,7 +102,11 @@ def main(argv=None) -> None:
 
         ccfg = cpy.CopyConfig.load(a.copy_config)
         eng = cpy.CopyEngine(client, ccfg, Path(a.state), Path(a.journal))
-        if a.mode == "serve":
+        if a.mode == "stream":
+            from . import rivo_stream
+
+            rivo_stream.run(eng, Path(a.state).with_name("rivo_stream.json"))
+        elif a.mode == "serve":
             cpy.serve(eng, a.host, a.port, a.token or os.environ.get("COPY_TOKEN"))
         elif a.mode == "inbox":
             cpy.tail_inbox(eng, Path(a.inbox))

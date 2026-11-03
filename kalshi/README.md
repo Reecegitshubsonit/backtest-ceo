@@ -14,6 +14,7 @@ outside the API, through any of these routes:
 
 | Route | How |
 |---|---|
+| **Rivo stream (recommended)** | `kalshibot copy stream`: Rivo pushes each trade by your traders over server-sent events the moment Rivo records it. No phone, no polling. Needs a Rivo plan ($15/mo) and `RIVO_API_KEY` |
 | HTTP | `POST http://host:8787/signal`, header `X-Token`, body JSON or the notification text |
 | Inbox file | append one signal per line to `data/signals.jsonl` (for an email or notification forwarder) |
 | One-off | `kalshibot copy signal 'alice bought 120 Yes on Will the Fed cut rates in December? at 62¢'` |
@@ -32,6 +33,21 @@ Guards on each copy:
 
 Fills are taker fills with the 7% fee. Every copy logs the leader's price, our fill, the slippage and the delay
 to `data/copy_journal.jsonl`. **That log is what tells you whether copying works.**
+
+Kalshi doesn't offer a feed of other people's trades, and its notifications only reach the phone app.
+Rivo watches Kalshi's public profiles and re-publishes each trade on `GET api.rivo.markets/v2/stream`, filtered
+to up to 50 `trader=kalshi:<name>` refs. Each event carries the Kalshi ticker, side, buy/sell, open/add/trim/close,
+price and contracts. Connections last 15 minutes. The bot reconnects with `Last-Event-ID`, and Rivo replays what
+was missed. Trims are ignored, closes sell our copy, and flips close then reopen. Latency is Rivo's ingestion
+delay, not ours. Compare a few copies against the trader's Rivo page to measure it.
+
+```bash
+export RIVO_API_KEY=rivo_live_...   # rivo.markets > Settings > API keys, read scope
+```
+
+```bash
+.venv/bin/python -m kalshibot copy stream
+```
 
 ```bash
 cp copy_config.example.json copy_config.json   # put leaderboard nicknames in "traders"
