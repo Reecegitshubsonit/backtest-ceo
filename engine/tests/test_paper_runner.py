@@ -103,7 +103,7 @@ FIRST5M_QQQ = C.StrategyConfig("first5m_qqq", "first5m_qqq", "first5m", "webull"
 
 def _only(cfg, *keys, **kw):
     pool = cfg.strategies + ((FIRST5M_QQQ,) if "first5m_qqq" in keys else ())
-    return replace(cfg, strategies=tuple(s for s in pool if s.key in keys), **kw)
+    return replace(cfg, strategies=tuple(replace(s, enabled=True) for s in pool if s.key in keys), **kw)
 
 
 @pytest.fixture(scope="module")
@@ -180,8 +180,8 @@ def test_pipeline_emits_every_agent_and_ceo_decision(series):
 def test_publish_one_screen_per_default_paper_leg_and_no_backtest_only(series):
     r, feed, _ = _sim(series, datetime(2026, 9, 1, 13, tzinfo=timezone.utc), 1, step_min=5)
     names = {e["strategy"]: e["name"] for e in feed.kinds("strategy_result")}
-    assert set(names) == {s.key for s in C.RunnerConfig().strategies}
-    assert len(names) == 13 and "first5m_qqq" not in names
+    assert set(names) == {s.key for s in C.RunnerConfig().strategies if s.enabled}
+    assert len(names) == 12 and "first5m_qqq" not in names and "ema9_21_btc1h" not in names  # EMA 9/21 disabled 2026-11-03
     assert not any("AEX" in n or "EMA150" in n for n in names.values())
     assert names["sip_pltr"] == "Stocks-in-Play ORB · PLTR" and names["supertrend_eth4h"] == "Adaptive SuperTrend · ETH/USD 4h"
 

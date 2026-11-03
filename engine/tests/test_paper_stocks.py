@@ -38,6 +38,8 @@ def test_default_paper_set():
     assert {s.symbol for s in cfg.strategies if s.rule == "overnight"} == {"NVDA", "MSTR", "LLY"}
     assert all(s.broker == "webull" for s in cfg.strategies if s.rule in ("sip", "rsi2", "overnight"))
     assert {s.key for s in cfg.strategies if s.broker == "alpaca"} == {"supertrend_eth4h", "supertrend_btc4h", "ai_ema_adx_eth4h", "ai_ema_adx_btc4h", "ema9_21_btc1h"}
+    # EMA 9/21 BTC 1h is kept for tests but switched off (lost on 60 days of 1h bars, 2026-11-03)
+    assert {s.key for s in cfg.strategies if s.broker == "alpaca" and s.enabled} == {"supertrend_eth4h", "supertrend_btc4h", "ai_ema_adx_eth4h", "ai_ema_adx_btc4h"}
     # per-strategy caps unchanged; the overall daily cap still covers one entry per strategy per day
     assert (cfg.caps.max_open_positions, cfg.caps.max_notional_usd, cfg.caps.max_entries_per_day, cfg.caps.max_entries_per_day_total) == (1, 2000.0, 4, 16)
     assert len(cfg.strategies) <= cfg.caps.max_entries_per_day_total

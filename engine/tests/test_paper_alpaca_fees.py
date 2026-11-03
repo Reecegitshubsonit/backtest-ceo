@@ -100,7 +100,7 @@ def test_runner_records_post_fee_qty_and_exits_succeed():
     start = datetime(2026, 9, 1, tzinfo=timezone.utc)
     data.now = start
     alp = FakeBroker("alpaca", data.last_price, crypto_fee=0.0025)
-    cfg = replace(C.RunnerConfig(), strategies=tuple(s for s in C.RunnerConfig().strategies if s.key == "ema9_21_btc1h"))
+    cfg = replace(C.RunnerConfig(), strategies=tuple(replace(s, enabled=True) for s in C.RunnerConfig().strategies if s.key == "ema9_21_btc1h"))
     feed = MemoryFeed()
     r = Runner(cfg, data, {"alpaca": alp}, feed, lambda: False, mode="dry-run", log=lambda *_: None)
     n = {"i": 0}
@@ -127,7 +127,7 @@ def test_runner_exit_is_capped_at_broker_position():
     """Shared BTC position smaller than the runner's book (e.g. fees or a manual sale): sell what is there."""
     b = FakeBroker("alpaca", lambda s: 80000.0, crypto_fee=0.0)
     b.submit("BTC/USD", "buy", qty=0.001)
-    cfg = replace(C.RunnerConfig(), strategies=tuple(s for s in C.RunnerConfig().strategies if s.key == "ema9_21_btc1h"))
+    cfg = replace(C.RunnerConfig(), strategies=tuple(replace(s, enabled=True) for s in C.RunnerConfig().strategies if s.key == "ema9_21_btc1h"))
     r = Runner(cfg, ReplayData({}), {"alpaca": b}, MemoryFeed(), lambda: False, mode="dry-run", log=lambda *_: None)
     s = cfg.strategies[0]
     r.st[s.key]["pos"] = dict(side="long", dir=1, qty=0.0011, entry=80000.0, opened_at="x", entry_bar_ts="x", stop=None)

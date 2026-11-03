@@ -11,7 +11,7 @@ in `engine/tests/test_paper_parity.py`); reference stats are `reference_results.
 | first5m_qqq | First 5-min RTH candle, QQQ | none | removed from the paper set 2026-10-28 (failed out of sample on Alpaca data); backtest-only |
 | supertrend_eth4h / _btc4h | Adaptive SuperTrend Confluence 4h | Alpaca paper | long side only (Alpaca crypto cannot short) |
 | ai_ema_adx_eth4h / _btc4h | EMA200 + ADX25 4h | Alpaca paper | long side only |
-| ema9_21_btc1h | EMA 9/21 cross, 2% stop, 1h | Alpaca paper | long only (as tested) |
+| ema9_21_btc1h | EMA 9/21 cross, 2% stop, 1h | none (disabled) | switched off 2026-11-03: negative on BTC/ETH/SOL over 60 days of 1h bars, even gross of fees (`docs/crypto-edge-round2.md`) |
 | first5m_nq, aex_first_hour, *_tuned | | none | backtest-only, listed on the wall, never traded |
 
 Run (from `engine/`):

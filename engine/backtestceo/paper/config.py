@@ -33,7 +33,9 @@ class RunnerConfig:
         StrategyConfig("supertrend_btc4h", "supertrend_btc4h", "supertrend", "alpaca", "BTC/USD", 4),
         StrategyConfig("ai_ema_adx_eth4h", "ai_ema_adx_eth4h", "alphainsider", "alpaca", "ETH/USD", 4),
         StrategyConfig("ai_ema_adx_btc4h", "ai_ema_adx_btc4h", "alphainsider", "alpaca", "BTC/USD", 4),
-        StrategyConfig("ema9_21_btc1h", "ema9_21_btc1h", "emacross", "alpaca", "BTC/USD", 1),
+        # disabled 2026-11-03: lost on BTC, ETH and SOL over 60 days of 1h bars, even before fees
+        # (docs/crypto-edge-round2.md); rule kept for the backtests and tests
+        StrategyConfig("ema9_21_btc1h", "ema9_21_btc1h", "emacross", "alpaca", "BTC/USD", 1, enabled=False),
         # US stocks on the Webull sandbox (rules from /workspace/backtests/backtest_alpaca.py; picks held up 2024+ out of sample)
         StrategyConfig("sip_pltr", "alpaca_sip_PLTR", "sip", "webull", "PLTR"),
         StrategyConfig("sip_tsla", "alpaca_sip_TSLA", "sip", "webull", "TSLA"),
