@@ -47,10 +47,10 @@ def get(url, params):
     raise RuntimeError("rate limited")
 
 
-def bars(kind, syms, start, end, tf="5Min"):
+def bars(kind, syms, start, end, tf="5Min", adjustment="raw"):
     url = f"{DATA}/v2/stocks/bars" if kind == "stocks" else f"{DATA}/v1beta1/options/bars"
     p = dict(symbols=",".join(syms), timeframe=tf, start=start, end=end, limit=10000)
-    if kind == "stocks": p.update(feed="sip", adjustment="raw")
+    if kind == "stocks": p.update(feed="sip", adjustment=adjustment)
     out, tok = defaultdict(list), None
     while True:
         body = get(url, {**p, **({"page_token": tok} if tok else {})})
