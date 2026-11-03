@@ -38,6 +38,12 @@ isolated CEO review. Model sources and reproduction: [3D room](docs/reference-ro
 - `web3d/src/model`: pure logic with unit tests. `model/indicators.ts` is the (empty) indicator registry.
 - Specs and plans: `docs/superpowers/`.
 
+## Small-cap momentum (Cameron-style)
+
+Gap / relative-volume / news scanner, bull flag / micro pullback / first pullback entries on 1-minute bars, 60-day
+backtest and an Alpaca paper trading loop: [engine/backtestceo/momentum/README.md](engine/backtestceo/momentum/README.md).
+Backtest outputs in `docs/momentum-backtest/`. Result: no edge on 1-minute bars (PF 0.69 over 60 sessions).
+
 ## Options execution research
 
 The three-month VWAP/EMA study has a separate quote-based options replay:

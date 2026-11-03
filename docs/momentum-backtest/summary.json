@@ -1,0 +1,147 @@
+{
+  "stats": {
+    "sessions": 60,
+    "first": "2026-08-11",
+    "last": "2026-11-03",
+    "trades": 124,
+    "days_traded": 46,
+    "green_days": 16,
+    "net_pnl": -1945.13,
+    "net_pnl_pct_equity": -7.78,
+    "win_rate": 0.282,
+    "avg_win": 121.54,
+    "avg_loss": -69.65,
+    "profit_factor": 0.69,
+    "avg_r": -0.186,
+    "expectancy_usd": -15.69,
+    "max_drawdown_usd": -1988.15,
+    "by_pattern": {
+      "bull_flag": {
+        "trades": 43,
+        "pnl": -1171.56,
+        "win_rate": 0.233,
+        "avg_r": -0.36
+      },
+      "first_pullback": {
+        "trades": 57,
+        "pnl": -541.09,
+        "win_rate": 0.298,
+        "avg_r": -0.11
+      },
+      "micro_pullback": {
+        "trades": 24,
+        "pnl": -232.48,
+        "win_rate": 0.333,
+        "avg_r": -0.06
+      }
+    },
+    "by_time": {
+      "09:30-10:00": {
+        "trades": 75,
+        "pnl": -1388.78,
+        "win_rate": 0.253,
+        "avg_r": -0.26
+      },
+      "10:00-10:30": {
+        "trades": 31,
+        "pnl": 34.49,
+        "win_rate": 0.387,
+        "avg_r": 0.11
+      },
+      "10:30-11:00": {
+        "trades": 18,
+        "pnl": -590.84,
+        "win_rate": 0.222,
+        "avg_r": -0.4
+      }
+    },
+    "by_exit": {
+      "bailout": {
+        "trades": 35,
+        "pnl": -1460.88,
+        "win_rate": 0.0,
+        "avg_r": -0.48
+      },
+      "stop": {
+        "trades": 54,
+        "pnl": -4738.24,
+        "win_rate": 0.0,
+        "avg_r": -1.15
+      },
+      "topping_tail": {
+        "trades": 15,
+        "pnl": 1794.79,
+        "win_rate": 1.0,
+        "avg_r": 1.36
+      },
+      "trail_stop": {
+        "trades": 20,
+        "pnl": 2459.2,
+        "win_rate": 1.0,
+        "avg_r": 1.77
+      }
+    }
+  },
+  "halts": {
+    "2026-08-11": "consecutive_losses",
+    "2026-08-13": "consecutive_losses",
+    "2026-08-14": "consecutive_losses",
+    "2026-09-02": "consecutive_losses",
+    "2026-09-21": "consecutive_losses",
+    "2026-09-22": "consecutive_losses",
+    "2026-10-01": "consecutive_losses",
+    "2026-10-12": "consecutive_losses",
+    "2026-10-20": "consecutive_losses",
+    "2026-10-27": "consecutive_losses",
+    "2026-10-29": "consecutive_losses",
+    "2026-11-03": "consecutive_losses"
+  },
+  "config": {
+    "min_price": 2.0,
+    "max_price": 20.0,
+    "min_gap_pct": 10.0,
+    "min_rvol": 5.0,
+    "require_news": true,
+    "catalyst_max_symbols": 2,
+    "adv_days": 20,
+    "min_history_days": 5,
+    "scan_from": "07:00",
+    "entry_from": "09:30",
+    "entry_until": "11:00",
+    "flatten_at": "11:30",
+    "patterns": [
+      "micro_pullback",
+      "bull_flag",
+      "first_pullback"
+    ],
+    "leg_lookback": 15,
+    "max_pullback_bars": 5,
+    "min_leg_pct": 4.0,
+    "max_retrace": 0.5,
+    "require_hod": true,
+    "require_macd_positive": true,
+    "require_above_vwap": true,
+    "require_light_pullback_volume": true,
+    "max_stop_pct": 5.0,
+    "min_stop_cents": 3.0,
+    "entry_limit_pct": 0.5,
+    "target_r": 2.0,
+    "partial_frac": 0.5,
+    "trail_prior_low": true,
+    "exit_topping_tail": true,
+    "topping_tail_wick": 0.6,
+    "exit_macd_cross": true,
+    "bailout_bars": 5,
+    "equity": 25000.0,
+    "risk_per_trade": 100.0,
+    "max_position_dollars": 25000.0,
+    "liquidity_frac": 0.1,
+    "daily_max_loss": 300.0,
+    "max_consecutive_losses": 3,
+    "cold_size_mult": 0.5,
+    "max_trades_per_day": 10,
+    "max_entries_per_symbol": 2,
+    "max_positions": 1,
+    "slippage_pct": 0.2
+  }
+}

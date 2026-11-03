@@ -1,0 +1,9 @@
+IS       30 OOS      160  n=20/19  {'min_gap_pct': 20, 'min_rvol': 5, 'patterns': ('first_pullback',), 'bailout_bars': 5, 'entry_until': '11:00'}
+IS       29 OOS     -386  n=17/17  {'min_gap_pct': 20, 'min_rvol': 10, 'patterns': ('first_pullback',), 'bailout_bars': 5, 'entry_until': '11:00'}
+IS      -21 OOS     -300  n=18/15  {'min_gap_pct': 20, 'min_rvol': 5, 'patterns': ('first_pullback',), 'bailout_bars': 5, 'entry_until': '10:30'}
+IS      -22 OOS     -523  n=15/13  {'min_gap_pct': 20, 'min_rvol': 10, 'patterns': ('first_pullback',), 'bailout_bars': 5, 'entry_until': '10:30'}
+IS      -99 OOS     -277  n=38/37  {'min_gap_pct': 20, 'min_rvol': 10, 'patterns': ('micro_pullback', 'bull_flag', 'first_pullback'), 'bailout_bars': 0, 'entry_until': '11:00'}
+IS     -143 OOS     -421  n=17/16  {'min_gap_pct': 20, 'min_rvol': 10, 'patterns': ('first_pullback',), 'bailout_bars': 0, 'entry_until': '11:00'}
+IS     -158 OOS     -305  n=37/35  {'min_gap_pct': 20, 'min_rvol': 5, 'patterns': ('micro_pullback', 'bull_flag', 'first_pullback'), 'bailout_bars': 0, 'entry_until': '10:30'}
+IS     -231 OOS     -340  n=41/38  {'min_gap_pct': 20, 'min_rvol': 5, 'patterns': ('micro_pullback', 'bull_flag', 'first_pullback'), 'bailout_bars': 5, 'entry_until': '10:30'}
+best-IS OOS: 159.76  mean OOS of all: -228.635  OOS>0 count: 8 / 32
