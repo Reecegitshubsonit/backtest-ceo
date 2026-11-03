@@ -191,3 +191,64 @@ search. Options that could produce a real answer:
 2. **Forward paper trading** of a small fixed set (e.g. I1b, I2b, N1) with rules frozen now. Live out-of-sample data
    cannot be overfit.
 3. Accept a risk-shape goal instead of beating SPY: N1 vol targeting kept SPY-like return with max DD -19% vs -34% over 2017–2026.
+
+## Round 5: diagnostics, drawdown goal, frozen forward test
+
+### Where they lose money, and whether they make it where they should (`diagnostics.py` → `diagnostics.md`)
+**N1 vol target.** Thesis: win in slow selloffs, lose in V-shapes.
+- Confirmed, but 4 of the 5 SPY drawdowns since 2017 were V-shaped. It gave up 5–28 pts of each recovery
+  (2020: +19% vs SPY +51%; 2025: +12% vs +24%). It was net ahead only in the slow 2022 bear (+0.9 pts).
+- **Lost where it should protect:** Feb 2018 it fell -14.5% vs SPY -10%. It was at max leverage after record-calm
+  January vol, then vol exploded. Calm → full leverage → shock is the structural weak spot.
+- **The premise fails at the extremes:** on its 2x days (31% of the time) SPY's return per unit of risk was 0.59,
+  vs 1.77 on 1.1–1.5x days. Maximum leverage bought little, at SSO's 0.89% fee. On its lowest-exposure days SPY returned
+  +26% annualized, the rebounds it was out of. 6 of 7 cuts below 0.6x were followed by SPY rising; only March 2020 paid.
+
+**1. SPY 200d SMA.** Thesis: win in slow bears, lose in V-shapes and chop.
+- 20 of 25 out-of-market spells cost money: +41% of SPY gains missed vs 7.7% of losses avoided.
+- SPY returned +24% annualized on out-days vs +14% on in-days, because exits cluster just before rebounds.
+- **Lost even in the slow 2022 bear (-3.8 pts)** by re-entering late after the October 2022 low (+7.6% of a +34% recovery).
+
+**I1b noise boundary.** Thesis: profit on trend days, small losses on quiet days.
+- **Works as designed:** top-quintile |open→close| days made +288% (2016–23) and +87% (2024+), at +75–100 bp per trade.
+  Quiet days and trades against the day's direction lose.
+- **Why 2024+ went flat:** fewer trend days among trades (14% vs 22%), and quiet-day losses grew (Q1 -43 → -52 bp).
+  Entries after noon turned negative (13:00 -10 bp, 15:00 -11 bp). Not a bug; the market had fewer trend days.
+
+**I2b ORB QQQ.** Same structure: profit lives in trend days, and 75% of trades stop out.
+- **Loses where it should make money:** in 2024+ longs lost -5.6% while QQQ rose strongly, while shorts made +21.8%.
+  Up-opening candles got faded more often in this bull market. The 10R target is hit by under 3% of trades;
+  the wins are close exits.
+
+Hypotheses these suggest (NOT tested: testing them on this data is the overfitting loop):
+- H1: cap N1 at 1.5x, or re-lever more slowly.
+- H2: skip I1/ORB entries when the trailing 14-day average range is in its bottom tercile (a quiet regime).
+- H3: no I1 entries after 12:30.
+- H4: ORB short-only, or ORB filtered by the overnight gap direction.
+
+H1 can be tested over 90 years once the long-history hosts are allowed. H2–H4 need intraday history, so only a new
+forward freeze can judge them.
+
+### Option 3: return for the same max drawdown (`drawdown_goal.py` → `drawdown_goal.md`)
+Benchmark: SPY scaled down to the strategy's own max drawdown, rest in T-bills. Pass rule (set before running): beat it on
+CAGR in both halves. Sanity check: a static 60/40 SPY/T-bill mix lands on Δ ≈ 0, as it should.
+
+| Strategy | ΔCAGR vs DD-matched SPY 2017–21 | 2022–26 | Full (95% CI) | Pass |
+|---|---:|---:|---:|---|
+| N1 vol target | +9.0 | -0.4 | +5.1 [-1.1, +12.0] | no |
+| N5 trend × vol target | +3.4 | -0.2 | +1.5 [-5.4, +8.6] | no |
+| 1. SPY 200d SMA | +2.3 | -0.8 | +1.4 [-3.6, +6.5] | no |
+| 2. TSMOM original 10 | +2.2 | +0.8 | +1.8 [-1.0, +4.6] | **yes** (hindsight-picked list) |
+| 2r. TSMOM GTAA-5 | +1.7 | -1.1 | +0.4 [-2.3, +3.2] | no |
+
+Only the hindsight-picked TSMOM list passes. Its rule-chosen twin (GTAA-5) does not, and every CI includes 0.
+The best drawdown result, N1's +5 pts/yr at -19% max DD, comes entirely from 2017–21 (mostly March 2020).
+
+### Option 2: frozen forward test (`frozen_2026_11_03/`, `forward_test.py`)
+- Exact copies of `backtest.py`, `new_strategies.py` and `intraday.py`, with SHA-256 hashes in `MANIFEST.json`, frozen
+  after the 2026-11-03 close. `forward_test.py` refuses to run if any byte changed, and scores only sessions after the freeze.
+- Strategies: N1, T2, T2r, I1b, I2b vs SPY.
+- Simulated fills with the frozen cost model, not broker paper orders. Wiring them into `engine/backtestceo/paper` is a separate job.
+- Kill rule: drop a strategy if its forward max DD exceeds 1.5× its backtest max DD.
+- Checkpoints at 63, 126 and 252 sessions. A strategy can graduate only after 252 sessions. One year can reject a broken
+  strategy, not prove a good one.

@@ -1,0 +1,27 @@
+{
+  "freeze_date": "2026-11-03",
+  "note": "Rules frozen after the last session used in research (2026-11-03 close). Only sessions AFTER this date count as forward evidence. Do not edit these files; change = new freeze folder with a new date.",
+  "source_commit_parent": "983786db76239a015669827177a5551db723d128",
+  "files": {
+    "backtest.py": "e450fc6be28e3b4894a9e65563eebd59fcc20b57c6307fdc44428a0950793956",
+    "intraday.py": "11aae82ca5542a2b62b73a5e51c481e5fca5e2d97a7d56d25762befe94a4ab9c",
+    "new_strategies.py": "d08a99a935659307442662ee4fa66605f50b459fb9d110d976327cf56e3a42d7"
+  },
+  "strategies": {
+    "SPY": "buy and hold (benchmark)",
+    "N1": "new_strategies.s_voltarget: S&P exposure 15%/21d realized vol, cap 2x via SSO, 10-pt band, next-open fills, 3 bp/side",
+    "T2": "backtest.make_tsmom(TREND_SET): 10-ETF 12-1m + 200d SMA, monthly, 3 bp/side (hindsight-picked list, kept to see if it holds)",
+    "T2r": "backtest.make_tsmom(GTAA5): Faber 5, same rules",
+    "I1b": "intraday.i1(levered=True): SPY noise boundary, 2% daily-vol sizing <=4x, 0.5 bp/side",
+    "I2b": "intraday.i2(levered=True): QQQ 5-min ORB, 1% risk <=4x, 0.5 bp/side"
+  },
+  "review_rules": {
+    "checkpoints_sessions": [
+      63,
+      126,
+      252
+    ],
+    "kill": "drop a strategy if forward max DD exceeds 1.5x its 2017-2026 backtest max DD (N1 -19.4%, T2 -8.4%, T2r -8.0%, I1b -31.2%, I2b -30.0%)",
+    "graduate": "only after 252 forward sessions: forward Sharpe (xs T-bill) above SPY's AND forward avg trade / return consistent with backtest sign. One year cannot prove an edge; it can reject a broken one."
+  }
+}

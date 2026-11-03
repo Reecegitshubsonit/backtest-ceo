@@ -79,11 +79,13 @@ def i1(days, levered):
             if new != pos:
                 px = o[k + 1]
                 if pos != 0:
-                    r = lev * pos * (px / entry - 1) - 2 * COST * lev; day += r; trades.append((dt, r))
-                if new != 0: entry = px
+                    r = lev * pos * (px / entry - 1) - 2 * COST * lev; day += r
+                    trades.append((dt, r, {"side": pos, "entry_k": ek, "exit": "stop", "lev": lev}))
+                if new != 0: entry, ek = px, k + 1
                 pos = new
         if pos != 0:
-            r = lev * pos * (c[-1] / entry - 1) - 2 * COST * lev; day += r; trades.append((dt, r))
+            r = lev * pos * (c[-1] / entry - 1) - 2 * COST * lev; day += r
+            trades.append((dt, r, {"side": pos, "entry_k": ek, "exit": "close", "lev": lev}))
         pnl[dt] = day
     return pd.Series(pnl), trades
 
@@ -101,16 +103,16 @@ def i2(days, levered):
             if R > 0:
                 target = entry + side * 10 * R
                 lev = min(MAX_LEV, 0.01 / (R / entry)) if levered else 1.0
-                exit_px = c[-1]
+                exit_px, why = c[-1], "close"
                 for k in range(1, len(g)):
                     if side == 1:
-                        if l[k] <= stop: exit_px = min(o[k], stop); break
-                        if h[k] >= target: exit_px = max(o[k], target); break
+                        if l[k] <= stop: exit_px, why = min(o[k], stop), "stop"; break
+                        if h[k] >= target: exit_px, why = max(o[k], target), "target"; break
                     else:
-                        if h[k] >= stop: exit_px = max(o[k], stop); break
-                        if l[k] <= target: exit_px = min(o[k], target); break
+                        if h[k] >= stop: exit_px, why = max(o[k], stop), "stop"; break
+                        if l[k] <= target: exit_px, why = min(o[k], target), "target"; break
                 day = lev * side * (exit_px / entry - 1) - 2 * COST * lev
-                trades.append((dt, day))
+                trades.append((dt, day, {"side": side, "exit": why, "risk_pct": R / entry, "lev": lev}))
         pnl[dt] = day
     return pd.Series(pnl), trades
 
@@ -126,7 +128,7 @@ def i3(days):
             if r1 != 0:
                 side = np.sign(r1)
                 day = side * (g["c"].iloc[-1] / g["o"].iloc[72] - 1) - 2 * COST   # 15:30 open -> 16:00 close
-                trades.append((dt, day))
+                trades.append((dt, day, {"side": side}))
         pnl[dt] = day
     return pd.Series(pnl), trades
 
@@ -162,7 +164,7 @@ def main():
             tot = p + r_f
             s = bt.stats(tot, r_f)
             d, lo, hi, pv = bt.boot_sharpe_diff(tot, bench, r_f)
-            tw = [r for dd, r in trades if dd >= pd.Timestamp(a) and (b is None or dd <= pd.Timestamp(b))]
+            tw = [r for dd, r, _ in trades if dd >= pd.Timestamp(a) and (b is None or dd <= pd.Timestamp(b))]
             rows.append((name, s, d, lo, hi, pv, tw))
         adj = ns.holm(np.r_[[r[5] for r in rows], np.ones(m - len(rows))])[:len(rows)]
         for (name, s, d, lo, hi, pv, tw), ap in zip(rows, adj):
