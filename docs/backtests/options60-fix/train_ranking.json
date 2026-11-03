@@ -1,0 +1,1202 @@
+[
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.75% OTM, wing 1.0%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 6.827841441823104,
+  "trades": 83,
+  "exp": 8.90470361445784
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter none",
+  "sharpe": 6.489801245009246,
+  "trades": 113,
+  "exp": 9.658641761061945
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter none",
+  "sharpe": 6.05838851979235,
+  "trades": 100,
+  "exp": 12.48940174
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter none",
+  "sharpe": 5.975563687029562,
+  "trades": 121,
+  "exp": 17.008074363636332
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.75% OTM, wing 0.5%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 5.831101513178214,
+  "trades": 85,
+  "exp": 5.603200000000011
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter none",
+  "sharpe": 5.778998731893616,
+  "trades": 121,
+  "exp": 21.678813206611572
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 14:00, stop none, target none, range filter none",
+  "sharpe": 5.310810088929279,
+  "trades": 112,
+  "exp": 26.15123148214293
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 5.225233808220301,
+  "trades": 165,
+  "exp": 11.093093212121284
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 5.169494346072419,
+  "trades": 168,
+  "exp": 15.806078446428511
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 5.137880494861103,
+  "trades": 165,
+  "exp": 10.711192569697005
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 14:00, stop none, target none, range filter none",
+  "sharpe": 5.0824023151697535,
+  "trades": 83,
+  "exp": 17.60771886746989
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.75% OTM, wing 1.0%, enter 11:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 5.07354681257963,
+  "trades": 200,
+  "exp": 4.98637543
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 5.041448693939552,
+  "trades": 132,
+  "exp": 24.44331260606055
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 1.0%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 5.024346611459622,
+  "trades": 160,
+  "exp": 17.386204012499846
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter none",
+  "sharpe": 5.007780646887021,
+  "trades": 148,
+  "exp": 14.464674986486434
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target 50%, range filter none",
+  "sharpe": 4.82424241843416,
+  "trades": 148,
+  "exp": 10.623105391891784
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 0.5%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 4.744735809983109,
+  "trades": 168,
+  "exp": 14.634892732142784
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.75% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter none",
+  "sharpe": 4.696247833990345,
+  "trades": 79,
+  "exp": 3.9785683544303794
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 4.6882324409137635,
+  "trades": 132,
+  "exp": 22.89269821212116
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 4.67057528427997,
+  "trades": 165,
+  "exp": 8.383627757575828
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.75% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter <1.0%",
+  "sharpe": 4.514537692580046,
+  "trades": 135,
+  "exp": 6.5472895259259465
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 4.505885375120453,
+  "trades": 165,
+  "exp": 7.823635715151582
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 4.496197917000724,
+  "trades": 161,
+  "exp": 31.31078980124219
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 4.496197917000724,
+  "trades": 161,
+  "exp": 31.31078980124219
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop none, target 50%, range filter none",
+  "sharpe": 4.472711175385014,
+  "trades": 113,
+  "exp": 5.062346185840708
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop 2x credit, target 50%, range filter <1.0%",
+  "sharpe": 4.472169709444496,
+  "trades": 161,
+  "exp": 31.048599118012422
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 4.472169709444496,
+  "trades": 161,
+  "exp": 31.048599118012422
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter none",
+  "sharpe": 4.469231044087652,
+  "trades": 100,
+  "exp": 7.55061274
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter none",
+  "sharpe": 4.435181272659368,
+  "trades": 100,
+  "exp": 10.142355760000001
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 0.5%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 4.43149442896208,
+  "trades": 184,
+  "exp": 12.36319985869552
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.75% OTM, wing 1.0%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 4.375247947516715,
+  "trades": 110,
+  "exp": 8.170331400000029
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 4.331685515427196,
+  "trades": 153,
+  "exp": 9.068779633986784
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 4.312796940493395,
+  "trades": 161,
+  "exp": 30.229381099378905
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop 1x credit, target 50%, range filter <1.0%",
+  "sharpe": 4.2883828604757666,
+  "trades": 161,
+  "exp": 29.967190416149137
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 4.280771360765022,
+  "trades": 37,
+  "exp": 9.799940540540565
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter none",
+  "sharpe": 4.255778237889021,
+  "trades": 65,
+  "exp": 5.225895384615384
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 4.209228175535416,
+  "trades": 165,
+  "exp": 8.74767211515157
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 4.183118437325999,
+  "trades": 125,
+  "exp": 12.477845471999872
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.75% OTM, wing 0.5%, enter 14:00, stop none, target none, range filter none",
+  "sharpe": 4.181898747877728,
+  "trades": 72,
+  "exp": 6.007220083333333
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter none",
+  "sharpe": 4.168241722853971,
+  "trades": 83,
+  "exp": 9.947291156626507
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 0.5%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 4.164708177067889,
+  "trades": 38,
+  "exp": 7.6429868421052625
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <0.6%",
+  "sharpe": 4.1267644665041425,
+  "trades": 45,
+  "exp": 10.956969022222292
+ },
+ {
+  "config": "bull put spread; short 0.75% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter none",
+  "sharpe": 4.123251142663333,
+  "trades": 356,
+  "exp": 10.730301867977602
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.75% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter none",
+  "sharpe": 4.034075213564731,
+  "trades": 298,
+  "exp": 3.4312861946308417
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 4.010465882822622,
+  "trades": 152,
+  "exp": 10.136782519736835
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 0.5%, enter 14:00, stop none, target none, range filter none",
+  "sharpe": 3.9866625509690414,
+  "trades": 131,
+  "exp": 17.223153061068775
+ },
+ {
+  "config": "daily RSI(2) reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 11:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.9728725746362445,
+  "trades": 133,
+  "exp": 10.738159563909779
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.97134816491312,
+  "trades": 100,
+  "exp": 12.957025009999995
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 0.5%, enter 14:00, stop none, target none, range filter none",
+  "sharpe": 3.971060139355745,
+  "trades": 106,
+  "exp": 10.783580528301835
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.75% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter none",
+  "sharpe": 3.9671745388522734,
+  "trades": 312,
+  "exp": 3.6486954743589446
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.936691633831059,
+  "trades": 102,
+  "exp": 10.270457852941172
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 3.9247131945981697,
+  "trades": 132,
+  "exp": 17.97744972727268
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop 2x credit, target none, range filter <0.6%",
+  "sharpe": 3.90708780766166,
+  "trades": 45,
+  "exp": 8.936433466666736
+ },
+ {
+  "config": "bull put spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.888785250540136,
+  "trades": 131,
+  "exp": 5.021368267175572
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.8833716914865346,
+  "trades": 45,
+  "exp": 10.612862355555697
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter none",
+  "sharpe": 3.859173407739838,
+  "trades": 112,
+  "exp": 14.335954330357206
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.50% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter <0.6%",
+  "sharpe": 3.840014701887579,
+  "trades": 45,
+  "exp": 8.81646000000007
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.75% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter none",
+  "sharpe": 3.824598265944602,
+  "trades": 263,
+  "exp": 3.1704012243345656
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 1.0%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.7929328674290823,
+  "trades": 189,
+  "exp": 24.80053722751307
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.791376284603357,
+  "trades": 54,
+  "exp": 15.429251277777846
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.75% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter <0.6%",
+  "sharpe": 3.7877291977514034,
+  "trades": 36,
+  "exp": 3.9866222222222216
+ },
+ {
+  "config": "bull put spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.78008555946645,
+  "trades": 115,
+  "exp": 4.072676895652173
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.775482375452298,
+  "trades": 45,
+  "exp": 8.913531244444586
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.7398747861040547,
+  "trades": 161,
+  "exp": 7.611930701863335
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 1.0%, enter 14:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 3.7127269500529834,
+  "trades": 160,
+  "exp": 13.56886294374992
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 1.0%, enter 15:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 3.699484014443188,
+  "trades": 132,
+  "exp": 18.5089804848485
+ },
+ {
+  "config": "daily RSI(2) reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 11:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 3.674212278643038,
+  "trades": 133,
+  "exp": 4.714274601503769
+ },
+ {
+  "config": "bear call spread; short 0.50% OTM, wing 1.0%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.649618406763354,
+  "trades": 113,
+  "exp": 8.70776612389382
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 3.646279734776877,
+  "trades": 168,
+  "exp": 10.704443327380897
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.619833160247656,
+  "trades": 157,
+  "exp": 8.998818866241988
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 0.5%, enter 15:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 3.60499932372264,
+  "trades": 168,
+  "exp": 11.451551494047594
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.25% OTM, wing 1.0%, enter 12:30, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 3.603804059933779,
+  "trades": 148,
+  "exp": 17.797488749999946
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.5989221861077922,
+  "trades": 130,
+  "exp": 8.890333038461513
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target 50%, range filter <1.0%",
+  "sharpe": 3.5792638095828915,
+  "trades": 132,
+  "exp": 16.50369821212117
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.552187338528531,
+  "trades": 162,
+  "exp": 19.925071277777686
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.50% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter <1.0%",
+  "sharpe": 3.5093855852009117,
+  "trades": 147,
+  "exp": 11.158550115646293
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 0.5%, enter 15:00, stop 1x credit, target 50%, range filter <1.0%",
+  "sharpe": 3.5032653992907785,
+  "trades": 175,
+  "exp": 19.861683211428446
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.4958580153356813,
+  "trades": 65,
+  "exp": 10.34567798461544
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.75% OTM, wing 1.0%, enter 12:30, stop none, target 50%, range filter none",
+  "sharpe": 3.4946626907570075,
+  "trades": 264,
+  "exp": 3.972668481060599
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 0.5%, enter 15:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 3.491127282047925,
+  "trades": 175,
+  "exp": 19.86309978285698
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.4738546825027155,
+  "trades": 33,
+  "exp": 23.035821242424227
+ },
+ {
+  "config": "bear call spread; short 0.75% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter none",
+  "sharpe": 3.467522298284087,
+  "trades": 116,
+  "exp": 5.194826724137899
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter none",
+  "sharpe": 3.458438887729645,
+  "trades": 142,
+  "exp": 26.877752232394204
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter none",
+  "sharpe": 3.451659301620798,
+  "trades": 142,
+  "exp": 23.719091626760363
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop 1x credit, target none, range filter none",
+  "sharpe": 3.4501223186158767,
+  "trades": 100,
+  "exp": 8.33373076
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 0.5%, enter 15:00, stop 2x credit, target 50%, range filter <1.0%",
+  "sharpe": 3.4498395297455016,
+  "trades": 175,
+  "exp": 19.690852919999845
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.4491408218848734,
+  "trades": 41,
+  "exp": 8.166295268292593
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.439106396746377,
+  "trades": 48,
+  "exp": 13.81049377083339
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 0.5%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 3.43805078531414,
+  "trades": 175,
+  "exp": 19.692269491428377
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 0.5%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 3.43356447778138,
+  "trades": 175,
+  "exp": 19.639782902857004
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.75% OTM, wing 1.0%, enter 11:00, stop none, target 50%, range filter <0.6%",
+  "sharpe": 3.425595188462243,
+  "trades": 83,
+  "exp": 2.29716265060242
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.4218826635321204,
+  "trades": 175,
+  "exp": 19.64119947428554
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.414709718692148,
+  "trades": 37,
+  "exp": 10.507724486486387
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop 2x credit, target none, range filter none",
+  "sharpe": 3.389974763534059,
+  "trades": 113,
+  "exp": 6.351767442477876
+ },
+ {
+  "config": "bear call spread; short 0.75% OTM, wing 1.0%, enter 10:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.3897006457751253,
+  "trades": 217,
+  "exp": 9.058630640553003
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter none",
+  "sharpe": 3.3849141870753434,
+  "trades": 65,
+  "exp": 4.391887692307693
+ },
+ {
+  "config": "bull put spread; short 0.75% OTM, wing 1.0%, enter 12:30, stop none, target 50%, range filter none",
+  "sharpe": 3.3532018355283273,
+  "trades": 356,
+  "exp": 4.648884171348376
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.50% OTM, wing 0.5%, enter 12:30, stop none, target none, range filter <0.6%",
+  "sharpe": 3.317056178990325,
+  "trades": 44,
+  "exp": 6.667004545454618
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 15:00, stop 1x credit, target none, range filter none",
+  "sharpe": 3.309792276984703,
+  "trades": 65,
+  "exp": 4.32720923076923
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.25% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter <1.0%",
+  "sharpe": 3.299346181646359,
+  "trades": 148,
+  "exp": 20.279339527026906
+ },
+ {
+  "config": "daily RSI(2) reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.2973395143727586,
+  "trades": 50,
+  "exp": 9.68416708
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter none",
+  "sharpe": 3.28190229554484,
+  "trades": 121,
+  "exp": 14.450050900826465
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.50% OTM, wing 1.0%, enter 12:30, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 3.263830168251799,
+  "trades": 147,
+  "exp": 8.260821598639456
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.75% OTM, wing 0.5%, enter 12:30, stop none, target none, range filter <1.0%",
+  "sharpe": 3.2581008312081368,
+  "trades": 132,
+  "exp": 4.1130317121212325
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.75% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter none",
+  "sharpe": 3.25231865696964,
+  "trades": 264,
+  "exp": 8.132082496212112
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 3.247575390973756,
+  "trades": 125,
+  "exp": 9.057824671999851
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 0.5%, enter 15:00, stop 2x credit, target 50%, range filter <1.0%",
+  "sharpe": 3.246630377543485,
+  "trades": 168,
+  "exp": 9.609139755952313
+ },
+ {
+  "config": "daily RSI(2) reversion -> put/call spread; short 0.75% OTM, wing 0.5%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.244458924689307,
+  "trades": 56,
+  "exp": 5.931822392857143
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.2226238896184514,
+  "trades": 160,
+  "exp": 6.704266012499952
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 3.220783878163407,
+  "trades": 165,
+  "exp": 5.615264121212176
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.25% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter <0.6%",
+  "sharpe": 3.2043844915846753,
+  "trades": 46,
+  "exp": 19.70972006521739
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.00% OTM, wing 1.0%, enter 11:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 3.202644674303624,
+  "trades": 287,
+  "exp": 28.22743441811841
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 0.5%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.2015855402336935,
+  "trades": 192,
+  "exp": 18.861621916666508
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.1968346243765486,
+  "trades": 42,
+  "exp": 6.954061785714198
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.182315115943457,
+  "trades": 175,
+  "exp": 15.78277897714276
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.176951272223069,
+  "trades": 33,
+  "exp": 4.948639393939283
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.1765225711942113,
+  "trades": 36,
+  "exp": 9.368397083333232
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 0.5%, enter 14:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 3.176503695744718,
+  "trades": 184,
+  "exp": 9.190613059782539
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.1488319226639683,
+  "trades": 133,
+  "exp": 6.704496954887194
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 3.145944546033509,
+  "trades": 37,
+  "exp": 4.982816216216216
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.75% OTM, wing 0.5%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.13882548613032,
+  "trades": 112,
+  "exp": 4.778529946428599
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 3.1179119958511614,
+  "trades": 153,
+  "exp": 6.085645647058662
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 3.117910206341948,
+  "trades": 162,
+  "exp": 15.892276833333218
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 3.112810710079744,
+  "trades": 152,
+  "exp": 8.11685905263158
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.103968481658419,
+  "trades": 102,
+  "exp": 4.975388656862744
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.067230435652034,
+  "trades": 88,
+  "exp": 4.5058084431818175
+ },
+ {
+  "config": "bear call spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.062952641651435,
+  "trades": 63,
+  "exp": 6.31199165079365
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 3.057973670340756,
+  "trades": 162,
+  "exp": 17.394134290123418
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.0568552311143304,
+  "trades": 41,
+  "exp": 7.028814000000001
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 3.0500968583707335,
+  "trades": 189,
+  "exp": 16.544523470899303
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 1x credit, target none, range filter <0.6%",
+  "sharpe": 3.049057158949763,
+  "trades": 45,
+  "exp": 8.478169022222293
+ },
+ {
+  "config": "bull put spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 3.0309992800763257,
+  "trades": 115,
+  "exp": 3.414170808695652
+ },
+ {
+  "config": "bear call spread; short 0.50% OTM, wing 0.5%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.028613432771719,
+  "trades": 118,
+  "exp": 5.864396372881364
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 3.011901573814471,
+  "trades": 39,
+  "exp": 7.3519152564101615
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 1.0%, enter 14:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 3.0114404774038865,
+  "trades": 160,
+  "exp": 11.357448299999952
+ },
+ {
+  "config": "iron condor; short 0.50% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 3.0035039383844757,
+  "trades": 112,
+  "exp": 8.803510866071429
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <0.6%",
+  "sharpe": 3.001947707422401,
+  "trades": 33,
+  "exp": 20.547600030303016
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 2.995099959714747,
+  "trades": 96,
+  "exp": 4.581945239583333
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 1.0%, enter 14:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 2.9938966926360617,
+  "trades": 189,
+  "exp": 19.719114798941717
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 0.5%, enter 14:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 2.9860515155928202,
+  "trades": 192,
+  "exp": 16.414606041666563
+ },
+ {
+  "config": "daily RSI(2) reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter <1.0%",
+  "sharpe": 2.979345584881533,
+  "trades": 85,
+  "exp": 6.852940929411796
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 2.977904748299755,
+  "trades": 84,
+  "exp": 3.9370695595238088
+ },
+ {
+  "config": "bear call spread; short 0.75% OTM, wing 1.0%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 2.9754986517539503,
+  "trades": 77,
+  "exp": 5.448851350649374
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 2.9718709489055537,
+  "trades": 85,
+  "exp": 3.9165722705882353
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 2.9629855306927824,
+  "trades": 40,
+  "exp": 10.09737935
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 0.5%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 2.962465040810124,
+  "trades": 175,
+  "exp": 14.60375439999992
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.50% OTM, wing 0.5%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 2.952574058144488,
+  "trades": 73,
+  "exp": 3.3640636027397255
+ },
+ {
+  "config": "iron condor; short 0.50% OTM, wing 1.0%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 2.94663297359388,
+  "trades": 118,
+  "exp": 19.55270862711859
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 2.9434011857450058,
+  "trades": 160,
+  "exp": 8.612759637499934
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 2.9403436900771585,
+  "trades": 100,
+  "exp": 8.985921009999968
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 1.0%, enter 14:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 2.933485014959926,
+  "trades": 189,
+  "exp": 20.2572502328041
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.75% OTM, wing 0.5%, enter 12:30, stop none, target none, range filter <0.6%",
+  "sharpe": 2.9313216190429223,
+  "trades": 33,
+  "exp": 2.6354212121212117
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 2.92968194108566,
+  "trades": 165,
+  "exp": 5.759301696969755
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 0.5%, enter 14:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 2.9291292613391917,
+  "trades": 192,
+  "exp": 17.476638557291526
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 2.925424476500427,
+  "trades": 161,
+  "exp": 5.995852024844709
+ },
+ {
+  "config": "bull put spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 2.9226092334071416,
+  "trades": 131,
+  "exp": 4.0878232290076335
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 2.909999796867921,
+  "trades": 54,
+  "exp": 12.433203129629689
+ },
+ {
+  "config": "bear call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 2.9035318017639007,
+  "trades": 59,
+  "exp": 8.2457266779661
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.25% OTM, wing 0.5%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 2.8991736162043087,
+  "trades": 102,
+  "exp": 6.97228138235291
+ },
+ {
+  "config": "bear call spread; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 2.89889140699602,
+  "trades": 45,
+  "exp": 20.659488555555384
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 1x credit, target none, range filter none",
+  "sharpe": 2.8926469513253137,
+  "trades": 121,
+  "exp": 12.448281438016549
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 0.5%, enter 14:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 2.887929698680586,
+  "trades": 184,
+  "exp": 7.695272451086915
+ },
+ {
+  "config": "daily RSI(2) reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <1.0%",
+  "sharpe": 2.881297163277545,
+  "trades": 78,
+  "exp": 9.79919212820507
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 0.5%, enter 15:00, stop 2x credit, target none, range filter <0.6%",
+  "sharpe": 2.873010743425118,
+  "trades": 48,
+  "exp": 11.937312520833324
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.00% OTM, wing 1.0%, enter 11:00, stop 1x credit, target none, range filter none",
+  "sharpe": 2.868104668111127,
+  "trades": 399,
+  "exp": 23.991328468671632
+ },
+ {
+  "config": "bear call spread; short 0.25% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter <0.6%",
+  "sharpe": 2.8507318444254794,
+  "trades": 72,
+  "exp": 17.44188869444449
+ },
+ {
+  "config": "EMA+VWAP trend -> put/call spread; short 0.50% OTM, wing 1.0%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 2.848546223814922,
+  "trades": 87,
+  "exp": 11.278452885057352
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop 2x credit, target 50%, range filter <0.6%",
+  "sharpe": 2.846691056144153,
+  "trades": 45,
+  "exp": 29.206534488888273
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target none, range filter <0.6%",
+  "sharpe": 2.846691056144153,
+  "trades": 45,
+  "exp": 29.206534488888273
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <0.6%",
+  "sharpe": 2.846691056144153,
+  "trades": 45,
+  "exp": 29.206534488888273
+ },
+ {
+  "config": "iron fly; short 0.00% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <0.6%",
+  "sharpe": 2.846691056144153,
+  "trades": 45,
+  "exp": 29.206534488888273
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.75% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter none",
+  "sharpe": 2.8434377570763463,
+  "trades": 192,
+  "exp": 3.6278581041666187
+ },
+ {
+  "config": "daily RSI(2) reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter none",
+  "sharpe": 2.8306800903500458,
+  "trades": 167,
+  "exp": 9.128695407185672
+ },
+ {
+  "config": "bear call spread; short 0.75% OTM, wing 1.0%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 2.821759654958468,
+  "trades": 53,
+  "exp": 9.293779849056603
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 0.5%, enter 15:00, stop 1x credit, target none, range filter <0.6%",
+  "sharpe": 2.818269915385297,
+  "trades": 48,
+  "exp": 11.63815418749999
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 2.816454549616507,
+  "trades": 54,
+  "exp": 10.170569796296322
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 2.8147781416502875,
+  "trades": 100,
+  "exp": 9.797951400000022
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <0.6%",
+  "sharpe": 2.8127887388123827,
+  "trades": 33,
+  "exp": 17.643924272727162
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.25% OTM, wing 1.0%, enter 11:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 2.811989596743104,
+  "trades": 286,
+  "exp": 16.031006433566436
+ },
+ {
+  "config": "bull put spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target 50%, range filter <1.0%",
+  "sharpe": 2.8003444869068814,
+  "trades": 165,
+  "exp": 5.3774010545454765
+ },
+ {
+  "config": "bear call spread; short 0.75% OTM, wing 0.5%, enter 14:00, stop none, target none, range filter <1.0%",
+  "sharpe": 2.791484317614724,
+  "trades": 48,
+  "exp": 7.2205735833333335
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.50% OTM, wing 1.0%, enter 12:30, stop none, target none, range filter none",
+  "sharpe": 2.7880681584645526,
+  "trades": 278,
+  "exp": 12.421341474820162
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.00% OTM, wing 0.5%, enter 11:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 2.7793721036273547,
+  "trades": 287,
+  "exp": 18.409885679442482
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 1x credit, target none, range filter <1.0%",
+  "sharpe": 2.7713889478909466,
+  "trades": 152,
+  "exp": 7.026692835526325
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.00% OTM, wing 1.0%, enter 15:00, stop 2x credit, target 50%, range filter <1.0%",
+  "sharpe": 2.7655786364439003,
+  "trades": 109,
+  "exp": 17.185865568807213
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.00% OTM, wing 1.0%, enter 15:00, stop none, target 50%, range filter <1.0%",
+  "sharpe": 2.7655786364439003,
+  "trades": 109,
+  "exp": 17.185865568807213
+ },
+ {
+  "config": "iron condor; short 0.50% OTM, wing 0.5%, enter 11:00, stop none, target none, range filter <0.6%",
+  "sharpe": 2.758586095228587,
+  "trades": 123,
+  "exp": 13.027805024390208
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 14:00, stop none, target none, range filter none",
+  "sharpe": 2.754170700767181,
+  "trades": 48,
+  "exp": 8.594585479166666
+ },
+ {
+  "config": "bull put spread; short 0.75% OTM, wing 0.5%, enter 12:30, stop none, target none, range filter none",
+  "sharpe": 2.752025647379289,
+  "trades": 371,
+  "exp": 5.988345455525658
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 2.7503943777241475,
+  "trades": 157,
+  "exp": 7.013264299363065
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.00% OTM, wing 1.0%, enter 15:00, stop 2x credit, target none, range filter none",
+  "sharpe": 2.743952225492957,
+  "trades": 142,
+  "exp": 22.08475142253511
+ },
+ {
+  "config": "VWAP side -> put/call spread; short 0.75% OTM, wing 0.5%, enter 14:00, stop none, target 50%, range filter none",
+  "sharpe": 2.7391883515320194,
+  "trades": 290,
+  "exp": 1.8799942965516925
+ },
+ {
+  "config": "EMA9>21 -> put/call spread; short 0.00% OTM, wing 0.5%, enter 11:00, stop 1x credit, target none, range filter none",
+  "sharpe": 2.738354370211799,
+  "trades": 400,
+  "exp": 16.479745729999976
+ },
+ {
+  "config": "daily RSI(2) reversion -> put/call spread; short 0.75% OTM, wing 1.0%, enter 14:00, stop none, target 50%, range filter none",
+  "sharpe": 2.717504613969529,
+  "trades": 121,
+  "exp": 3.1370754710744024
+ },
+ {
+  "config": "iron condor; short 0.25% OTM, wing 1.0%, enter 15:00, stop 1x credit, target none, range filter <0.6%",
+  "sharpe": 2.7131894055145707,
+  "trades": 33,
+  "exp": 18.768890939393923
+ },
+ {
+  "config": "RSI14 momentum -> put/call spread; short 0.75% OTM, wing 1.0%, enter 12:30, stop 2x credit, target none, range filter <1.0%",
+  "sharpe": 2.7093001340449283,
+  "trades": 135,
+  "exp": 4.062459896296296
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.25% OTM, wing 1.0%, enter 15:00, stop 2x credit, target 50%, range filter none",
+  "sharpe": 2.700198024301413,
+  "trades": 121,
+  "exp": 9.789963297520647
+ },
+ {
+  "config": "RSI14 reversion -> put/call spread; short 0.50% OTM, wing 1.0%, enter 15:00, stop 2x credit, target 50%, range filter none",
+  "sharpe": 2.6769154042467798,
+  "trades": 100,
+  "exp": 5.220516759999999
+ },
+ {
+  "config": "bear call spread; short 0.50% OTM, wing 0.5%, enter 12:30, stop none, target 50%, range filter none",
+  "sharpe": 2.6759728510236513,
+  "trades": 354,
+  "exp": 5.654401090395452
+ },
+ {
+  "config": "daily RSI(2) reversion -> put/call spread; short 0.25% OTM, wing 0.5%, enter 12:30, stop none, target 50%, range filter <0.6%",
+  "sharpe": 2.674241475388068,
+  "trades": 50,
+  "exp": 9.715923839999908
+ }
+]
