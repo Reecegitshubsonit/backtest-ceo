@@ -39,10 +39,10 @@ S = requests.Session()
 
 
 def get(url, params):
-    for i in range(6):
+    for i in range(12):
         r = S.get(url, params=params, headers=HDR, timeout=60)
         if r.status_code == 429:
-            time.sleep(2 ** i); continue
+            time.sleep(min(2 ** i, 30)); continue
         r.raise_for_status(); return r.json()
     raise RuntimeError("rate limited")
 
