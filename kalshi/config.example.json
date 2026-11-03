@@ -1,0 +1,20 @@
+{
+ "fav_min": 0.8,
+ "fav_max": 0.95,
+ "min_hours_to_close": 3.0,
+ "max_hours_to_close": 240,
+ "min_volume_24h": 200,
+ "max_spread": 0.06,
+ "min_edge": 0.015,
+ "maker_fee_rate": 0.0175,
+ "kelly_fraction": 0.15,
+ "max_per_market": 25.0,
+ "max_per_event": 40.0,
+ "max_total_exposure": 300.0,
+ "min_contracts": 1,
+ "exclude_prefixes": [
+  "KXMVE"
+ ],
+ "calibration_path": null,
+ "starting_cash": 1000.0
+}
