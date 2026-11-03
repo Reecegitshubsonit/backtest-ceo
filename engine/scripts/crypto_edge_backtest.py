@@ -66,23 +66,115 @@ def metrics(trades, daily, cost):
     }
 
 
-def run_positions(close, pos, side_cost):
-    """pos[t] is chosen at close t and earns close t -> close t+1. Fee charged per unit of position change."""
-    ret = close.pct_change().shift(-1).fillna(0)
-    pos = pos.fillna(0)
-    turn = pos.diff().abs().fillna(pos.abs())
-    daily = pos * ret - turn * side_cost
-    trades, cur, acc = [], 0, 1.0
-    for p, r in zip(pos.values, ret.values):
-        if p != cur:
+def simulate(d, sig, side_cost, fill="next_open", rf=None):
+    """Event simulation of a daily signal. sig[i] is computed from bar i (uses its close).
+    fill: "next_open"  -> trade at the open of bar i+1 (default, realistic)
+          "next_close" -> trade at the close of bar i+1 (one full bar of lag, stress test)
+          "same_close" -> trade at the close of bar i (look-ahead-ish: the signal bar's own close)
+    rf: optional daily cash return series (index = d.index) earned on idle equity when flat.
+    Returns (trade returns, daily equity returns, held position per bar)."""
+    o, c = d["o"].values, d["c"].values
+    s = np.nan_to_num(np.asarray(sig, float))
+    n = len(c)
+    tgt = np.zeros(n)  # target applied at bar j's fill
+    if fill == "same_close":
+        tgt[:] = s
+    else:
+        tgt[1:] = s[:-1]
+    at_open = fill == "next_open"
+    r_cash = np.zeros(n) if rf is None else rf.reindex(d.index).ffill().fillna(0).values
+    E, u, mark = 1.0, 0.0, c[0]
+    eq, held, trades = np.empty(n), np.empty(n), []
+    cur, entry = 0.0, None
+    for j in range(n):
+        if u == 0:
+            E *= 1 + r_cash[j]
+        px = o[j] if at_open else c[j]
+        if tgt[j] != cur:
+            E += u * (px - mark)
+            mark = px
             if cur != 0:
-                trades.append(acc - 1 - 2 * side_cost)
-            cur, acc = p, 1.0
-        if cur != 0:
-            acc *= 1 + cur * r
+                trades.append(cur * (px / entry - 1) - 2 * side_cost)
+            new_u = tgt[j] * E / px
+            E -= abs(new_u - u) * px * side_cost
+            u, cur, entry = new_u, tgt[j], px
+        E += u * (c[j] - mark)
+        mark = c[j]
+        eq[j], held[j] = E, cur
     if cur != 0:
-        trades.append(acc - 1 - 2 * side_cost)
-    return trades, daily
+        trades.append(cur * (c[-1] / entry - 1) - 2 * side_cost)
+    daily = pd.Series(eq, d.index).pct_change().fillna(0)
+    return trades, daily, pd.Series(held, d.index)
+
+
+def trades_in(d, held, side_cost, start, at_open=True):
+    """Net trade returns for trades whose entry falls on/after start (for sub-period tables)."""
+    o, c = d["o"], d["c"]
+    px = o if at_open else c
+    out, cur, entry = [], 0.0, None
+    for t, h in held.items():
+        if h != cur:
+            if cur != 0 and entry is not None:
+                out.append(cur * (px[t] / entry - 1) - 2 * side_cost)
+            cur, entry = h, (px[t] if t >= start else None)
+    if cur != 0 and entry is not None:
+        out.append(cur * (c.iloc[-1] / entry - 1) - 2 * side_cost)
+    return out
+
+
+def cagr(daily):
+    eq = (1 + daily).prod()
+    yrs = len(daily) / 365.25  # bar count, so a data hole is not counted as elapsed time
+    return 100 * (eq ** (1 / yrs) - 1)
+
+
+def sharpe(x):
+    return x.mean() / x.std() * np.sqrt(365) if x.std() > 0 else np.nan
+
+
+def boot_sharpe_diff(a, b, reps=5000, block=20, seed=7):
+    """Paired circular block bootstrap of Sharpe(a) - Sharpe(b). Returns (point, lo95, hi95, P(diff<=0))."""
+    a, b = np.asarray(a), np.asarray(b)
+    n = len(a)
+    rng = np.random.default_rng(seed)
+    k = int(np.ceil(n / block))
+    out = np.empty(reps)
+    for i in range(reps):
+        idx = (rng.integers(0, n, k)[:, None] + np.arange(block)).ravel()[:n] % n
+        x, y = a[idx], b[idx]
+        out[i] = x.mean() / x.std() * np.sqrt(365) - y.mean() / y.std() * np.sqrt(365)
+    pt = sharpe(pd.Series(a)) - sharpe(pd.Series(b))
+    return pt, np.percentile(out, 2.5), np.percentile(out, 97.5), (out <= 0).mean()
+
+
+def tbill_daily(cache, start, end):
+    """Daily T-bill cash return from Alpaca dividend-adjusted BIL (+0.1355%/y expense ratio added back),
+    smoothed over 63 trading days, spread over calendar days."""
+    f = cache / f"BIL_adj_{start:%Y%m%d}_{end:%Y%m%d}.json"
+    if f.exists():
+        rows = json.loads(f.read_text())
+    else:
+        rows, tok = [], None
+        while True:
+            p = {"symbols": "BIL", "timeframe": "1Day", "start": (start - timedelta(days=120)).isoformat(),
+                 "end": end.isoformat(), "adjustment": "all", "feed": "sip", "limit": 10000}
+            if tok:
+                p["page_token"] = tok
+            j = requests.get("https://data.alpaca.markets/v2/stocks/bars", params=p, timeout=30,
+                             headers={"APCA-API-KEY-ID": os.environ.get("ALPACA_API_KEY", "x"),
+                                      "APCA-API-SECRET-KEY": os.environ.get("ALPACA_SECRET_KEY", "x")}).json()
+            rows += j["bars"]["BIL"]
+            tok = j.get("next_page_token")
+            if not tok:
+                break
+        f.write_text(json.dumps(rows))
+    b = pd.Series({pd.Timestamp(r["t"]).normalize(): r["c"] for r in rows}).sort_index()
+    b.index = b.index.tz_convert("UTC").normalize()
+    days = (b.index.to_series().diff(63).dt.days).values
+    ann = (b / b.shift(63)) ** (365.25 / days) - 1 + 0.001355
+    cal = pd.date_range(b.index[0], end.replace(hour=0, minute=0, second=0), freq="D", tz="UTC")
+    ann = ann.reindex(cal).ffill()
+    return ((1 + ann) ** (1 / 365.25) - 1).fillna(0), ann
 
 
 # ---------- daily strategies ----------
@@ -142,11 +234,81 @@ def intraday(df, side_cost, kind):
     return trades, daily
 
 
+def segments(d, max_gap_days=5, min_len=60):
+    """Split a daily series at holes > max_gap_days (Alpaca SOL/USD has a 417-day hole 2023-06 -> 2024-08).
+    Strategies run per segment; the return across a hole is never booked."""
+    cut = np.flatnonzero(d.index.to_series().diff().dt.days.values > max_gap_days)
+    parts = np.split(np.arange(len(d)), cut)
+    return [d.iloc[p] for p in parts if len(p) >= min_len]
+
+
+def seg_run(d, sig_fn, side_cost, fill="next_open", rf=None):
+    tr, dl, hl = [], [], []
+    for seg in segments(d):
+        t, daily, held = simulate(seg, sig_fn(seg), side_cost, fill, rf)
+        daily.iloc[0] = 0.0
+        tr += t
+        dl.append(daily)
+        hl.append(held)
+    return tr, pd.concat(dl), pd.concat(hl)
+
+
+def seg_trades_in(d, held, side_cost, start):
+    out = []
+    for seg in segments(d):
+        out += trades_in(seg, held.reindex(seg.index), side_cost, start)
+    return out
+
+
+def seg_bh(d):
+    return pd.concat([seg["c"].pct_change().fillna(0) for seg in segments(d)])
+
+
+def md_table(df):
+    r = df.round(2).map(lambda v: "" if (isinstance(v, float) and np.isnan(v)) else str(v))
+    cols = list(df.columns)
+    return "\n".join(["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)] + ["| " + " | ".join(x) + " |" for x in r.values])
+
+
+def stats(daily, trades=None, cost=0.0, rf=None):
+    eq = (1 + daily).cumprod()
+    out = {"CAGR%": cagr(daily), "vol%": 100 * daily.std() * np.sqrt(365), "maxDD%": 100 * (eq / eq.cummax() - 1).min(),
+           "sharpe": sharpe(daily)}
+    if rf is not None:
+        out["xs_sharpe"] = sharpe(daily - rf.reindex(daily.index).fillna(0))
+    if trades is not None:
+        t = np.asarray(trades)
+        out = {"trades": len(t), "win%": 100 * (t > 0).mean(), "exp%": 100 * t.mean(), **out}
+    return out
+
+
+def quality(sym, d, m):
+    """Internal Alpaca checks (no second venue reachable): daily open vs prior close gap, daily close vs the last
+    30m close of the same UTC day, missing / zero-range / stale 30m bars."""
+    gap = (d["o"] / d["c"].shift(1) - 1).abs() * 100
+    full_days = pd.date_range(d.index[0], d.index[-1], freq="D")
+    m_day = m.groupby(m.index.normalize())["c"].last()
+    both = d["c"].reindex(m_day.index).dropna()
+    dc = ((m_day.reindex(both.index) / both - 1).abs() * 100)
+    exp = pd.date_range(m.index[0], m.index[-1], freq="30min")
+    zero = (m["h"] == m["l"])
+    stale = zero & (m["c"] == m["c"].shift(1))
+    return {"symbol": sym,
+            "daily_missing": len(full_days) - len(d),
+            "largest_hole_days": int(d.index.to_series().diff().dt.days.max()) - 1,
+            "open_vs_prev_close_med%": gap.median(), "open_vs_prev_close_max%": gap.max(),
+            "gaps>1%": int((gap > 1).sum()),
+            "daily_vs_30m_close_max%": dc.max(),
+            "30m_bars": len(m), "30m_missing": len(exp) - len(m),
+            "30m_zero_range": int(zero.sum()), "30m_stale": int(stale.sum()), "30m_zero_vol": int((m["v"] == 0).sum())}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fee", type=float, default=0.0025, help="per-side fee (Alpaca crypto taker tier 1 = 0.25%%)")
     ap.add_argument("--slip", type=float, default=0.0005, help="per-side slippage")
     ap.add_argument("--daily-start", default="2021-01-01")
+    ap.add_argument("--recent-years", type=float, default=2.0)
     ap.add_argument("--intraday-days", type=int, default=60)
     ap.add_argument("--cache", default=str(Path(__file__).resolve().parents[1] / ".cache" / "crypto_edge"))
     ap.add_argument("--out", default=None)
@@ -158,37 +320,84 @@ def main():
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(seconds=1)
     d0 = datetime.fromisoformat(a.daily_start).replace(tzinfo=timezone.utc)
     i0 = today + timedelta(seconds=1) - timedelta(days=a.intraday_days)
+    recent = pd.Timestamp(today + timedelta(seconds=1) - timedelta(days=round(365.25 * a.recent_years)))
+    rf, rf_ann = tbill_daily(cache, d0, today)
+    strats = [("TSMOM 28d (long/flat)", tsmom), ("Donchian 20/10 (long/flat)", donchian),
+              ("Abnormal-day momentum (L/S)", abnormal_day)]
 
-    rows = []
+    main_rows, fill_rows, bh_rows, ts_rows, boot_rows, q_rows = [], [], [], [], [], []
     for sym in SYMS:
         d = fetch(sym, "1Day", d0, today, cache)
-        span = f"{d.index[0]:%Y-%m-%d}..{d.index[-1]:%Y-%m-%d}"
-        for name, f in [("TSMOM 28d (long/flat)", tsmom), ("Donchian 20/10 (long/flat)", donchian),
-                        ("Abnormal-day momentum (L/S)", abnormal_day)]:
-            tr, daily = run_positions(d["c"], f(d), side)
-            rows.append({"strategy": name, "tf": "1D", "symbol": sym, "span": span, **metrics(tr, daily, 2 * side)})
-        bh = d["c"].pct_change().fillna(0)
-        rows.append({"strategy": "Buy & hold (reference)", "tf": "1D", "symbol": sym, "span": span,
-                     **metrics([d["c"].iloc[-1] / d["c"].iloc[0] - 1 - 2 * side], bh, 2 * side)})
         m = fetch(sym, "30Min", i0, today, cache)
-        span = f"{m.index[0]:%Y-%m-%d}..{m.index[-1]:%Y-%m-%d}"
+        q_rows.append(quality(sym, d, m))
+        bh = seg_bh(d)
+        for name, f in strats:
+            for fill in ["same_close", "next_open", "next_close"]:
+                tr, daily, _ = seg_run(d, f, side, fill)
+                st = stats(daily, tr, 2 * side)
+                fill_rows.append({"strategy": name, "symbol": sym, "fill": fill, "trades": st["trades"],
+                                  "exp%": st["exp%"], "sharpe": st["sharpe"], "maxDD%": st["maxDD%"]})
+                if fill == "next_open":
+                    main_rows.append({"strategy": name, "tf": "1D", "symbol": sym, **stats(daily, tr, 2 * side)})
+        main_rows.append({"strategy": "Buy & hold (reference)", "tf": "1D", "symbol": sym, **stats(bh)})
         for name, kind in [("Intraday TS momentum 1st->last 30m (L/S)", "ihm"), ("21-23 UTC seasonality (long)", "season")]:
             tr, daily = intraday(m, side, kind)
-            rows.append({"strategy": name, "tf": "30m", "symbol": sym, "span": span, **metrics(tr, daily, 2 * side)})
+            main_rows.append({"strategy": name, "tf": "30m", "symbol": sym, **stats(daily, tr, 2 * side)})
 
-    t = pd.DataFrame(rows)
+        # buy & hold by period
+        bper = [("full", d.index[0]), (f"last {a.recent_years:g}y", recent)]
+        if sym == "SOL/USD":
+            bper.append(("ex-2021 (2022+)", pd.Timestamp("2022-01-01", tz="UTC")))
+        for per, st0 in bper:
+            x = bh[bh.index >= st0]
+            x.iloc[0] = 0.0
+            bh_rows.append({"symbol": sym, "period": per, "from": f"{x.index[0]:%Y-%m-%d}", **stats(x, rf=rf)})
+
+        # TSMOM variants: periods x cash, with bootstrap vs buy & hold
+        periods = [("full", d.index[0]), (f"last {a.recent_years:g}y", recent)]
+        if sym == "SOL/USD":
+            periods.append(("ex-2021 (2022+)", pd.Timestamp("2022-01-01", tz="UTC")))
+        for cash in [False, True]:
+            tr_all, daily, held = seg_run(d, tsmom, side, "next_open", rf if cash else None)
+            for per, st0 in periods:
+                x = daily[daily.index >= st0].copy()
+                x.iloc[0] = 0.0
+                b = bh[bh.index >= st0].copy()
+                b.iloc[0] = 0.0
+                tr = seg_trades_in(d, held, side, st0)
+                st = stats(x, tr, 2 * side, rf)
+                ts_rows.append({"symbol": sym, "period": per, "idle cash": "T-bill" if cash else "0%",
+                                **{k: st[k] for k in ["trades", "exp%", "CAGR%", "maxDD%", "sharpe", "xs_sharpe"]},
+                                "B&H sharpe": sharpe(b), "B&H xs_sharpe": sharpe(b - rf.reindex(b.index).fillna(0))})
+                r = rf.reindex(x.index).fillna(0)
+                ex = (x - r, b - r) if cash else (x, b)
+                pt, lo, hi, p0 = boot_sharpe_diff(*ex)
+                boot_rows.append({"symbol": sym, "period": per, "idle cash": "T-bill" if cash else "0%",
+                                  "sharpe": "excess" if cash else "raw", "diff": pt, "lo95": lo, "hi95": hi,
+                                  "P(diff<=0)": p0, "CI excludes 0": "yes" if lo > 0 or hi < 0 else "no"})
+
+    t = pd.DataFrame(main_rows)
     ref = t["strategy"].str.startswith("Buy & hold")
     t["status"] = np.where(ref, "reference", np.where(t["trades"] < MIN_TRADES, f"REJECT (<{MIN_TRADES} trades)", "ok"))
+    t = t[["strategy", "tf", "symbol", "trades", "win%", "exp%", "maxDD%", "sharpe", "CAGR%", "status"]]
+    sections = {
+        f"Main table — next-bar-open fills, cost {side:.2%}/side": t,
+        "Fill timing check (daily strategies)": pd.DataFrame(fill_rows),
+        "Buy & hold by period (xs_sharpe = minus T-bill)": pd.DataFrame(bh_rows),
+        "TSMOM variants (next-open fills)": pd.DataFrame(ts_rows),
+        "Bootstrap 95% CI: Sharpe(TSMOM) - Sharpe(B&H), circular block 20d, 5000 reps": pd.DataFrame(boot_rows),
+        "Data quality (Alpaca only)": pd.DataFrame(q_rows),
+    }
     pd.set_option("display.width", 250)
-    pd.set_option("display.max_columns", 20)
-    print(f"cost per side = {side:.4%} (fee {a.fee:.4%} + slip {a.slip:.4%})")
-    print(t.round(2).to_string(index=False))
+    pd.set_option("display.max_columns", 30)
+    txt = []
+    for k, v in sections.items():
+        print(f"\n== {k}\n{v.round(3).to_string(index=False)}")
+        txt.append(f"### {k}\n\n{md_table(v)}\n")
+    print(f"\nT-bill (BIL-implied) annual rate: first {rf_ann.dropna().iloc[0]:.2%}, mean {rf_ann.mean():.2%}, last {rf_ann.iloc[-1]:.2%}")
     if a.out:
-        cols = ["strategy", "tf", "symbol", "trades", "win%", "exp%", "gross_exp%", "maxDD%", "sharpe", "total%", "status"]
-        r = t[cols].round(2).astype(str)
-        md = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)] + ["| " + " | ".join(x) + " |" for x in r.values]
-        Path(a.out).write_text(f"cost per side {side:.2%}\n\n" + "\n".join(md) + "\n")
-    return t
+        Path(a.out).write_text("\n".join(txt))
+    return sections
 
 
 if __name__ == "__main__":
