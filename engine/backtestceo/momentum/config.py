@@ -22,6 +22,9 @@ class Config:
     flatten_at: str = "11:30"          # close anything still open
 
     # ---- setups
+    bar_minutes: int = 1               # candle size the setups/exits run on (1-min bars aggregated to N minutes)
+    entry_confirm_close: bool = False  # buy the next open only after a candle CLOSES above the trigger, near its high
+    confirm_close_frac: float = 0.5    # ...close in the top half of that candle's range
     patterns: tuple = ("micro_pullback", "bull_flag", "first_pullback")
     leg_lookback: int = 15             # bars to look back for the impulse leg start
     max_pullback_bars: int = 5
@@ -30,6 +33,8 @@ class Config:
     require_hod: bool = True           # leg high must be the high of day so far
     require_macd_positive: bool = True
     require_above_vwap: bool = True
+    require_above_ema9: bool = False   # setup candle closes above the 1-min 9 EMA
+    leader_only: bool = False          # only trade the in-play stock that is up the most right now (the day's leader)
     require_light_pullback_volume: bool = True  # bull flag / first pullback: pullback avg vol < leg avg vol
     max_stop_pct: float = 5.0          # skip setups whose stop is wider than this % of entry
     min_stop_cents: float = 3.0        # stop at least 3 cents below the trigger

@@ -21,6 +21,7 @@ import json
 import os
 import time
 import uuid
+from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -30,7 +31,7 @@ from ..paper import envfile, safety
 from .backtest import Risk, to_bars, tradable_symbol
 from .config import Config
 from .data import CACHE, ET, Data, et_dt, parse_t
-from .engine import is_catalyst, Position, SymbolState, hhmm, size
+from .engine import confirmed, leader, Position, SymbolState, hhmm, size
 
 PAPER = "https://paper-api.alpaca.markets"
 REPO = Path(__file__).resolve().parents[3]
@@ -126,6 +127,8 @@ class DryRun:
             sp, lp = float(o.get("stop_price") or 0), float(o.get("limit_price") or 0)
             if o["side"] == "buy" and o["type"] == "stop_limit" and price >= sp and price <= lp:
                 self._fill(o, price)
+            elif o["side"] == "buy" and o["type"] == "limit" and price <= lp:
+                self._fill(o, price)
             elif o["side"] == "sell" and o["type"] == "stop" and price <= sp:
                 self._fill(o, price)
 
@@ -162,6 +165,7 @@ class Trader:
         self.pos: Position | None = None
         self.stop_id: str | None = None
         self.states: dict[str, SymbolState] = {}
+        self.armed: dict = {}  # close-confirm mode: setups waiting for a confirming candle close
 
     # ---- data
     def poll_news(self):
@@ -170,11 +174,9 @@ class Trader:
             if n["id"] in self.news_seen:
                 continue
             self.news_seen.add(n["id"])
-            if self.cfg.require_news and not is_catalyst(n["headline"], n["symbols"], self.cfg):
-                continue
             for s in n["symbols"]:
                 if tradable_symbol(s):
-                    self.news.setdefault(s, []).append((parse_t(n["t"]).astimezone(ET), n["headline"]))
+                    self.news.setdefault(s, []).append((parse_t(n["t"]).astimezone(ET), n["headline"], len(n["symbols"])))
         self.news_until = end
 
     def prev_adv(self, syms):
@@ -245,17 +247,34 @@ class Trader:
             return
         if not (hhmm(max(c.entry_from, "09:30")) <= t.time() <= hhmm(c.entry_until)):
             return
+        lead = leader(states) if c.leader_only else None
+        armed, self.armed = self.armed, {}
         for s, st in sorted(states.items(), key=lambda kv: -kv[1].rvol_now):
-            if st.entries >= c.max_entries_per_symbol:
+            if st.entries >= c.max_entries_per_symbol or (c.leader_only and s != lead):
                 continue
-            su = st.setup()
+            if c.entry_confirm_close:
+                prev, b = armed.get(s), st.bars[-1]
+                su = None
+                if prev and confirmed(prev, b, c) and 0 < b.c - prev.stop <= b.c * c.max_stop_pct / 100:
+                    su = replace(prev, trigger=round(b.c, 2), limit=round(b.c * (1 + c.entry_limit_pct / 100), 2))
+                if not su:
+                    nxt = st.setup()
+                    if nxt:
+                        self.armed[s] = nxt  # watch: buy only after a candle closes through its trigger
+                    continue
+            else:
+                su = st.setup()
             if not su:
                 continue
             q = size(su, st, c, self.risk.mult())
             if q < 1:
                 continue
-            o = self.broker.submit(symbol=s, qty=str(q), side="buy", type="stop_limit", time_in_force="day",
-                                   stop_price=f"{su.trigger:.2f}", limit_price=f"{su.limit:.2f}")
+            if c.entry_confirm_close:
+                o = self.broker.submit(symbol=s, qty=str(q), side="buy", type="limit", time_in_force="day",
+                                       limit_price=f"{su.limit:.2f}")
+            else:
+                o = self.broker.submit(symbol=s, qty=str(q), side="buy", type="stop_limit", time_in_force="day",
+                                       stop_price=f"{su.trigger:.2f}", limit_price=f"{su.limit:.2f}")
             self.entry_order = {"sym": s, "id": o["id"], "setup": su, "shares": q}
             log(f"ARM {su.pattern} {s} buy {q} stop {su.trigger} limit {su.limit} risk-stop {su.stop} "
                 f"(gap {su.gap_pct:.1f}% rvol {su.rvol:.1f})")
@@ -369,6 +388,8 @@ def latest_price(data: Data, sym: str) -> float | None:
 
 
 def main(a, cfg: Config):
+    if cfg.bar_minutes != 1:
+        raise SystemExit("paper loop runs on 1-minute bars only (bar_minutes=1); 5-minute mode is backtest-only")
     env = envfile.load(REPO / ".env", os.environ)
     feed = env.get("ALPACA_DATA_FEED") or "iex"
     if feed != "sip":

@@ -4,7 +4,7 @@ Everything works on closed 1-minute bars. A setup found at the close of bar i is
 that is valid only during bar i+1 (the "first candle to make a new high"); if it does not trigger it is recomputed.
 """
 from dataclasses import dataclass, field
-from datetime import datetime, time as dtime
+from datetime import datetime, time as dtime, timedelta
 import re
 from math import floor
 
@@ -14,13 +14,13 @@ from .config import Config
 # Market-wide pieces, sector roundups, mover lists and call transcripts are not stock-specific catalysts.
 ROUNDUP = re.compile(r"stocks? moving|movers|gainers|losers|mid-?day|pre-?market session|after-?market session|"
                      r"transcript|stock market today|futures|\b\d+ stocks\b|top \d+|stocks to watch|market clubhouse|"
-                     r"most active|biggest|unusual options", re.I)
+                     r"most active|biggest|unusual options|halt|resumes? trad|circuit breaker", re.I)
 
 
-def is_catalyst(headline: str, symbols: list, cfg: Config) -> bool:
+def is_catalyst(headline: str, n_symbols: int, cfg: Config) -> bool:
     if not cfg.catalyst_filter:
         return True
-    return len(symbols) <= cfg.catalyst_max_symbols and not ROUNDUP.search(headline or "")
+    return n_symbols <= cfg.catalyst_max_symbols and not ROUNDUP.search(headline or "")
 
 
 def hhmm(s: str) -> dtime:
@@ -36,6 +36,27 @@ class Bar:
     l: float
     c: float
     v: float
+
+
+def aggregate(bars: list, n: int) -> list:
+    """1-min bars -> n-min bars stamped with the bucket start (09:30, 09:35, ...)."""
+    if n <= 1:
+        return bars
+    out = []
+    for b in bars:
+        start = b.t.replace(minute=b.t.minute - b.t.minute % n, second=0)
+        if out and out[-1].t == start:
+            o = out[-1]
+            o.h, o.l, o.c, o.v = max(o.h, b.h), min(o.l, b.l), b.c, o.v + b.v
+        else:
+            out.append(Bar(start, b.o, b.h, b.l, b.c, b.v))
+    return out
+
+
+def confirmed(su, b, cfg) -> bool:
+    """Breakout candle closed above the trigger and in the top part of its range."""
+    rng = b.h - b.l
+    return b.h >= su.trigger and b.c >= su.trigger and (rng <= 0 or (b.c - b.l) / rng >= cfg.confirm_close_frac)
 
 
 class EMA:
@@ -82,7 +103,8 @@ class SymbolState:
 
     def __init__(self, sym: str, prev_close: float, adv: float, news: list, cfg: Config):
         self.sym, self.pc, self.adv, self.cfg = sym, prev_close, adv, cfg
-        self.news = sorted(news, key=lambda n: n[0])  # [(datetime, headline)]
+        # [(datetime, headline, n_symbols_tagged)] -> keep stock-specific catalysts only
+        self.news = sorted((n for n in news if is_catalyst(n[1], n[2] if len(n) > 2 else 1, cfg)), key=lambda n: n[0])
         self.bars: list[Bar] = []
         self.hod: list[float] = []
         self.e9, self.e12, self.e26, self.sig = EMA(9), EMA(12), EMA(26), EMA(9)
@@ -113,7 +135,7 @@ class SymbolState:
         self.cum_v += b.v
         self.cum_pv += typical * b.v
         self.vwap = self.cum_pv / self.cum_v if self.cum_v else b.c
-        self.rvol_now = rvol(self.cum_v, self.adv, b.t)
+        self.rvol_now = rvol(self.cum_v, self.adv, b.t + timedelta(minutes=self.cfg.bar_minutes - 1))
         if self.in_play_at is None and b.t.time() >= hhmm(self.cfg.scan_from) and self.scanner_ok(b):
             self.in_play_at = b.t
 
@@ -134,6 +156,8 @@ class SymbolState:
         if c.require_macd_positive and self.macd <= 0:
             return None
         if c.require_above_vwap and b.c <= self.vwap:
+            return None
+        if c.require_above_ema9 and b.c <= self.ema9:
             return None
         lo = max(0, i - c.max_pullback_bars)
         j = max(range(lo, i), key=lambda k: (bars[k].h, k))
@@ -179,6 +203,12 @@ class SymbolState:
     def avg_vol(self, n: int = 5) -> float:
         tail = self.bars[-n:]
         return sum(b.v for b in tail) / len(tail) if tail else 0.0
+
+
+def leader(states) -> str | None:
+    """Symbol of the in-play stock with the biggest % gain from the previous close at its last bar."""
+    live = [(st.gap_pct(st.bars[-1].c), s) for s, st in states.items() if st.in_play_at and st.bars]
+    return max(live)[1] if live else None
 
 
 def size(setup: Setup, state: SymbolState, cfg: Config, mult: float) -> int:

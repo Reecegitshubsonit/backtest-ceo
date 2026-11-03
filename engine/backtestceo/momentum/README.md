@@ -4,7 +4,7 @@ Our own version of Ross Cameron's (Warrior Trading) small-cap momentum day-tradi
 news scanner, three pullback entries on 1-minute bars, and his exit and risk habits written as fixed rules.
 There's a backtest on 60 sessions of Alpaca 1-minute SIP bars and a loop for the Alpaca **paper** account.
 
-**Result: no edge found.** Over 60 sessions (2026-08-11 to 2026-11-03) the default rules lost $1,945 on $100 risk
+**Result: no edge found, in two independent 60-session periods (see 3b).** Over 60 sessions (2026-08-11 to 2026-11-03) the default rules lost $1,945 on $100 risk
 per trade: 124 trades, 28% winners, profit factor 0.69, −0.19R a trade. It still loses with zero slippage. Out of
 32 tuned variants, 8 were positive on the held-out half, and the mean out-of-sample result was −$229. Do not trade
 it with real money as it stands.
@@ -136,6 +136,50 @@ the strongest stock of the day. The sample is too small to call that an edge.
 **Caveats.** Fills on 1-minute bars of thin small caps are approximate. Spreads can be wider than 0.2%. Halts
 aren't modelled. Alpaca's news feed is Benzinga, which is not the same as the scanners and feeds Cameron uses.
 
+## 3b. Round 2: fixes tried, then a true holdout
+
+**Diagnosis of the default run.**
+- 42% of trades never reached +0.5R before stopping out.
+- 15% stopped out on the entry candle itself (false breakouts).
+- The median stop is only 2% wide, so 0.4% round-trip slippage costs about 0.2R a trade.
+
+**Changes added** (all are options; defaults unchanged):
+
+| Option | What |
+|---|---|
+| `entry_confirm_close=true` | Buy at the next open only after a candle *closes* above the trigger, in the top half of its range |
+| `bar_minutes=5` | Run setups and exits on 5-minute candles (backtest only) |
+| `leader_only=true` | Only trade the stock that's up the most right now (Cameron trades the leading gainer) |
+| `require_above_ema9=true` | Setup candle must close above the 9 EMA |
+| (always on) | Halt / resume / circuit-breaker headlines are no longer counted as catalysts |
+
+**Method.** All tuning used the 60 sessions 2026-08-11..11-03 (dev). Two candidates were then fixed in advance,
+along with the plain fixes, and each was run once on the 60 sessions before that, 2026-05-14..08-10 (holdout).
+
+| Config | Dev trades | Dev P&L | Dev PF | Holdout trades | Holdout P&L | Holdout PF |
+|---|---:|---:|---:|---:|---:|---:|
+| default (stop entry, 1m) | 123 | −1,891 | 0.69 | 147 | −1,755 | 0.73 |
+| close-confirm, 1m | 75 | −801 | 0.74 | 96 | −1,590 | 0.56 |
+| close-confirm, 5m | 31 | −93 | 0.92 | 55 | −871 | 0.63 |
+| A: close-confirm 1m, gap ≥20%, RVOL ≥10 | 40 | −256 | 0.83 | 40 | −922 | 0.52 |
+| B: close-confirm 5m, gap ≥20%, RVOL ≥10 | 13 | **+466** | **2.59** | 20 | **−796** | **0.27** |
+
+Other dev-only variants (leader only, 9 EMA, no bailout, target 1.5R/3R, smaller partial, no topping-tail or MACD
+exit, $2–10, time windows) also all came in between −$1,300 and +$80.
+
+**Takeaway.** Candidate B looked like a winner on dev and lost on unseen data. That's the curve-fitting trap: with
+13–40 trades, any "profitable" setting found by search is mostly luck. Close-confirmation and 5-minute candles cut
+losses in both periods, but nothing tested is profitable out of sample. Long pullback entries on 1- and 5-minute
+bars of news gappers, without Cameron's tape reading and sub-minute timing, show no edge in 120 sessions of 2026
+data.
+
+Reproduce:
+
+```bash
+python3 -m backtestceo.momentum backtest --days 60 --set entry_confirm_close=true bar_minutes=5 min_gap_pct=20 min_rvol=10
+python3 -m backtestceo.momentum backtest --days 60 --end 2026-08-10 --set entry_confirm_close=true bar_minutes=5 min_gap_pct=20 min_rvol=10 --out /tmp/holdout
+```
+
 ## 4. Alpaca paper trading
 
 ```bash
@@ -182,6 +226,7 @@ Safety:
 
 Limitations:
 
+- `bar_minutes` must be 1 (5-minute mode is backtest-only); `entry_confirm_close=true` works (limit buy after the confirming close).
 - Entries are regular-hours only, because Alpaca rejects stop orders in extended hours. The premarket variant
   backtested worse anyway.
 - On the free IEX feed, volume is a few percent of the tape, so RVOL is computed against IEX daily volume. That

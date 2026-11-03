@@ -42,7 +42,7 @@ isolated CEO review. Model sources and reproduction: [3D room](docs/reference-ro
 
 Gap / relative-volume / news scanner, bull flag / micro pullback / first pullback entries on 1-minute bars, 60-day
 backtest and an Alpaca paper trading loop: [engine/backtestceo/momentum/README.md](engine/backtestceo/momentum/README.md).
-Backtest outputs in `docs/momentum-backtest/`. Result: no edge on 1-minute bars (PF 0.69 over 60 sessions).
+Backtest outputs in `docs/momentum-backtest/`. Result: no edge on 1- or 5-minute bars, confirmed on a separate 60-session holdout.
 
 ## Options execution research
 

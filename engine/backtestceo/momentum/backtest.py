@@ -7,13 +7,14 @@ import csv
 import hashlib
 import json
 import re
+from dataclasses import replace
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from .config import Config
 from .data import ET, Data, parse_t
-from .engine import is_catalyst, Bar, Position, SymbolState, hhmm, sim_bar, sim_entry, size, slip
+from .engine import aggregate, confirmed, leader, Bar, Position, SymbolState, hhmm, sim_bar, sim_entry, size, slip
 
 SYMBOL_RE = re.compile(r"^[A-Z]{1,5}$")
 
@@ -38,12 +39,10 @@ def build_universe(data: Data, days: list[date], prev: dict, cfg: Config, log=pr
     for d in days:
         per = defaultdict(list)
         for n in data.news_for_day(d, prev[d], "11:30"):
-            ok = not cfg.require_news or is_catalyst(n["headline"], n["symbols"], cfg)
             for s in n["symbols"]:
-                if tradable_symbol(s):
-                    syms.add(s)  # daily bars for every news symbol (one cache for all catalyst-filter settings)
-                    if ok:
-                        per[s].append((parse_t(n["t"]).astimezone(ET), n["headline"]))
+                if tradable_symbol(s):  # catalyst quality is judged later, in SymbolState, so one universe serves all configs
+                    syms.add(s)
+                    per[s].append((parse_t(n["t"]).astimezone(ET), n["headline"], len(n["symbols"])))
         news_by_day[d] = per
     syms = sorted(syms)
     start, end = days[0] - timedelta(days=int(cfg.adv_days * 1.6) + 10), days[-1]
@@ -114,10 +113,10 @@ def run_day(d: date, cands, minute: dict, cfg: Config):
     states = {s: SymbolState(s, pc, adv, news, cfg) for s, pc, adv, news in cands}
     events = []
     for s in states:
-        for b in to_bars(minute.get(s, [])):
+        for b in aggregate(to_bars(minute.get(s, [])), cfg.bar_minutes):
             events.append((b.t, s, b))
     events.sort(key=lambda e: (e[0], e[1]))
-    risk, pending, open_pos, trades = Risk(cfg), {}, {}, []
+    risk, pending, open_pos, trades, confirmed_su = Risk(cfg), {}, {}, [], {}
     e_from, e_until, flat = hhmm(cfg.entry_from), hhmm(cfg.entry_until), hhmm(cfg.flatten_at)
 
     def finish(s):
@@ -141,15 +140,24 @@ def run_day(d: date, cands, minute: dict, cfg: Config):
                 else:
                     sim_bar(p, b, cfg, entry_bar=False)
         # 2) entries from setups armed at the previous close (strongest rvol first)
+        lead = leader(states) if cfg.leader_only else None
         for _, s, b in sorted(group, key=lambda e: -states[e[1]].rvol_now):
-            st, su = states[s], pending.pop(s, None)
+            st = states[s]
+            su = confirmed_su.pop(s, None) if cfg.entry_confirm_close else pending.pop(s, None)
             if su is None or s in open_pos or not (e_from <= t.time() <= e_until):
+                continue
+            if cfg.leader_only and s != lead:
                 continue
             if not risk.can_trade() or len(open_pos) >= cfg.max_positions or st.entries >= cfg.max_entries_per_symbol:
                 continue
-            fill = sim_entry(su, b, cfg)
-            if fill is None or fill <= su.stop:
-                continue
+            if cfg.entry_confirm_close:  # market at the open after the confirming close
+                fill = b.o + slip(b.o, cfg)
+                if fill <= su.stop or fill - su.stop > 2 * su.risk:
+                    continue
+            else:
+                fill = sim_entry(su, b, cfg)
+                if fill is None or fill <= su.stop:
+                    continue
             q = size(su, st, cfg, risk.mult())
             if q < 1:
                 continue
@@ -169,7 +177,13 @@ def run_day(d: date, cands, minute: dict, cfg: Config):
                     p.exit(t, b.c - slip(b.c, cfg), p.remaining, why)
             if p and p.remaining <= 0:
                 finish(s)
-            pending.pop(s, None)
+            armed = pending.pop(s, None)
+            confirmed_su.pop(s, None)
+            if cfg.entry_confirm_close and armed and s not in open_pos and confirmed(armed, b, cfg):
+                risk_c = b.c - armed.stop
+                if risk_c > 0 and risk_c / b.c * 100 <= cfg.max_stop_pct:
+                    confirmed_su[s] = replace(armed, trigger=round(b.c, 2), limit=round(b.c * (1 + cfg.entry_limit_pct / 100), 2))
+                    continue
             if s not in open_pos:
                 su = st.setup()
                 if su:

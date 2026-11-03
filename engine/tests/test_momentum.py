@@ -107,9 +107,10 @@ def test_run_day_end_to_end():
 
 
 def test_catalyst_filter_and_symbols():
-    assert is_catalyst("Acme Wins FDA Approval", ["ACME"], CFG)
-    assert not is_catalyst("12 Health Care Stocks Moving In Tuesday's Pre-Market Session", ["A"], CFG)
-    assert not is_catalyst("Merger news", ["A", "B", "C"], CFG)
+    assert is_catalyst("Acme Wins FDA Approval", 1, CFG)
+    assert not is_catalyst("12 Health Care Stocks Moving In Tuesday's Pre-Market Session", 1, CFG)
+    assert not is_catalyst("Merger news", 3, CFG)
+    assert not is_catalyst("Acme Shares Resume Trade", 1, CFG)
     assert tradable_symbol("ACME") and not tradable_symbol("ACMEW") and not tradable_symbol("BRK.B")
 
 
@@ -161,3 +162,32 @@ def test_paper_trader_dry_run_flow(tmp_path, monkeypatch):
     tr.on_price(tr.pos.stop - 0.01)
     assert tr.pos is None and tr.risk.trades == 1
     assert (tmp_path / f"trades-{D}.jsonl").exists()
+
+
+def test_aggregate_and_close_confirm():
+    from backtestceo.momentum.engine import aggregate, confirmed
+    one = [bar(f"09:3{k}", 5 + k * 0.1, 5.2 + k * 0.1, 4.9 + k * 0.1, 5.1 + k * 0.1, 10) for k in range(7)]
+    five = aggregate(one, 5)
+    assert [b.t.strftime("%H:%M") for b in five] == ["09:30", "09:35"]
+    assert five[0].o == 5.0 and abs(five[0].h - 5.6) < 1e-9 and five[0].v == 50 and five[0].c == one[4].c
+    su = state(surge_then_pullback()).setup()
+    assert confirmed(su, bar("09:35", su.trigger - 0.05, su.trigger + 0.10, su.trigger - 0.06, su.trigger + 0.08), CFG)
+    assert not confirmed(su, bar("09:35", su.trigger - 0.05, su.trigger + 0.20, su.trigger - 0.06, su.trigger - 0.01), CFG)
+
+
+def test_paper_close_confirm_waits_for_close(tmp_path, monkeypatch):
+    from backtestceo.momentum import paper
+    monkeypatch.setattr(paper, "STATE", tmp_path)
+    cfg = CFG.with_(entry_confirm_close=True)
+    bars = surge_then_pullback()
+    clock = {"now": t("09:35") + timedelta(seconds=3)}
+    data = FakeData(bars)
+    tr = paper.Trader(cfg, data, paper.DryRun(), now=lambda: clock["now"])
+    tr.on_minute()
+    assert tr.entry_order is None and "TEST" in tr.armed  # setup seen, no order yet
+    su = tr.armed["TEST"]
+    data.rows.append({"t": t("09:35").isoformat(), "o": bars[-1].c, "h": su.trigger + 0.1, "l": bars[-1].c - 0.01,
+                      "c": su.trigger + 0.09, "v": 300_000})
+    clock["now"] = t("09:36") + timedelta(seconds=3)
+    tr.on_minute()
+    assert tr.entry_order and tr.entry_order["setup"].trigger == round(su.trigger + 0.09, 2)

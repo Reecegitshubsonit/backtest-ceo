@@ -12,6 +12,7 @@ def main(argv=None):
     for name in ("backtest", "sweep"):
         p = sub.add_parser(name)
         p.add_argument("--days", type=int, default=60)
+        p.add_argument("--end", default=None, help="last session YYYY-MM-DD (default: latest), e.g. 2026-08-10 for the holdout")
         p.add_argument("--set", nargs="*", default=[], metavar="key=value")
         p.add_argument("--out", default=str(Path(__file__).resolve().parents[3] / "docs" / "momentum-backtest"))
     p = sub.add_parser("scan", help="one live scanner pass (read-only)")
@@ -27,7 +28,8 @@ def main(argv=None):
         from . import backtest as bt
         from .data import Data
         data = Data()
-        days, uni, minute = bt.prepare(data, a.days, cfg)
+        from datetime import date
+        days, uni, minute = bt.prepare(data, a.days, cfg, date.fromisoformat(a.end) if a.end else None)
         if a.cmd == "backtest":
             trades, scanned, halts = bt.run(days, uni, minute, cfg)
             st = bt.stats(trades, days, cfg)
