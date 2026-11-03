@@ -151,6 +151,9 @@ def run_symbol(sym):
     days = [d for d in tdays_all if D.FIRST_EXP <= d <= D.LAST_DAY]
     gidx = {d: i for i, d in enumerate(days)}
     exps = D.expiries(sym, tdays_all)
+    # split factor raw/adjusted per day: skip positions whose life spans a split (contracts get renamed)
+    adjc = {D.ts(r["t"]).date(): r["c"] for r in u["1d"]}
+    fac = {D.ts(r["t"]).date(): r["c"] / adjc[D.ts(r["t"]).date()] for r in u["1d-raw"] if D.ts(r["t"]).date() in adjc}
     bars = defaultdict(dict)
     for r in u["30m"]:
         t = D.ts(r["t"]); sl = (t.hour * 60 + t.minute - 570) // 30
@@ -161,7 +164,9 @@ def run_symbol(sym):
         if len(bars[d]) < 12: continue
         for b in BUCKETS:
             e = D.bucket_expiry(sym, d, b, exps, tidx_all)
-            if e is not None and e <= D.LAST_DAY: work[e].append((d, b))
+            if e is None or e > D.LAST_DAY: continue
+            if abs(fac.get(d, 1) / fac.get(e, 1) - 1) > 0.01: continue
+            work[e].append((d, b))
     rows_key, rows_pnl, rows_exit, rows_risk = [], [], [], []
     for e in sorted(work):
         f = D.DIR / f"opt/{sym}/{e}.json.gz"
@@ -192,7 +197,7 @@ def run_symbol(sym):
                 delta[ok] = implied_delta(S, tape.strike[ok], T, px[ok], tape.right[ok])
                 half = hs(sym, b, np.nan_to_num(px))
                 key = (sym, gidx[d], ti, b)
-                res = simulate(tape, g, delta, px, half, intrinsic, b, sym)
+                res = simulate(tape, g, delta, px, half, intrinsic, b, sym, hs)
                 if res is None: continue
                 pnl, ex, risk = res
                 # exit slot -> global day index
@@ -208,15 +213,15 @@ def run_symbol(sym):
 
 
 def pick(delta, right, target, call):
-    """index of contract whose |delta| is closest to target on the given side; None if > 0.07 away."""
+    """index of contract whose |delta| is closest to target on the given side; None if > max(0.07, 40%) away."""
     m = (right == call) & ~np.isnan(delta)
     if not m.any(): return None
     cand = np.where(m)[0]; err = np.abs(np.abs(delta[cand]) - target)
     j = cand[np.argmin(err)]
-    return int(j) if err.min() <= 0.07 else None
+    return int(j) if err.min() <= max(0.07, 0.4 * target) else None
 
 
-def simulate(tape, g, delta, px, half, intrinsic, bucket, sym):
+def simulate(tape, g, delta, px, half, intrinsic, bucket, sym, hs):
     """All NS structures for one entry. Returns pnl (NS,16), exit offset (NS,16), risk (NS,)."""
     pnl = np.full((NS, 16), np.nan, np.float32); ex = np.full((NS, 16), -1, np.int32); risk = np.full(NS, np.nan, np.float32)
     end = tape.mark.shape[1]
@@ -264,7 +269,7 @@ def simulate(tape, g, delta, px, half, intrinsic, bucket, sym):
         # exit at t -> fill on t+1 (last slot: use own mark)
         nf = np.concatenate([fp[idx][:, 1:], fp[idx][:, -1:]], axis=1)
         nf = np.where(np.isnan(nf), m, nf)
-        hx = np.maximum(0.005, half[idx][:, None] * np.maximum(nf, 0.01) / np.maximum(mid0[:, None], 0.01))
+        hx = hs(sym, bucket, np.maximum(nf, 0.0))
         xfill = np.maximum(nf - q[:, None] * hx, 0)        # close long at bid, short at ask
         fees_in = FEE * len(legs)
         exit_pnl = ((xfill - efill[:, None]) * q[:, None]).sum(0) * 100 - fees_in - FEE * len(legs)
