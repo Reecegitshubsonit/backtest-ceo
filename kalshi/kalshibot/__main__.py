@@ -44,6 +44,12 @@ def main(argv=None) -> None:
     cp.add_argument("--inbox", default=str(DATA / "signals.jsonl"))
     cp.add_argument("--state", default=str(DATA / "copy_state.json"))
     cp.add_argument("--journal", default=str(DATA / "copy_journal.jsonl"))
+    ld = sub.add_parser("leaders", help="rank Kalshi leaderboard traders by copyability (data: rivo.markets)")
+    ld.add_argument("--refresh", action="store_true", help="re-download pages (otherwise use cache)")
+    ld.add_argument("--cache", default=str(DATA / "rivo"))
+    ld.add_argument("--top", type=int, default=10)
+    ld.add_argument("--slippage", type=float, default=0.02)
+    ld.add_argument("--write", default=None, help="write picks into this copy config (e.g. copy_config.json)")
     sub.add_parser("account", help="authenticated read-only: balance and positions (checks your keys)")
     a = ap.parse_args(argv)
 
@@ -109,6 +115,16 @@ def main(argv=None) -> None:
             print(summary(eng.state))
             for pos in eng.state.positions.values():
                 print(f"  POS {pos.ticker} {pos.side} x{pos.contracts} cost ${pos.cost:.2f} via {eng.owner.get(pos.ticker, '?')}")
+    elif a.cmd == "leaders":
+        from . import leaders as L
+
+        pages = L.fetch(None, Path(a.cache), refresh=a.refresh)
+        keep, drop = L.rank(pages, L.Rules(slippage=a.slippage))
+        print(L.report(keep, drop, a.top))
+        L.dump(keep, drop, Path(a.cache) / "_scored.json")
+        if a.write:
+            L.write_config(keep, Path(a.write), a.top, Path("copy_config.example.json"))
+            print(f"wrote top {min(a.top, len(keep))} to {a.write}")
     elif a.cmd == "account":
         print(json.dumps({"balance": client.balance(), "positions": client.positions()}, indent=1))
 

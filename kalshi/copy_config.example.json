@@ -1,9 +1,17 @@
 {
- "traders": {"replace_with_leaderboard_nickname": 1.0},
+ "traders": {
+  "whodis1": 1.0,
+  "old.cardinal6907": 1.0,
+  "hughman": 1.0,
+  "silicon": 1.0,
+  "dontsleeponthedub": 1.0,
+  "manimal2017": 0.5,
+  "breukinksepulveda3105": 0.5
+ },
  "usd_per_trade": 10.0,
  "max_slippage": 0.03,
  "max_age_sec": 300,
- "min_price": 0.10,
+ "min_price": 0.1,
  "max_price": 0.95,
  "max_per_market": 30.0,
  "max_per_trader": 150.0,

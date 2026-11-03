@@ -51,6 +51,18 @@ Why copies can underperform the leader:
 - Bürgi, Deng & Whelan find takers lose about 32% on average and makers about 10%.
 - Leaderboard rank is in-sample: past P&L, survivorship and size you can't match.
 
+### Choosing traders: `kalshibot leaders`
+
+`kalshibot leaders --refresh --write copy_config.json` downloads Rivo's Kalshi leaderboard and every listed
+trader's page (kalshi.com blocks bots, and the API has no leaderboard). It then:
+- takes Rivo's 90-day "$100 per bet" copy simulation;
+- charges the taker fee and 2¢ of slippage;
+- drops market makers, idle accounts, parlay-heavy accounts, one-win and one-month wonders, closers
+  (95¢+ entries) and longshot-driven results;
+- ranks the rest by t-stat and writes the top names into the copy config.
+
+Current picks and why the biggest lifetime earners fail: [LEADERS.md](LEADERS.md).
+
 Paper-copy for a few weeks, then keep only the traders whose *copied* P&L (not their own P&L) is positive.
 
 **FOMO:** it's a social crypto trading app with feeds of followed traders, leaderboards and copy signals.
