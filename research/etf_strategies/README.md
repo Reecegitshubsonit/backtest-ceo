@@ -145,3 +145,49 @@ All Holm-adjusted p = 1.00.
    to be tested over ~90 years, where a 0.2 Sharpe edge is detectable. The environment's network policy blocks
    `mba.tuck.dartmouth.edu`, `fred.stlouisfed.org` and `stooq.com`.
 2. More orthogonal return sources than SPY timing (carry, value or cross-sectional factor ETFs), tested the same way.
+
+## Round 4: 3-month backtest and intraday strategies (`three_month.py`, `intraday.py`)
+
+### Last 3 months, daily strategies (2026-08-03 .. 2026-11-03, 66 sessions): `three_month_results.md`
+SPY +0.9%. Best: turn of month +4.6% (Sharpe 2.39) and top-3 sectors +4.5% (1.46). Both rest on 3 rebalances or
+holding windows, and turn of month lost to vol-matched SPY over 10 years. 66 days cannot rank strategies, so
+nothing was tuned or chosen on this window.
+
+### Intraday candidates, published rules, 5-min SIP bars 2016–2026
+- I1 **Noise-boundary intraday momentum, SPY** (Zarattini, Aziz, Barbon 2024): bands = max/min(open, prev close) × (1 ± 14-day
+  average absolute move from open at that time of day). Checks every 30 min, trailing stop at the band or VWAP, flat at the close.
+  1x, and the paper's sizing (2% daily vol target, ≤4x).
+- I2 **5-min opening-range breakout, QQQ** (Zarattini, Barbon, Aziz 2023): trade in the direction of the first 5-min candle,
+  stop at its other end, 10R target, else exit at the close. 1x, and the paper's 1%-risk sizing (≤4x).
+- I3 **First half-hour → last half-hour momentum, SPY** (Gao, Han, Li, Zhou 2018).
+
+Pass rule set before the results: net Sharpe above SPY in **both** 2016–2023 and 2024-01..2026-07, with the last 3 months
+as a holdout scored once. Main cost 0.5 bp/side. The paper costs of about 0.06 bp/side at today's prices are under the
+0.25 bp sensitivity row. Disclosure: the first run used 2 bp/side, at which all five lose money even in 2016–2023.
+I cut the main case to 0.5 bp after seeing that, because 2 bp is about 15× SPY's 1-cent spread. The sensitivity table covers 0–2 bp.
+
+| Sharpe (xs T-bill), 0.5 bp/side | 2016–2023 | 2024-01..2026-07 | Holdout 3m | Full | Gross (0 bp) full |
+|---|---:|---:|---:|---:|---:|
+| SPY buy & hold | 0.74 | 0.99 | 0.15 | 0.78 | — |
+| I1a Noise boundary 1x | 0.77 | -0.13 | -0.67 | 0.56 | 0.89 |
+| I1b Noise boundary ≤4x | 0.92 | 0.16 | -1.22 | 0.69 | 1.09 |
+| I2a ORB QQQ 1x | 0.56 | -0.05 | 1.21 | 0.45 | 0.71 |
+| I2b ORB QQQ ≤4x | 0.68 | 0.12 | 1.20 | 0.57 | 0.88 |
+| I3 Last half-hour | -0.68 | -0.63 | -4.40 | -0.70 | -0.18 |
+
+Full-period CAGR / max DD at 0.5 bp: I1b 11.9% / -31%, I2b 15.3% / -30%, SPY 15.2% / -34%.
+
+**No intraday strategy passes.** The noise-boundary and ORB edges replicate before costs in 2016–2023 (gross Sharpe
+1.31 and 0.99), but **they decayed after publication.** In 2024–26 even the gross Sharpes (0.56, 0.45) are about half of SPY's.
+The ORB's strong last 3 months (Sharpe 1.2, +39% annualized at ≤4x) rests on 65 trades with a ΔSharpe CI of [-2.3, +3.8],
+right after a 2.5-year stretch below SPY. That is the profile of a lucky window, not a fixed strategy. I3 loses in every window.
+
+### Where this leaves the project
+17 strategy-vs-SPY tests, 0 survivors after Holm correction, and none passed its own pre-declared rule. Searching further
+on the same 10 years will eventually produce something that looks extremely profitable, and it will be an artifact of the
+search. Options that could produce a real answer:
+1. **Longer history** to test rules over many regimes. The environment's network policy blocks the hosts
+   (`mba.tuck.dartmouth.edu`, `fred.stlouisfed.org`, `stooq.com`).
+2. **Forward paper trading** of a small fixed set (e.g. I1b, I2b, N1) with rules frozen now. Live out-of-sample data
+   cannot be overfit.
+3. Accept a risk-shape goal instead of beating SPY: N1 vol targeting kept SPY-like return with max DD -19% vs -34% over 2017–2026.
