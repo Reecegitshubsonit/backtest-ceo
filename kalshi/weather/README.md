@@ -103,3 +103,11 @@ Settings: 58 days, 31 series, 10,249 quoted brackets, decisions the day before.
 Beating these markets would need inputs the free global models don't have. Examples are station-level National
 Blend of Models (NBM) probabilities, HRRR or MOS guidance, and same-day observation trends. Any new model
 should beat the market's Brier score in `backtest` before it trades.
+
+## NBM retest, 2026-11-04: also loses
+The National Blend of Models (NWS station forecast: TXN with its own XND spread, 12Z run the day before),
+with leave-one-out bias and spread, across 19 series and 6,268 brackets:
+- **Brier score:** NBM 0.1337 vs market 0.1051.
+- **ROI:** −14% to −19% in every variant, t from −2.7 to −5.1.
+
+Public forecasts do not beat these markets the day before.
