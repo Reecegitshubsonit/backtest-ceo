@@ -26,7 +26,7 @@ def run(client: KalshiClient, cfg: WxConfig, series_list, days: int, out: Path, 
     for series in series_list or DEFAULT_SERIES:
         for attempt in range(4):
             try:
-                code, kind, events = settled_events(client, series, days)
+                code, kind, events = settled_events(client, series, days, cache / f"kalshi_{series}_{days}.json")
                 break
             except KalshiError as e:
                 log(f"{series}: {e} (retrying)")
@@ -46,7 +46,8 @@ def run(client: KalshiClient, cfg: WxConfig, series_list, days: int, out: Path, 
         allfit = nbm.fit(list(errs.values()))
         if allfit:
             cal_out.setdefault(code, {})[f"{kind}_nbm"] = allfit
-        q = quotes_at(client, {m["ticker"]: decision_ts(d) for d, e in events.items() if d in fc for m in e["markets"]})
+        q = quotes_at(client, {m["ticker"]: decision_ts(d) for d, e in events.items() if d in fc for m in e["markets"]},
+                      cache / f"quotes_{series}_{days}.json")
         used = 0
         for d, e in events.items():
             if d not in fc:

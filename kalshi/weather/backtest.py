@@ -26,7 +26,10 @@ from .stations import DEFAULT_SERIES, STATIONS, kind_from_rules, station_from_ru
 from .trader import event_date
 
 
-def settled_events(client: KalshiClient, series: str, days: int) -> tuple[str | None, str | None, dict]:
+def settled_events(client: KalshiClient, series: str, days: int, cache: Path | None = None) -> tuple[str | None, str | None, dict]:
+    if cache and cache.exists():
+        d = json.loads(cache.read_text())
+        return d["code"], d["kind"], {date.fromisoformat(k): v for k, v in d["events"].items()}
     now = int(time.time())
     code = kind = None
     events: dict[date, dict] = {}
@@ -43,25 +46,47 @@ def settled_events(client: KalshiClient, series: str, days: int) -> tuple[str | 
             e["truth"] = float(m["expiration_value"])
         except (KeyError, TypeError, ValueError):
             pass
-    return code, kind, {d: e for d, e in events.items() if e["truth"] is not None}
+    events = {d: e for d, e in events.items() if e["truth"] is not None}
+    if cache and code:
+        keep = ("ticker", "event_ticker", "strike_type", "floor_strike", "cap_strike", "result")
+        slim = {k.isoformat(): {"truth": v["truth"], "markets": [{f: m.get(f) for f in keep} for m in v["markets"]]}
+                for k, v in events.items()}
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({"code": code, "kind": kind, "events": slim}))
+    return code, kind, events
 
 
 def decision_ts(day: date) -> int:
     return int(datetime(day.year, day.month, day.day, 20, tzinfo=timezone.utc).timestamp()) - 86400
 
 
-def quotes_at(client: KalshiClient, tickers_ts: dict[str, int]) -> dict[str, tuple[float, float]]:
-    """(yes_bid, yes_ask) from the last hourly candle at or before each ticker's decision time."""
+def _get_patiently(client: KalshiClient, endpoint: str, params: dict, tries: int = 6) -> dict:
+    for attempt in range(tries):
+        try:
+            return client.get(endpoint, params)
+        except KalshiError:
+            if attempt == tries - 1:
+                raise
+            time.sleep(20 * (attempt + 1))  # rate limited: back off and resume
+    return {}
+
+
+def quotes_at(client: KalshiClient, tickers_ts: dict[str, int], cache: Path | None = None) -> dict[str, tuple[float, float]]:
+    """(yes_bid, yes_ask) from the last hourly candle at or before each ticker's decision time.
+    With `cache`, results are saved as they arrive so an interrupted run resumes where it stopped."""
+    stored = json.loads(cache.read_text()) if cache and cache.exists() else {}
+    out = {t: tuple(v) for t, v in stored.get("quotes", {}).items() if t in tickers_ts}
+    done = set(stored.get("done", []))
     groups: dict[int, list[str]] = {}
     for t, ts in tickers_ts.items():  # one short window per decision time keeps under the 10,000-candle cap
-        groups.setdefault(ts, []).append(t)
-    out = {}
+        if t not in done:
+            groups.setdefault(ts, []).append(t)
     for ts, ticks in groups.items():
         for i in range(0, len(ticks), 100):
             chunk = ticks[i:i + 100]
-            data = client.get("/markets/candlesticks", {"market_tickers": ",".join(chunk), "start_ts": ts - 6 * 3600,
-                                                        "end_ts": ts, "period_interval": 60,
-                                                        "include_latest_before_start": "true"})
+            data = _get_patiently(client, "/markets/candlesticks",
+                                  {"market_tickers": ",".join(chunk), "start_ts": ts - 6 * 3600, "end_ts": ts,
+                                   "period_interval": 60, "include_latest_before_start": "true"})
             for mk in data.get("markets", []):
                 best = None
                 for c in mk.get("candlesticks", []):
@@ -73,6 +98,10 @@ def quotes_at(client: KalshiClient, tickers_ts: dict[str, int]) -> dict[str, tup
                         best = (float(b), float(a))
                 if best:
                     out[mk.get("market_ticker")] = best
+            done.update(chunk)
+            if cache:
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                cache.write_text(json.dumps({"quotes": {**stored.get("quotes", {}), **out}, "done": sorted(done)}))
     return out
 
 
