@@ -64,25 +64,31 @@ class Fake:
     """Kalshi + Open-Meteo stand-in. Ensemble says ~74F tomorrow; market prices 70-71 as the favorite."""
 
     def __init__(self, day):
-        self.day, self.posts = day, []
+        self.day, self.posts, self.nws_high = day, [], 74
         tag = day.strftime("%y%b%d").upper()
         close = iso(datetime(day.year, day.month, day.day, tzinfo=timezone.utc) + timedelta(hours=30))
         def mk(suffix, st, f, c, ya, na, label):
             return {"ticker": f"KXHIGHNY-{tag}-{suffix}", "event_ticker": f"KXHIGHNY-{tag}", "rules_primary": RULES,
                     "strike_type": st, "floor_strike": f, "cap_strike": c, "yes_ask_dollars": ya, "no_ask_dollars": na,
+                    "yes_bid_dollars": f"{max(0.0, float(ya) - 0.02):.2f}",
                     "yes_ask_size_fp": "500", "no_ask_size_fp": "500", "volume_24h_fp": "5000",
                     "close_time": close, "yes_sub_title": label, "status": "active"}
-        self.markets = [mk("T70", "less", None, 70, "0.10", "0.92", "69 or below"),
-                        mk("B70.5", "between", 70, 71, "0.60", "0.42", "70 to 71"),
-                        mk("B72.5", "between", 72, 73, "0.25", "0.77", "72 to 73"),
-                        mk("B74.5", "between", 74, 75, "0.08", "0.94", "74 to 75"),
-                        mk("T75", "greater", 75, None, "0.03", "0.98", "76 or above")]
+        self.markets = [mk("T70", "less", None, 70, "0.03", "0.98", "69 or below"),
+                        mk("B70.5", "between", 70, 71, "0.30", "0.72", "70 to 71"),
+                        mk("B72.5", "between", 72, 73, "0.45", "0.57", "72 to 73"),
+                        mk("B74.5", "between", 74, 75, "0.15", "0.87", "74 to 75"),
+                        mk("T75", "greater", 75, None, "0.06", "0.96", "76 or above")]
 
     def _r(self, body, code=200):
         return type("R", (), {"status_code": code, "json": lambda s: body, "text": json.dumps(body),
                               "raise_for_status": lambda s: None})()
 
     def get(self, url, params=None, headers=None, timeout=None):
+        if "weather.gov/points" in url:
+            return self._r({"properties": {"forecast": "https://api.weather.gov/gridpoints/OKX/1,1/forecast"}})
+        if "weather.gov/gridpoints" in url:
+            return self._r({"properties": {"periods": [{"isDaytime": True, "startTime": f"{self.day.isoformat()}T06:00:00-05:00",
+                                                        "temperature": self.nws_high, "temperatureUnit": "F"}]}})
         if "open-meteo" in url:
             t0 = datetime(self.day.year, self.day.month, self.day.day, tzinfo=timezone.utc) - timedelta(days=2)
             times = [t0 + timedelta(hours=i) for i in range(24 * 5)]
@@ -109,12 +115,26 @@ def test_scan_finds_the_mispriced_brackets():
     day = (now - timedelta(hours=5)).date() + timedelta(days=1)
     f = Fake(day)
     client = KalshiClient(base_url="https://x/trade-api/v2", session=f, min_interval=0)
-    opps = scan(client, WxConfig(series=["KXHIGHNY"]), now=now, session=f, log=lambda *a: None)
+    msgs = []
+    opps = scan(client, WxConfig(series=["KXHIGHNY"]), now=now, session=f, log=msgs.append)
     best = {o.ticker.rsplit("-", 1)[1]: o for o in opps}
-    # model mean ~74.6: 74-75 YES at 8c is cheap, 70-71 is overpriced -> buy NO
-    assert best["B74.5"].side == "yes" and best["B74.5"].edge > 0.2
+    # ensemble ~74.6 and NWS 74 vs a market centred on 72-73: 74-75 cheap, 70-71 rich
+    assert best["B74.5"].side == "yes" and 0.06 <= best["B74.5"].edge <= 0.20
     assert best["B70.5"].side == "no"
+    assert "T75" not in best or best["T75"].side == "no"  # 6c YES is below the 10c floor
     assert all(o.lead == 1 for o in opps)
+
+
+def test_huge_edge_is_treated_as_model_error():
+    now = datetime.now(timezone.utc)
+    day = (now - timedelta(hours=5)).date() + timedelta(days=1)
+    f = Fake(day)
+    client = KalshiClient(base_url="https://x/trade-api/v2", session=f, min_interval=0)
+    msgs = []
+    opps = scan(client, WxConfig(series=["KXHIGHNY"], max_edge=0.05, min_edge=0.01), now=now, session=f,
+                log=msgs.append)
+    assert any("too large" in m for m in msgs)
+    assert all(o.edge <= 0.05 for o in opps)
 
 
 def test_paper_trader_respects_caps(tmp_path):

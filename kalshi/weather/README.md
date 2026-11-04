@@ -26,7 +26,13 @@ Separate from the copy bot. It uses the same Kalshi client and paper or live mac
    (a ceiling for the low). Brackets it has already passed are worth 0 or 1. This is often the clearest edge
    late in the day.
 5. **Bracket probabilities:** each bracket's probability is computed with the whole-degree rounding.
-6. **When it buys:** YES or NO, whichever beats the ask plus the taker fee by at least `min_edge` (6¢).
+6. **Blending:** highs centre on 50% NWS point forecast and 50% ensemble. The bracket probability is then
+   50% model and 50% market mid. Any remaining "edge" above 20¢ is logged as model error and skipped. Longshots
+   under 10¢ are skipped.
+7. **When it buys:** YES or NO, whichever beats the ask plus the taker fee by at least `min_edge` (6¢).
+
+The first uncalibrated paper run (2026-11-04) bought six 5–8¢ longshots at "edges" of 20–37¢. That's the
+signature of a model that's off by 2–3°F, which is why these guards exist.
 
 ## Use (from the `kalshi/` folder)
 ```bash

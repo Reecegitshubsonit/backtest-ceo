@@ -89,3 +89,24 @@ def mean_sd(xs: list[float]) -> tuple[float, float]:
     m = sum(xs) / len(xs)
     sd = math.sqrt(sum((x - m) ** 2 for x in xs) / max(1, len(xs) - 1))
     return m, sd
+
+
+def nws_forecast_high(lat: float, lon: float, day: date, session=None, cache: dict | None = None) -> float | None:
+    """NWS point forecast high (F) for `day` (local date of the daytime period), or None."""
+    s = session or requests
+    key = (round(lat, 4), round(lon, 4))
+    if cache is not None and key in cache:
+        url = cache[key]
+    else:
+        r = s.get(f"{NWS}/points/{lat:.4f},{lon:.4f}", headers=UA, timeout=30)
+        r.raise_for_status()
+        url = r.json()["properties"]["forecast"]
+        if cache is not None:
+            cache[key] = url
+    r = s.get(url, headers=UA, timeout=30)
+    r.raise_for_status()
+    for p in r.json()["properties"]["periods"]:
+        if p.get("isDaytime") and p.get("startTime", "")[:10] == day.isoformat():
+            t = float(p["temperature"])
+            return t if p.get("temperatureUnit", "F") == "F" else t * 9 / 5 + 32
+    return None

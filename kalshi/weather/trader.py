@@ -54,6 +54,7 @@ def scan(client: KalshiClient, cfg: WxConfig, now: datetime | None = None, sessi
     now = now or datetime.now(timezone.utc)
     cal = cfg.calibration()
     ens_cache: dict[str, tuple] = {}
+    nws_cache: dict = {}
     out: list[Opp] = []
     for series in cfg.series or DEFAULT_SERIES:
         try:
@@ -92,6 +93,14 @@ def scan(client: KalshiClient, cfg: WxConfig, now: datetime | None = None, sessi
                 except Exception as e:
                     log(f"{icao}: observations failed: {e}")
             mu, sd = distribution(members, lead, kind, cfg, cal.get(code))
+            nws = None
+            if kind == "high" and cfg.nws_weight > 0:
+                try:
+                    nws = fc.nws_forecast_high(lat, lon, day, session=session, cache=nws_cache)
+                except Exception as e:
+                    log(f"{icao}: NWS forecast failed: {e}")
+                if nws is not None:
+                    mu = cfg.nws_weight * nws + (1 - cfg.nws_weight) * mu
             for m in ms:
                 ct = parse_time(m.get("close_time"))
                 hours_left = (ct - now).total_seconds() / 3600 if ct else 0
@@ -100,12 +109,21 @@ def scan(client: KalshiClient, cfg: WxConfig, now: datetime | None = None, sessi
                 p = bracket_prob(m.get("strike_type", ""), m.get("floor_strike"), m.get("cap_strike"), mu, sd, obs, kind)
                 if p is None:
                     continue
+                yb, ya = price(m, "yes_bid"), price(m, "yes_ask")
+                if yb is None or ya is None:
+                    continue
+                mid = (yb + ya) / 2
+                p = cfg.model_weight * p + (1 - cfg.model_weight) * mid  # lean on the market
                 best = None
-                for side, p_side, ask, size in (("yes", p, price(m, "yes_ask"), count(m, "yes_ask_size")),
+                for side, p_side, ask, size in (("yes", p, ya, count(m, "yes_ask_size")),
                                                 ("no", 1 - p, price(m, "no_ask"), count(m, "no_ask_size"))):
                     if not ask or not cfg.min_price <= ask <= cfg.max_price:
                         continue
                     edge = p_side - ask - fee(100, ask, cfg.taker_fee_rate) / 100
+                    if edge > cfg.max_edge:
+                        log(f"{m['ticker']} {side}: edge {edge:+.2f} too large, treating as model error "
+                            f"(mu {mu:.1f}, nws {nws}, ask {ask:.2f})")
+                        continue
                     if edge >= cfg.min_edge and (best is None or edge > best.edge):
                         best = Opp(m["ticker"], ev, code, kind, day.isoformat(), lead, m.get("yes_sub_title", ""),
                                    side, ask, round(p_side, 4), round(edge, 4), round(mu, 2), round(sd, 2),

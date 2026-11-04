@@ -52,8 +52,11 @@ class WxConfig:
     sd_floor: dict = field(default_factory=lambda: {"0": 1.6, "1": 2.3, "2": 3.0, "3": 3.6})
     max_lead_days: int = 2       # trade today, tomorrow and the day after
     min_hours_left: float = 1.0  # stop trading a market this close to its close
-    min_edge: float = 0.06       # model prob minus all-in cost, per $1 contract
-    min_price: float = 0.05
+    min_edge: float = 0.06       # blended prob minus all-in cost, per $1 contract
+    max_edge: float = 0.20       # bigger "edges" on liquid markets are model error: skip and log
+    model_weight: float = 0.5    # blended prob = w * model + (1 - w) * market mid
+    nws_weight: float = 0.5      # highs: centre = w * NWS point forecast + (1 - w) * ensemble
+    min_price: float = 0.10      # longshots are where the favorite-longshot bias bites
     max_price: float = 0.92
     min_volume_24h: float = 300
     usd_per_bet: float = 2.0
