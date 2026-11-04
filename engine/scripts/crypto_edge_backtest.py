@@ -31,12 +31,13 @@ def fetch(sym, tf, start, end, cache):
             p = {"symbols": sym, "timeframe": tf, "start": start.isoformat(), "end": end.isoformat(), "limit": 10000}
             if tok:
                 p["page_token"] = tok
-            for a in range(5):
+            for a in range(10):  # Alpaca rate-limits at ~200 req/min: back off on 429, honour Retry-After
                 r = requests.get(URL, params=p, headers=h, timeout=30)
                 if r.status_code == 200:
                     break
-                time.sleep(2 ** a)
+                time.sleep(float(r.headers.get("Retry-After") or min(60, 2 ** a)))
             r.raise_for_status()
+            time.sleep(0.35)
             j = r.json()
             rows += j["bars"].get(sym, [])
             tok = j.get("next_page_token")
