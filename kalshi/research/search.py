@@ -130,6 +130,28 @@ class Split:
         return sums[cnt > 0] / cnt[cnt > 0]
 
 
+def tail_check(splits_all: Split, c) -> dict:
+    """Binary-payoff sanity check for hold-to-settlement combos.
+
+    A 96c favourite earns ~+4% when right and -100% when wrong, so a handful of events with no loss
+    gives a huge t-stat and says nothing. Pool every split, count losing events, and ask how likely that
+    few losses would be if the true loss rate were the break-even rate (1 - average cost). p >= 0.05 means
+    the record cannot be told apart from zero edge."""
+    if EXITS[c[7]][0] is not None:
+        return {"applies": False}
+    er = splits_all.event_returns(c)
+    if not len(er):
+        return {"applies": True, "events": 0, "losses": 0, "breakeven_loss_rate": None, "p": 1.0}
+    wins = er[er > 0]
+    cost = float(np.mean(1 / (1 + wins))) if len(wins) else 1.0  # win return = 1/cost - 1
+    q = 1 - cost
+    n, k = len(er), int((er < 0).sum())
+    from math import comb
+    p = sum(comb(n, i) * q ** i * (1 - q) ** (n - i) for i in range(k + 1)) if n <= 1000 else \
+        NormalDist(n * q, math.sqrt(max(n * q * (1 - q), 1e-12))).cdf(k + 0.5)
+    return {"applies": True, "events": n, "losses": k, "breakeven_loss_rate": q, "p": float(p)}
+
+
 def neighbours(c):
     s, b, h, cat, v, sp, mo, ex, sz = c
     out = []
@@ -207,6 +229,7 @@ def search(split: Split, combos: list[tuple], ckpt: Path, label: str, log=print)
 
 def pipeline(d: dict, splits: dict[str, np.ndarray], combos, ckdir: Path, label: str, cat_names, log=print) -> dict:
     sp = {k: Split(d, v) for k, v in splits.items()}
+    sall = Split(d, np.concatenate(list(splits.values())))
     sv = Split(d, np.concatenate([splits["search"], splits["validate"]]))
     res = search(sp["search"], combos, ckdir / f"search_{label}.npz", label, log)
     ok = (res[:, 0] >= MIN_EV_SEARCH) & (res[:, 1] > 0)
@@ -237,7 +260,8 @@ def pipeline(d: dict, splits: dict[str, np.ndarray], combos, ckdir: Path, label:
         out.append({"params": describe(c, cat_names), "search": dict(zip(("events", "mean", "sd", "t"), map(float, res[i]))),
                     "validate": dict(zip(("events", "mean", "sd", "t"), map(float, sp["validate"].evaluate(c)))),
                     "holdout": {"events": int(hn), "mean": hmu, "t": ht},
-                    "deflated_sharpe_search": deflated_sharpe(sp["search"].event_returns(c), sr_trials, len(combos))})
+                    "deflated_sharpe_search": deflated_sharpe(sp["search"].event_returns(c), sr_trials, len(combos)),
+                    "tail": tail_check(sall, c)})
     return {"label": label, "combos": len(combos), "eligible_search": int(ok.sum()),
             "best_search_t": float(np.nanmax(res[ok, 3])) if ok.any() else None,
             "search_t_gt_3": int((res[ok, 3] > 3).sum()), "passed_validation": len(val),
