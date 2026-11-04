@@ -343,3 +343,51 @@ by 3.4 pts CAGR, but the CI spans -2.1 to +2.0, and the same rule on SPY (#3) lo
   only bias toward false positives, so the negative result stands.
 - Only one shuffle was run (compute): it shows the scale of luck, not a full null distribution.
 - The fast engines hold target weights between rebalances; finalists were rerun on the exact engine (intraday: same per-trade engine).
+
+## Round 7: why "nothing survives" was the wrong verdict, and what does work (`search/moc.py`, `frozen_2026_11_04/`)
+
+**The test was underpowered and used the wrong yardstick.**
+- Power of the round-6 holdout test: with Holm over 10, a 2-year holdout catches a true +0.5 Sharpe edge over SPY 2% of the
+  time, and +1.0 5% of the time. 80% power for +0.5 on a single test needs about 53 years of holdout.
+- Sharpe-vs-SPY is the wrong bar for an intraday strategy that has ~0 correlation with SPY. The question is whether it adds
+  return to SPY (alpha), not whether it beats SPY alone.
+
+**Candidate 1: noise-band intraday momentum on QQQ** (the 2024 paper's default parameters; the search's #1 pick).
+| Split | Sharpe | SPY Sharpe | Corr with SPY | Alpha / yr | t(alpha), HAC |
+|---|---:|---:|---:|---:|---:|
+| Search 2017-02..2022-12 | 1.35 | 0.64 | -0.10 | 21.4% | 4.04 |
+| Validate 2022-12..2024-11 | 2.19 | 1.22 | 0.00 | 26.3% | 3.40 |
+| Holdout 2024-11..2026-11 | 0.88 | 0.70 | -0.02 | 14.2% | 1.30 |
+
+- Positive in every calendar year 2017–2026: +20 +51 +3 +18 +10 +20 +31 +27 +9 +11 (% P&L, ≤4x vol-sized).
+- Break-even cost is about 2.4 bp/side, vs a 0.5 bp/side main case; QQQ's real half-spread is ~0.1 bp.
+- **Holdout portfolio test:**
+
+  | | CAGR | Sharpe | Max DD |
+  |---|---:|---:|---:|
+  | SPY | 15.2% | 0.70 | -18.8% |
+  | SPY vol-matched to the 50/50 mix | 11.9% | 0.70 | -13.0% |
+  | 50% SPY + 50% noise band | 17.5% | 1.13 | -7.4% |
+  | 100% SPY + half-size overlay | 23.2% | 1.02 | -16.5% |
+
+- **The real-vs-luck test supports it:** 82% of noise-band settings were positive on both search and validate,
+  vs 29% on shuffled data.
+- **But it is decaying since publication:** the whole QQQ family's median holdout Sharpe is 0.14 (search median 0.95), and the
+  SPY version, the paper's own instrument, is median -0.55 in the holdout. The 0.88 of the chosen point is top-6% of its
+  family. A realistic forward Sharpe expectation is well below the backtest.
+
+**Candidate 2: SPY IBS mean reversion with market-on-close fills** (round 6b, `moc_results.md`). Round 6 forced next-open fills,
+which removes the overnight bounce these rules trade. MOC look-ahead check: the 15:55-price signal matches the close-based
+signal on 99.0% of days. Buy SPY at the close when IBS < 0.10; exit at the first close above the 5-day SMA (max 10 days).
+Sharpe: search 0.98, validate 1.64, holdout 1.00. **That holdout figure is a second look and not clean**, because the holdout
+had already been used once. The neighbors are similar (IBS < 0.15 / 0.20: 0.27–0.91 in the holdout).
+
+**Frozen for forward testing** (`frozen_2026_11_04/`, `forward_test_v2.py`, hash-checked, completed sessions after
+2026-11-03 only):
+- Sleeves: noise band QQQ, SPY IBS (MOC).
+- Portfolios: 50/50 SPY + noise band; SPY + half-size overlay; 40/30/30.
+- Kill rules are in `MANIFEST.json`.
+
+Bottom line: there is one real edge in this data (intraday momentum), and it is fading. The way to use it is as a
+low-correlation sleeve next to SPY, not as a replacement that beats SPY on its own. The forward test is the only clean
+evidence left.

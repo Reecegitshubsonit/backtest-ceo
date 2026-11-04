@@ -1,0 +1,23 @@
+{
+  "freeze_date": "2026-11-03",
+  "frozen_on": "2026-11-04",
+  "note": "Round 7 candidates. Only sessions after 2026-11-03 count. Do not edit; a change needs a new freeze folder.",
+  "source_commit_parent": "db8814618b854ef159849a10e5fec129fed60b40",
+  "files": {
+    "backtest.py": "e450fc6be28e3b4894a9e65563eebd59fcc20b57c6307fdc44428a0950793956",
+    "common.py": "15458d961d24483877c5edd9cbf621d28c18fee25b6e81138ee50bbda1e88e30",
+    "families_daily.py": "bce26657b0cb54158a8651f906b254faed21837e43372b14859365a154817762",
+    "families_intraday.py": "dbacee35922d3bb156227bd940cbe5f6d8b271de743f8fecb1431d732fd82aac",
+    "moc.py": "85489d5f03ed8937490ca17f654f12af6453d04e0047b9506395c1715879ae1d"
+  },
+  "sleeves": {
+    "NBQ": "families_intraday.NoiseBand look=14 mult=1.0 freq=6 stop=max last=71 quiet=False size=vol2 side=both sym=QQQ (0.5 bp/side)",
+    "IBS": "families_daily.MeanRev ind=27 (IBS<0.10) exit=sma5 maxhold=10 trend=none sizing=slot univ=SPY, market-on-close fills (moc.run_moc, 3 bp/side)"
+  },
+  "portfolios": {
+    "P1": "50% SPY + 50% NBQ (NBQ capital in T-bills overnight)",
+    "P2": "100% SPY + NBQ at half size (overlay)",
+    "P3": "40% SPY + 30% NBQ + 30% IBS"
+  },
+  "review": "Checkpoints 63/126/252 sessions vs SPY and vol-matched SPY. Kill a sleeve if forward max DD < 1.5x its 2017-2026 backtest max DD, or NBQ forward Sharpe < 0 after 252 sessions (the post-publication decay case)."
+}
