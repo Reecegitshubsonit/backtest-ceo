@@ -103,7 +103,8 @@ def run(engine: CopyEngine, state_path: Path, api_key: str | None = None, settle
     params = [("channels", "trades"), ("venue", "kalshi"), ("action", "all")] + [("trader", f"kalshi:{t}") for t in traders]
     st = StreamState(state_path)
     backoff, last_settle = 1.0, 0.0
-    print(f"streaming {len(traders)} traders from Rivo (paper copy): {', '.join(traders)}")
+    mode = "LIVE copy" if engine.live else "paper copy"
+    print(f"streaming {len(traders)} traders from Rivo ({mode}): {', '.join(traders)}")
     while True:
         headers = {"Authorization": f"Bearer {key}", "Accept": "text/event-stream"}
         if st.last_id:
@@ -128,7 +129,8 @@ def run(engine: CopyEngine, state_path: Path, api_key: str | None = None, settle
                         engine.settle_all()
                         last_settle = time.time()
         except requests.RequestException as e:
-            print("stream dropped:", e)
+            # Rivo ends every stream within 15 minutes; resuming from Last-Event-ID loses nothing
+            print(time.strftime("%H:%M"), "stream closed, reconnecting" + ("" if "prematurely" in str(e) else f" ({e})"))
         # 90s read timeout > 25s pings, so a silent socket is caught; normal 15-min closes land here too
         time.sleep(backoff)
         backoff = min(backoff * 2, 60)
