@@ -243,23 +243,24 @@ def stop_price(sd, mode, k, fill, rng_low):
 def run_exit(sd, P, k, fill, stop):
     n, ex = len(sd.m), P["exit"]
     r = fill - stop
+    s0 = stop  # initial stop for sizing / R
     tgt = fill + float(ex[3:]) * r if ex.startswith("tgt") else None
     for j in range(k, n):
         if sd.l[j] <= stop:
             px = stop if j == k else min(sd.o[j], stop)
-            return sd.m[k], sd.m[j], fill, stop, px - slip(px), "stop"
+            return sd.m[k], sd.m[j], fill, s0, px - slip(px), "stop"
         if tgt and j > k and sd.h[j] >= tgt + 0.01:
-            return sd.m[k], sd.m[j], fill, stop, tgt, "target"
+            return sd.m[k], sd.m[j], fill, s0, tgt, "target"
         if sd.m[j] >= 955:
-            return sd.m[k], sd.m[j], fill, stop, sd.c[j] - slip(sd.c[j]), "eod"
+            return sd.m[k], sd.m[j], fill, s0, sd.c[j] - slip(sd.c[j]), "eod"
         if ex == "trail5" and sd.tr5[j] and j > k:
-            return sd.m[k], sd.m[j], fill, stop, sd.c[j] - slip(sd.c[j]), "trail5"
+            return sd.m[k], sd.m[j], fill, s0, sd.c[j] - slip(sd.c[j]), "trail5"
         if ex == "vwap" and sd.c[j] < sd.vwap[j]:
-            return sd.m[k], sd.m[j], fill, stop, sd.c[j] - slip(sd.c[j]), "vwap"
+            return sd.m[k], sd.m[j], fill, s0, sd.c[j] - slip(sd.c[j]), "vwap"
         if P.get("be") and sd.h[j] >= fill + P["be"] * r:
             stop = max(stop, round(fill, 2))
     j = n - 1
-    return sd.m[k], sd.m[j], fill, stop, sd.c[j] - slip(sd.c[j]), "last"
+    return sd.m[k], sd.m[j], fill, s0, sd.c[j] - slip(sd.c[j]), "last"
 
 
 # ------------------------------------------------------------------ short side (fade the gapper)

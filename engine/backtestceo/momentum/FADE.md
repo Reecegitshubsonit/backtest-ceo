@@ -71,6 +71,71 @@ The rule was fixed before the out-of-sample test. Nothing below was tuned on Feb
 
 Entering later (10:00) is the weakest variant. Most of the fade happens in the first half hour.
 
+## Premarket (where Cameron does much of his trading)
+
+`premarket.py` builds its universe from premarket bars, so there's no regular-session lookahead. For each session
+it pulls 04:00–09:29 bars for every symbol whose previous close is $1.50–25 with ADV ≥50k (about 2,200 a day).
+Any stock that trades ≥10% above the previous close in premarket is kept, including runners that collapse before
+the open. That gives 50–70 a day and 2,400–3,000 symbol-days per period.
+
+**Premarket momentum doesn't carry.** Buy the first 07:00–09:15 bar that's up ≥ G% with premarket volume
+≥0.2× ADV (Aug–Nov):
+
+| Up in premarket | To 09:29, mean / median | Share higher at 09:29 | To 09:45, median |
+|---|---|---|---|
+| ≥10% | −3.1% / −2.3% | 37% | −4.4% |
+| ≥20% | −4.6% / −4.0% | 33% | −7.4% |
+| ≥40% | −7.9% / −8.6% | 28% | −10.7% |
+
+**Premarket long setups lose.** The grid has 486 configs per period:
+
+- **Entries:** break of the premarket high of day, 1–3 bar pullback above VWAP, or the first push.
+- **Filters:** up ≥10/20/40%, premarket volume ≥0.05/0.2/0.5× ADV.
+- **Stops:** recent 5-bar low or −5%.
+- **Exits:** 2R target, trail after +1R, or time exit at 09:29 or 09:45.
+- **Windows:** entries 07:00 or 08:00 to 09:15.
+- **Costs:** 0.5% slippage per side.
+
+| Period | Positive configs | Positive in both halves | Best config | At 0% slippage: positive / both halves |
+|---|---:|---:|---:|---:|
+| Feb–May | 1 / 486 | 0 | +$1,011 | 3 / 0 |
+| May–Aug | 23 / 486 | 0 | +$731 | 72 / 5 |
+| Aug–Nov | 0 / 486 | 0 | −$23 | 13 / 0 |
+
+**Premarket fade.** The rule was fixed after seeing the Aug–Nov drift, then run unchanged on the other two periods:
+
+- **Scan:** the first 07:00–09:15 bar that closes ≥30% above the previous close, $2–20, premarket volume
+  ≥0.1× ADV.
+- **Entry:** short the next bar's open, with 0.5% premarket slippage.
+- **Stop and exit:** disaster stop +50%, cover at 15:55.
+- **Size:** $1k each, max 5 a day.
+
+| Period | Trades | Net | PF | Win rate | Green days | Max DD | Stops | Same period, 09:35 fade |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Feb–May | 197 | +$9,689 | 1.56 | 66% | 38/57 | −$1,343 | 26 | +$5,724, PF 2.39, DD −$504 |
+| May–Aug | 246 | +$4,118 | 1.13 | 60% | 31/59 | **−$6,038** | 56 | +$8,654, PF 1.46, DD −$1,610 |
+| Aug–Nov | 205 | +$14,452 | 1.74 | 67% | 39/59 | −$2,644 | 31 | +$3,931, PF 1.37, DD −$1,679 |
+
+- **Total:** the premarket fade made more over 180 sessions (+$28.3k vs +$18.3k) and all six half-periods are
+  positive.
+- **Rougher ride:** in May–Aug it had a −$6k drawdown and twice as many squeeze stops. Its gap ≥20% variant lost
+  money there (−$2,155), while every 09:35 fade variant was positive in every period.
+- **Same stocks:** the two fades mostly short the same names, so running both doubles the exposure.
+- **Order limits:** in extended hours, Alpaca takes limit orders only. Stop orders aren't accepted outside
+  regular hours, so the stop would have to be watched in software. Short selling in premarket also needs
+  easy-to-borrow shares.
+
+**Verdict.** The 09:35 fade is the main strategy: steadier, regular hours, and a real broker-side stop. The
+premarket fade earns more but has deeper drawdowns. It isn't in the paper trader yet.
+
+Data and trades: `docs/premarket-backtest/`.
+
+```bash
+python3 -m backtestceo.momentum.premarket prepare --end 2026-11-03   # ~10 min per period, cached
+python3 -m backtestceo.momentum.premarket drift   --end 2026-11-03
+python3 -m backtestceo.momentum.premarket search  --end 2026-11-03   # the 486 long configs
+```
+
 ## Risks the backtest can't capture
 
 - **Borrow.** This is the big one. Alpaca only lets you short **easy-to-borrow** stocks, and many +30% small-cap
@@ -124,5 +189,6 @@ slightly different sets.
 |---|---|
 | `fade.py` | Rule, portfolio backtest, stats, paper trader |
 | `gappers.py` | No-news gapper universe, full-day 1-min data cache, long/short search grids |
+| `premarket.py` | Premarket-runner universe, premarket long grid, premarket fade |
 | `../../tests/test_fade.py`, `../../tests/test_gappers.py` | Tests |
 | `docs/fade-backtest/` | Trades per period, sensitivity table |

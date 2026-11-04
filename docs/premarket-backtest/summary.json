@@ -1,0 +1,239 @@
+{
+ "2026-05-13": {
+  "days": "2026-02-18..2026-05-13",
+  "symbol_days": 2580,
+  "long_grid": {
+   "configs": 486,
+   "positive": 1,
+   "positive_both_halves": 0,
+   "best_pnl": 1010.88,
+   "positive_at_zero_slippage": 3,
+   "both_halves_zero_slip": 0
+  },
+  "pm_fade": {
+   "trades": 197,
+   "net_pnl": 9689.09,
+   "pf": 1.56,
+   "win_rate": 0.66,
+   "avg_ret_pct": 4.94,
+   "green_days": "38/57",
+   "max_dd": -1343.43,
+   "stops": 26,
+   "worst": -507.44,
+   "h1": 4728.33,
+   "h2": 4960.76
+  },
+  "pm_fade_variants": {
+   "cover 09:45": {
+    "trades": 197,
+    "net_pnl": 7893.59,
+    "pf": 1.61,
+    "win_rate": 0.624,
+    "avg_ret_pct": 4.02,
+    "green_days": "36/57",
+    "max_dd": -1127.3,
+    "stops": 15,
+    "worst": -507.41,
+    "h1": 3793.4,
+    "h2": 4100.19
+   },
+   "slip 1%": {
+    "trades": 197,
+    "net_pnl": 8467.91,
+    "pf": 1.47,
+    "win_rate": 0.645,
+    "avg_ret_pct": 4.31,
+    "green_days": "38/57",
+    "max_dd": -1467.29,
+    "stops": 27,
+    "worst": -514.99,
+    "h1": 4314.35,
+    "h2": 4153.56
+   },
+   "gap 20": {
+    "trades": 268,
+    "net_pnl": 8879.66,
+    "pf": 1.41,
+    "win_rate": 0.608,
+    "avg_ret_pct": 3.33,
+    "green_days": "37/59",
+    "max_dd": -1655.78,
+    "stops": 27,
+    "worst": -529.63,
+    "h1": 4550.62,
+    "h2": 4329.04
+   },
+   "gap 40": {
+    "trades": 139,
+    "net_pnl": 9133.75,
+    "pf": 1.79,
+    "win_rate": 0.683,
+    "avg_ret_pct": 6.6,
+    "green_days": "38/56",
+    "max_dd": -825.36,
+    "stops": 19,
+    "worst": -507.47,
+    "h1": 5633.01,
+    "h2": 3500.74
+   }
+  }
+ },
+ "2026-08-10": {
+  "days": "2026-05-14..2026-08-10",
+  "symbol_days": 2991,
+  "long_grid": {
+   "configs": 486,
+   "positive": 23,
+   "positive_both_halves": 0,
+   "best_pnl": 731.49,
+   "positive_at_zero_slippage": 72,
+   "both_halves_zero_slip": 5
+  },
+  "pm_fade": {
+   "trades": 246,
+   "net_pnl": 4118.39,
+   "pf": 1.13,
+   "win_rate": 0.602,
+   "avg_ret_pct": 1.68,
+   "green_days": "31/59",
+   "max_dd": -6038.51,
+   "stops": 56,
+   "worst": -507.46,
+   "h1": 1657.21,
+   "h2": 2461.18
+  },
+  "pm_fade_variants": {
+   "cover 09:45": {
+    "trades": 246,
+    "net_pnl": 5056.87,
+    "pf": 1.22,
+    "win_rate": 0.573,
+    "avg_ret_pct": 2.06,
+    "green_days": "32/59",
+    "max_dd": -2877.21,
+    "stops": 31,
+    "worst": -507.46,
+    "h1": 4149.66,
+    "h2": 907.21
+   },
+   "slip 1%": {
+    "trades": 246,
+    "net_pnl": 2901.23,
+    "pf": 1.09,
+    "win_rate": 0.593,
+    "avg_ret_pct": 1.19,
+    "green_days": "31/59",
+    "max_dd": -6366.63,
+    "stops": 57,
+    "worst": -515.0,
+    "h1": 1039.11,
+    "h2": 1862.12
+   },
+   "gap 20": {
+    "trades": 286,
+    "net_pnl": -2155.34,
+    "pf": 0.94,
+    "win_rate": 0.57,
+    "avg_ret_pct": -0.72,
+    "green_days": "32/60",
+    "max_dd": -5601.86,
+    "stops": 59,
+    "worst": -507.43,
+    "h1": -266.63,
+    "h2": -1888.71
+   },
+   "gap 40": {
+    "trades": 196,
+    "net_pnl": 8992.71,
+    "pf": 1.33,
+    "win_rate": 0.643,
+    "avg_ret_pct": 4.6,
+    "green_days": "34/57",
+    "max_dd": -4806.94,
+    "stops": 48,
+    "worst": -507.91,
+    "h1": 5052.82,
+    "h2": 3939.89
+   }
+  }
+ },
+ "2026-11-03": {
+  "days": "2026-08-11..2026-11-03",
+  "symbol_days": 2403,
+  "long_grid": {
+   "configs": 486,
+   "positive": 0,
+   "positive_both_halves": 0,
+   "best_pnl": -22.53,
+   "positive_at_zero_slippage": 13,
+   "both_halves_zero_slip": 0
+  },
+  "pm_fade": {
+   "trades": 205,
+   "net_pnl": 14451.54,
+   "pf": 1.74,
+   "win_rate": 0.673,
+   "avg_ret_pct": 7.07,
+   "green_days": "39/59",
+   "max_dd": -2644.05,
+   "stops": 31,
+   "worst": -624.37,
+   "h1": 4721.5,
+   "h2": 9730.04
+  },
+  "pm_fade_variants": {
+   "cover 09:45": {
+    "trades": 205,
+    "net_pnl": 12341.41,
+    "pf": 1.96,
+    "win_rate": 0.644,
+    "avg_ret_pct": 6.04,
+    "green_days": "37/59",
+    "max_dd": -926.61,
+    "stops": 15,
+    "worst": -624.37,
+    "h1": 6050.36,
+    "h2": 6291.05
+   },
+   "slip 1%": {
+    "trades": 205,
+    "net_pnl": 13490.51,
+    "pf": 1.68,
+    "win_rate": 0.673,
+    "avg_ret_pct": 6.6,
+    "green_days": "38/59",
+    "max_dd": -2738.31,
+    "stops": 31,
+    "worst": -639.94,
+    "h1": 4185.14,
+    "h2": 9305.37
+   },
+   "gap 20": {
+    "trades": 270,
+    "net_pnl": 12726.2,
+    "pf": 1.56,
+    "win_rate": 0.656,
+    "avg_ret_pct": 4.72,
+    "green_days": "38/60",
+    "max_dd": -2440.06,
+    "stops": 34,
+    "worst": -624.37,
+    "h1": 3536.4,
+    "h2": 9189.8
+   },
+   "gap 40": {
+    "trades": 158,
+    "net_pnl": 13242.62,
+    "pf": 1.87,
+    "win_rate": 0.69,
+    "avg_ret_pct": 8.41,
+    "green_days": "39/58",
+    "max_dd": -1588.17,
+    "stops": 26,
+    "worst": -606.87,
+    "h1": 6811.96,
+    "h2": 6430.66
+   }
+  }
+ }
+}
