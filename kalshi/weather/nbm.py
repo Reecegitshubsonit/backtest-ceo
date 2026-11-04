@@ -40,16 +40,22 @@ def history(icao: str, start: date, end: date, cache_dir: Path | None = None, se
         text = f.read_text()
     else:
         s = session or requests
-        for attempt in range(5):
-            r = s.get(f"{IEM}/cgi-bin/request/mos.py", headers=UA, timeout=120,
-                      params={"station": icao, "model": "NBS", "sts": f"{start}T00:00Z", "ets": f"{end}T23:59Z",
-                              "format": "csv"})
-            if r.status_code == 200 and not r.text.startswith("Too many"):
-                break
+        text = ""
+        for attempt in range(6):
+            try:
+                r = s.get(f"{IEM}/cgi-bin/request/mos.py", headers=UA, timeout=120,
+                          params={"station": icao, "model": "NBS", "sts": f"{start}T00:00Z",
+                                  "ets": f"{end}T23:59Z", "format": "csv"})
+                if r.status_code == 200 and r.text.startswith("runtime"):
+                    text = r.text
+                    break
+            except requests.RequestException:
+                pass  # cut-off transfer: retry
             time.sleep(15 * (attempt + 1))
-        text = r.text
+        if not text:
+            return []
         time.sleep(3)  # be polite to IEM
-        if f:
+        if f and text:
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_text(text)
     return [{"runtime": _t(x["runtime"]), "ftime": _t(x["ftime"]), "txn": _f(x.get("txn")), "xnd": _f(x.get("xnd"))}
