@@ -1,0 +1,11 @@
+{
+ "chosen": [
+  "4h | volume_spike_up(3.0) | above_sma200 | vol_above_avg | hold 12",
+  "4h | tsmom(24) | above_sma200 | 00-08 | weekdays | hold 48 | stop 2ATR",
+  "4h | ema_cross((50, 200)) | vol_above_avg | hold 48 | tp 4ATR",
+  "4h | ema_cross((10, 50)) | above_sma200 | vol_below_avg | 00-08 | hold 48 | stop 3ATR",
+  "1d | ema_cross((20, 100)) | weekend | hold 6",
+  "4h | ema_cross((5, 20)) | 08-16 | weekend | hold 48 | stop 3ATR",
+  "4h | tsmom(192) | 00-08 | weekdays | hold 48 | stop 3ATR"
+ ]
+}

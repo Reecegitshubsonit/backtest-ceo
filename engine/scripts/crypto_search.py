@@ -466,9 +466,11 @@ def main():
     ap.add_argument("--out")
     ap.add_argument("--cache", default=str(HERE.parent / ".cache"))
     ap.add_argument("--shuffles", type=int, default=10, help="independent shuffled-data luck benchmarks")
+    ap.add_argument("--end", default=None, help="last full UTC day YYYY-MM-DD (default: yesterday)")
     a = ap.parse_args()
     cache = Path(a.cache)
-    end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(seconds=1)
+    end = (datetime.fromisoformat(a.end).replace(tzinfo=timezone.utc) + timedelta(days=1) if a.end else
+           datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)) - timedelta(seconds=1)
     start = pd.Timestamp("2021-01-01", tz="UTC")
     syms_all = ["BTC/USD", "ETH/USD", "SOL/USD"]
     h1 = {s: load_1h(s, end, cache / "crypto_edge") for s in syms_all}

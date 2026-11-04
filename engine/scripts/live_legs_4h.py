@@ -22,21 +22,27 @@ SIDE = 0.003
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out")
+    ap.add_argument("--end", default=None, help="last full UTC day YYYY-MM-DD (default: yesterday)")
     a = ap.parse_args()
     cache = HERE.parent / ".cache" / "crypto_edge"
     cache.mkdir(parents=True, exist_ok=True)
-    end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(seconds=1)
+    end = (datetime.fromisoformat(a.end).replace(tzinfo=timezone.utc) + timedelta(days=1) if a.end else
+           datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)) - timedelta(seconds=1)
     rows = []
     for sym in ("BTC/USD", "ETH/USD", "SOL/USD"):
         h1 = fetch(sym, "1Hour", datetime(2021, 1, 1, tzinfo=timezone.utc), end, cache)
         bars = resample(to_bars(h1), 4)
         dd = pd.Series([b["c"] for b in bars], index=pd.DatetimeIndex([b["ts"] for b in bars]))
+        # data holes > 2 days (Alpaca SOL/USD 2023-06 -> 2024-08): drop trades held across them
+        ts = dd.index.to_series()
+        holes = [(a, b) for a, b in zip(ts.shift().dropna(), ts.iloc[1:]) if b - a > pd.Timedelta(days=2)]
         for rule in ("supertrend", "alphainsider"):
             for mode in ("long only (live)", "L/S"):
                 sig = SIGNALS[rule](bars)
                 if mode.startswith("long"):
                     sig = dict(sig, se=[False] * len(bars))
-                tl = replay_bars(bars, sig)
+                tl = [x for x in replay_bars(bars, sig)
+                      if not any(x["entry_time"] <= ha and x["exit_time"] >= hb for ha, hb in holes)]
                 for per, st in (("2021+", pd.Timestamp("2021-03-01", tz="UTC")), ("last 2y", pd.Timestamp(end) - pd.Timedelta(days=730))):
                     t = [x for x in tl if x["entry_time"] >= st]
                     net = [((x["exit"] / x["entry"] - 1) if x["side"] == "long" else (1 - x["exit"] / x["entry"])) - 2 * SIDE for x in t]
