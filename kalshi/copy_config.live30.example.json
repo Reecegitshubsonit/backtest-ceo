@@ -1,0 +1,19 @@
+{
+ "traders": {"lakeshow24692469": 1.0, "panicky.tarantula8159": 1.0, "fuuutboldave": 1.0,
+             "call.road": 1.0, "eddyterpp": 1.0, "parental.cardinal": 1.0},
+ "live": true,
+ "usd_per_trade": 2.0,
+ "max_per_market": 3.0,
+ "max_per_trader": 6.0,
+ "max_total_exposure": 20.0,
+ "max_drawdown_usd": 8.0,
+ "max_slippage": 0.03,
+ "max_age_sec": 300,
+ "min_price": 0.10,
+ "max_price": 0.90,
+ "min_contracts": 1,
+ "copy_sells": true,
+ "taker_fee_rate": 0.07,
+ "kill_file": "data/STOP",
+ "starting_cash": 30.0
+}

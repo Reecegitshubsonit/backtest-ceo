@@ -1,7 +1,7 @@
-"""Read-only Kalshi REST client.
+"""Kalshi REST client.
 
-Only GET is implemented. There is no code path that creates, amends or cancels an order:
-paper mode simulates fills locally. Auth (RSA-PSS) is only needed for /portfolio reads.
+Read-only unless constructed with allow_trading=True: the only write is create_order (V2, IOC),
+used by the copy engine in live mode. Auth (RSA-PSS) is needed for /portfolio calls.
 """
 from __future__ import annotations
 
@@ -49,7 +49,9 @@ class KalshiClient:
         key_path: str | None = None,
         min_interval: float = 0.08,
         session: requests.Session | None = None,
+        allow_trading: bool = False,
     ):
+        self.allow_trading = allow_trading
         env = os.environ.get("KALSHI_ENV", "prod").lower()
         self.base_url = (base_url or os.environ.get("KALSHI_BASE_URL") or (DEMO if env == "demo" else PROD)).rstrip("/")
         self.key_id = key_id or os.environ.get("KALSHI_API_KEY_ID")
@@ -60,7 +62,7 @@ class KalshiClient:
         self.s = session or requests.Session()
 
     # -- transport ---------------------------------------------------------------------------
-    def _auth_headers(self, path: str) -> dict[str, str]:
+    def _auth_headers(self, path: str, method: str = "GET") -> dict[str, str]:
         if not (self.key_id and self.key_path):
             raise KalshiError("Set KALSHI_API_KEY_ID and KALSHI_PRIVATE_KEY_PATH for portfolio reads")
         if self._key is None:
@@ -69,7 +71,7 @@ class KalshiClient:
         return {
             "KALSHI-ACCESS-KEY": self.key_id,
             "KALSHI-ACCESS-TIMESTAMP": ts,
-            "KALSHI-ACCESS-SIGNATURE": sign(self._key, ts, "GET", path),
+            "KALSHI-ACCESS-SIGNATURE": sign(self._key, ts, method, path),
         }
 
     def get(self, endpoint: str, params: dict | None = None, auth: bool = False) -> dict:
@@ -90,6 +92,31 @@ class KalshiClient:
                 raise KalshiError(f"GET {endpoint} -> {r.status_code}: {r.text[:300]}")
             return r.json()
         raise KalshiError(f"GET {endpoint}: retries exhausted")
+
+    def post(self, endpoint: str, body: dict) -> dict:
+        """Signed POST. Not retried: a timeout may still have placed the order."""
+        if not self.allow_trading:
+            raise KalshiError("trading disabled on this client")
+        url = self.base_url + endpoint
+        path = requests.utils.urlparse(url).path
+        headers = {**self._auth_headers(path, "POST"), "Content-Type": "application/json"}
+        r = self.s.post(url, json=body, headers=headers, timeout=20)
+        if r.status_code not in (200, 201):
+            raise KalshiError(f"POST {endpoint} -> {r.status_code}: {r.text[:300]}")
+        return r.json()
+
+    def create_order(self, ticker: str, book_side: str, count: int, price: float, reduce_only: bool = False,
+                     client_order_id: str | None = None) -> dict:
+        """V2 order on the single YES book: 'bid' buys YES, 'ask' sells YES (= buys NO at 1-price).
+        Immediate-or-cancel, so nothing is left resting."""
+        import uuid
+
+        if book_side not in ("bid", "ask") or count < 1 or not 0.01 <= price <= 0.99:
+            raise KalshiError(f"bad order {book_side} {count} @ {price}")
+        body = {"ticker": ticker, "side": book_side, "count": str(int(count)), "price": f"{price:.4f}",
+                "time_in_force": "immediate_or_cancel", "self_trade_prevention_type": "taker_at_cross",
+                "reduce_only": reduce_only, "client_order_id": client_order_id or str(uuid.uuid4())}
+        return self.post("/portfolio/events/orders", body)
 
     def paginate(self, endpoint: str, key: str, params: dict | None = None, max_pages: int = 50) -> Iterator[dict]:
         params = dict(params or {})
@@ -121,5 +148,18 @@ class KalshiClient:
     def balance(self) -> dict:
         return self.get("/portfolio/balance", auth=True)
 
-    def positions(self) -> dict:
-        return self.get("/portfolio/positions", {"limit": 1000}, auth=True)
+    def positions(self, ticker: str | None = None) -> dict:
+        return self.get("/portfolio/positions", {"limit": 1000, "ticker": ticker}, auth=True)
+
+    def balance_usd(self) -> float:
+        b = self.balance()
+        v = b.get("balance_dollars")
+        return float(v) if v is not None else float(b.get("balance", 0)) / 100
+
+    def position_count(self, ticker: str) -> float:
+        """Signed contracts held: + YES, - NO."""
+        for p in self.positions(ticker).get("market_positions") or []:
+            if p.get("ticker") == ticker:
+                v = p.get("position_fp", p.get("position"))
+                return float(v or 0)
+        return 0.0

@@ -45,6 +45,7 @@ def main(argv=None) -> None:
     cp.add_argument("--inbox", default=str(DATA / "signals.jsonl"))
     cp.add_argument("--state", default=str(DATA / "copy_state.json"))
     cp.add_argument("--journal", default=str(DATA / "copy_journal.jsonl"))
+    cp.add_argument("--live", action="store_true", help='real orders (also needs "live": true in the copy config)')
     ld = sub.add_parser("leaders", help="rank Kalshi leaderboard traders by copyability (data: rivo.markets)")
     ld.add_argument("--refresh", action="store_true", help="re-download pages (otherwise use cache)")
     ld.add_argument("--cache", default=str(DATA / "rivo"))
@@ -106,7 +107,12 @@ def main(argv=None) -> None:
         from .runner import summary
 
         ccfg = cpy.CopyConfig.load(a.copy_config)
-        eng = cpy.CopyEngine(client, ccfg, Path(a.state), Path(a.journal))
+        state, journal = Path(a.state), Path(a.journal)
+        if a.live:
+            client = KalshiClient(allow_trading=True)
+            state, journal = state.with_name("live_state.json"), journal.with_name("live_journal.jsonl")
+            print(f"LIVE MODE: real orders. Kill switch: touch {ccfg.kill_file}")
+        eng = cpy.CopyEngine(client, ccfg, state, journal, live=a.live)
         if a.mode == "stream":
             from . import rivo_stream
 

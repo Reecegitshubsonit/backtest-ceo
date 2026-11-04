@@ -54,6 +54,10 @@ class CopyConfig:
     copy_sells: bool = True
     taker_fee_rate: float = 0.07
     starting_cash: float = 1000.0
+    live: bool = False                # real orders; also needs --live on the command line
+    max_drawdown_usd: float = 10.0    # live: stop buying once balance+cost of open copies falls this far
+    min_contracts: int = 1
+    kill_file: str = "data/STOP"      # live: create this file to stop new buys immediately
 
     @classmethod
     def load(cls, path: str | None) -> "CopyConfig":
@@ -140,8 +144,11 @@ def best_match(title: str, index: list[tuple[str, str]], cutoff: float = 0.8) ->
 # -- engine -------------------------------------------------------------------------------------
 class CopyEngine:
     def __init__(self, client: KalshiClient, cfg: CopyConfig, state_path: Path, journal_path: Path,
-                 resolver: Resolver | None = None):
+                 resolver: Resolver | None = None, live: bool = False):
         self.client, self.cfg = client, cfg
+        self.live = live
+        if live and not (cfg.live and client.allow_trading):
+            raise SystemExit('live needs "live": true in the copy config, --live, and Kalshi API keys')
         self.state_path = state_path
         self.state = State.load(state_path, cfg.starting_cash)
         self.log = Journal(journal_path)
@@ -149,6 +156,22 @@ class CopyEngine:
         self.owner_path = state_path.with_suffix(".owners.json")
         self.owner: dict[str, str] = (json.loads(self.owner_path.read_text())  # ticker -> trader copied
                                       if self.owner_path.exists() else {})
+        self.start_path = state_path.with_suffix(".start.json")
+        if live:
+            bal = client.balance_usd()
+            if not self.start_path.exists():  # equity at first live start = drawdown reference
+                self.start_path.write_text(json.dumps({"equity": bal, "ts": int(time.time())}))
+            self.state.cash = bal
+            self.log("live_start", ts=int(time.time()), balance=bal)
+
+    def _live_block(self) -> str | None:
+        if Path(self.cfg.kill_file).exists():
+            return "kill_switch"
+        start = json.loads(self.start_path.read_text())["equity"]
+        equity = self.state.cash + sum(p.cost for p in self.state.positions.values())
+        if equity < start - self.cfg.max_drawdown_usd:
+            return "drawdown_limit"
+        return None
 
     def save(self) -> None:
         self.state.save(self.state_path)
@@ -195,6 +218,11 @@ class CopyEngine:
             return self.skip(sig, "price_band", ticker=ticker, ask=ask)
         if sig.price is not None and ask > sig.price + cfg.max_slippage + 1e-9:
             return self.skip(sig, "slippage", ticker=ticker, ask=ask)
+        if self.live:
+            st.cash = self.client.balance_usd()  # refresh first: the drawdown check uses it
+            block = self._live_block()
+            if block:
+                return self.skip(sig, block, ticker=ticker)
         unit = ask + fee(100, ask, cfg.taker_fee_rate) / 100
         budget = min(
             cfg.usd_per_trade * cfg.traders[sig.trader],
@@ -206,17 +234,36 @@ class CopyEngine:
         # don't take more than is offered at the best ask (we are not walking the book in paper)
         offered = book.size_at("no" if sig.side == "yes" else "yes", r2(1 - ask))
         n = int(min(budget / unit, offered or 0))
-        if n < 1:
+        if n < max(1, cfg.min_contracts):
             return self.skip(sig, "no_room_or_liquidity", ticker=ticker, ask=ask, offered=offered)
-        f = fee(n, ask, cfg.taker_fee_rate)
-        cost = r2(n * ask + f)
+        fill_px, f = ask, fee(n, ask, cfg.taker_fee_rate)
+        order_id = None
+        if self.live:
+            limit = r2(min(cfg.max_price, ask if sig.price is None else max(ask, min(sig.price + cfg.max_slippage, ask + 0.01))))
+            try:
+                if sig.side == "yes":
+                    res = self.client.create_order(ticker, "bid", n, limit)
+                else:
+                    res = self.client.create_order(ticker, "ask", n, r2(1 - limit))
+            except KalshiError as e:
+                return self.skip(sig, "order_error", ticker=ticker, err=str(e))
+            self.log("order", ts=now, ticker=ticker, side=sig.side, n=n, limit=limit, response=res)
+            filled = int(float(res.get("fill_count") or 0))
+            if filled < 1:
+                return self.skip(sig, "no_fill", ticker=ticker, limit=limit)
+            yes_px = float(res.get("average_fill_price") or (limit if sig.side == "yes" else 1 - limit))
+            fill_px = yes_px if sig.side == "yes" else r2(1 - yes_px)
+            f = round(float(res.get("average_fee_paid") or 0) * filled, 4)
+            n, order_id = filled, res.get("order_id")
+        cost = r2(n * fill_px + f)
         st.cash = r2(st.cash - cost)
         pos = st.positions.setdefault(ticker, Position(ticker, ticker.rsplit("-", 1)[0], sig.side))
         pos.contracts += n
         pos.cost = r2(pos.cost + cost)
         self.owner[ticker] = sig.trader
-        out = {"result": "copied", "ticker": ticker, "side": sig.side, "contracts": n, "fill": ask, "fee": f,
-               "leader_price": sig.price, "slippage": None if sig.price is None else r2(ask - sig.price),
+        out = {"result": "copied", "live": self.live, "order_id": order_id, "ticker": ticker, "side": sig.side,
+               "contracts": n, "fill": fill_px, "fee": f, "leader_price": sig.price,
+               "slippage": None if sig.price is None else r2(fill_px - sig.price),
                "delay_sec": now - sig.ts, "trader": sig.trader}
         self.log("copy_buy", ts=now, **out)
         return out
@@ -230,15 +277,50 @@ class CopyEngine:
         if bid is None:
             return self.skip(sig, "no_bid", ticker=ticker)
         n = pos.contracts
-        f = fee(n, bid, self.cfg.taker_fee_rate)
-        proceeds = r2(n * bid - f)
+        fill_px, f = bid, fee(n, bid, self.cfg.taker_fee_rate)
+        if self.live:
+            held = self.client.position_count(ticker)
+            n = int(held if sig.side == "yes" else -held) if held else 0
+            n = max(0, min(n, pos.contracts))
+            if n < 1:
+                del st.positions[ticker]
+                return self.skip(sig, "position_gone", ticker=ticker)
+            floor = max(0.01, r2(bid - 0.02))  # accept up to 2c below the bid to get out
+            try:
+                if sig.side == "yes":
+                    res = self.client.create_order(ticker, "ask", n, floor, reduce_only=True)
+                else:
+                    res = self.client.create_order(ticker, "bid", n, r2(1 - floor), reduce_only=True)
+            except KalshiError as e:
+                return self.skip(sig, "order_error", ticker=ticker, err=str(e))
+            self.log("order", ts=now, ticker=ticker, side=sig.side, n=n, sell_floor=floor, response=res)
+            filled = int(float(res.get("fill_count") or 0))
+            if filled < 1:
+                return self.skip(sig, "no_fill", ticker=ticker)
+            yes_px = float(res.get("average_fill_price") or (floor if sig.side == "yes" else 1 - floor))
+            fill_px = yes_px if sig.side == "yes" else r2(1 - yes_px)
+            f = round(float(res.get("average_fee_paid") or 0) * filled, 4)
+            if filled < pos.contracts:  # partial exit: keep the rest on the books
+                part_cost = r2(pos.cost * filled / pos.contracts)
+                proceeds = r2(filled * fill_px - f)
+                pos.contracts -= filled
+                pos.cost = r2(pos.cost - part_cost)
+                st.cash = r2(st.cash + proceeds)
+                st.realized = r2(st.realized + proceeds - part_cost)
+                out = {"result": "partial_close", "ticker": ticker, "contracts": filled, "fill": fill_px,
+                       "pnl": r2(proceeds - part_cost), "trader": sig.trader}
+                self.log("copy_sell", ts=now, **out)
+                return out
+            n = filled
+        proceeds = r2(n * fill_px - f)
         pnl = r2(proceeds - pos.cost)
         st.cash = r2(st.cash + proceeds)
         st.realized = r2(st.realized + pnl)
         st.wins += pnl > 0
         st.losses += pnl < 0
         del st.positions[ticker]
-        out = {"result": "closed", "ticker": ticker, "contracts": n, "fill": bid, "pnl": pnl, "trader": sig.trader}
+        out = {"result": "closed", "live": self.live, "ticker": ticker, "contracts": n, "fill": fill_px, "pnl": pnl,
+               "trader": sig.trader}
         self.log("copy_sell", ts=now, **out)
         return out
 
