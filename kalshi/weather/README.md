@@ -89,3 +89,17 @@ balance, so weather losses also count toward the copy bot's drawdown limit.
 - **Data sources:**
   - Forecasts: `ensemble-api.open-meteo.com` and `previous-runs-api.open-meteo.com`, both free with no key.
   - Observations: `api.weather.gov`.
+
+## Result, 2026-11-04: do not trade
+Settings: 58 days, 31 series, 10,249 quoted brackets, decisions the day before.
+- **Brier score:** the model scored **0.1286**, the market **0.1065**. The market forecasts temperature
+  brackets better than GFS+ECMWF with station bias correction.
+- **Every variant lost 16–20% ROI, with t from −3 to −6.5.** That covers model-only and 50/50 blends, and
+  minimum edges of 3, 6 and 10¢.
+- **The few cities with positive ROI (ATL, MIA, SEA, SFO) are noise.** All have t < 1.7, and 21 cities would
+  produce a few positives by chance.
+- **Calibration itself is now sane.** One-day and two-day errors are similar, at 1.6–2.5°F sd for most stations.
+
+Beating these markets would need inputs the free global models don't have. Examples are station-level National
+Blend of Models (NBM) probabilities, HRRR or MOS guidance, and same-day observation trends. Any new model
+should beat the market's Brier score in `backtest` before it trades.
