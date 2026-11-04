@@ -9,6 +9,11 @@ per trade: 124 trades, 28% winners, profit factor 0.69, −0.19R a trade. It sti
 32 tuned variants, 8 were positive on the held-out half, and the mean out-of-sample result was −$229. Do not trade
 it with real money as it stands.
 
+> **What works instead: [Gapper Fade](FADE.md).** It uses the same scanner, simplified (gap + relative volume,
+> no news), but shorts the biggest gappers after 09:35 and covers at the close. It was positive in three
+> separate 60-session periods, including one held back until the rule was fixed (+$5,724, PF 2.39). The main
+> risk is borrow availability; see FADE.md.
+
 ## 1. What the method is (research summary)
 
 Sources: Warrior Trading's own blog posts, video summaries and TradingView ports of the rules. These secondhand

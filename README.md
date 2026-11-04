@@ -44,6 +44,11 @@ Gap / relative-volume / news scanner, bull flag / micro pullback / first pullbac
 backtest and an Alpaca paper trading loop: [engine/backtestceo/momentum/README.md](engine/backtestceo/momentum/README.md).
 Backtest outputs in `docs/momentum-backtest/`. Result: no edge on 1- or 5-minute bars, confirmed on a separate 60-session holdout.
 
+**Gapper Fade** (the strategy that tests well): short gappers ≥30% at 09:35, +50% disaster stop, cover 15:55.
+Positive in 3 of 3 separate 60-session periods of 2026 (+$5.7k / +$8.7k / +$3.9k at $1k per position, 5 max).
+Alpaca paper trader included. Read the borrow caveat first:
+[engine/backtestceo/momentum/FADE.md](engine/backtestceo/momentum/FADE.md).
+
 ## Options execution research
 
 The three-month VWAP/EMA study has a separate quote-based options replay:

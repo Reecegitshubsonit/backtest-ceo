@@ -120,6 +120,10 @@ class Data:
     def daily_cached(self, symbols, start: date, end: date, adjustment: str, tag: str) -> dict[str, list]:
         final = et_dt(end, "20:00") < datetime.now(timezone.utc)
         stamp = "" if final else "_asof" + datetime.now(ET).strftime("%Y%m%d%H")  # partial day: reuse within the hour
+        if not final:  # a pull made after 17:00 ET on the end date already holds the full session
+            for p in sorted((self.cache / "daily").glob(f"{tag}_{start}_{end}_{adjustment}_asof{end:%Y%m%d}*.json")):
+                if int(p.stem[-2:]) >= 17:
+                    return json.loads(p.read_text())
         return self._cached(f"daily/{tag}_{start}_{end}_{adjustment}{stamp}.json", True,
                             lambda: self.daily(symbols, start, end, adjustment))
 
@@ -128,7 +132,7 @@ class Data:
         final = et_dt(d, end) < datetime.now(timezone.utc) - timedelta(minutes=20)
         out, missing = {}, []
         for s in symbols:
-            p = self.cache / "minute" / str(d) / f"{s}.json"
+            p = self.cache / "minute" / str(d) / (f"{s}.json" if end == "12:00" else f"{s}_{end.replace(':', '')}.json")
             if final and p.exists():
                 out[s] = json.loads(p.read_text())
             else:
@@ -138,7 +142,7 @@ class Data:
             for s in missing:
                 out[s] = got.get(s, [])
                 if final:
-                    p = self.cache / "minute" / str(d) / f"{s}.json"
+                    p = self.cache / "minute" / str(d) / (f"{s}.json" if end == "12:00" else f"{s}_{end.replace(':', '')}.json")
                     p.parent.mkdir(parents=True, exist_ok=True)
                     p.write_text(json.dumps(out[s]))
         return out

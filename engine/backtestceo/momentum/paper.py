@@ -129,6 +129,8 @@ class DryRun:
                 self._fill(o, price)
             elif o["side"] == "buy" and o["type"] == "limit" and price <= lp:
                 self._fill(o, price)
+            elif o["side"] == "buy" and o["type"] == "stop" and price >= sp:
+                self._fill(o, price)
             elif o["side"] == "sell" and o["type"] == "stop" and price <= sp:
                 self._fill(o, price)
 
