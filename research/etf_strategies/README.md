@@ -252,3 +252,94 @@ The best drawdown result, N1's +5 pts/yr at -19% max DD, comes entirely from 201
 - Kill rule: drop a strategy if its forward max DD exceeds 1.5× its backtest max DD.
 - Checkpoints at 63, 126 and 252 sessions. A strategy can graduate only after 252 sessions. One year can reject a broken
   strategy, not prove a good one.
+
+## Round 6: our own strategies, 100,176-combination search (`search/`)
+
+### Setup
+- **Data:** Alpaca SIP adjusted daily bars from 2016-01-04, scored from 2017-02-01 after warm-up. Intraday: every SPY/QQQ
+  5-min RTH bar from 2016 on. Data is cut at the 2026-11-03 close.
+- **Level 2:** not used, because no history exists here. Alpaca serves top-of-book (L1) quote history back to 2016 but
+  no order-book history. Databento sells historical L2, but it is paid and this environment blocks it.
+- **Splits by time:** search 2017-02-01..2022-12-02 (60%), validate 2022-12-05..2024-11-15 (20%),
+  holdout 2024-11-18..2026-11-03 (20%). Holdout days are dropped before anything is stored. One run, enforced by a lock file.
+- **Costs:** daily 3 bp/side, intraday 0.5 bp/side × leverage. Idle cash earns BIL (T-bills); Sharpe is in excess of BIL.
+- **Grid (100,176 combinations):**
+
+  | Family | Combinations | What varies |
+  |---|---:|---|
+  | F1 trend | 5,760 | SMA / 12-1 momentum / SMA cross, lookbacks 20–252, equal or inverse-vol weights, daily–quarterly rebalance, vol target none–15% |
+  | F2 rotation | 53,568 | 31 blends of 21–252-day momentum, skip 0/21, top-K 1–5, absolute filters, weights, rebalance, vol target |
+  | F3 mean reversion | 11,025 | RSI 2/3/5/14, z-scores, IBS, consecutive down days; exits, max hold, trend filter, sizing |
+  | F4 candle patterns | 735 | 7 patterns, hold 1–10 days, trend filter |
+  | F5 vol targeting | 10,080 | SPY/SSO, target 8–25%, 6 estimators, cap 1–2x, bands, trend overlays, rebalance |
+  | I1 opening-range breakout | 14,400 | SPY, QQQ |
+  | I2 noise band | 4,608 | SPY, QQQ |
+
+- **Universes are fixed by rule:** sector SPDRs listed before 2016; Faber GTAA-5 (2007); Antonacci GEM (2014); the union of
+  those. No QQQ, GLD or TLT, the hindsight picks from round 2. The round-5 fixes H1–H4 are points inside the grid.
+- **Selection** (rules in `select_top.py`, fixed before results):
+  1. Top 500 by search Sharpe.
+  2. Neighbor test: one ordinal parameter moved one step; median neighbor search Sharpe ≥ 0.7× own, and median neighbor validate Sharpe > 0.
+  3. Rank by validate Sharpe; top 10, at most 2 per family/symbol. The cap left 6, so the last 4 were filled uncapped (disclosed).
+- **Luck and multiple-testing checks:** Deflated Sharpe with N = 100,176; studentized White's Reality Check (stationary
+  bootstrap, 500 draws) against vol-matched SPY; the whole pipeline rerun on shuffled data (days permuted across all ETFs together;
+  intraday sessions and in-session bars permuted, overnight gap kept at the open).
+
+### Bugs found and fixed before the holdout
+1. A crash in the consecutive-down-days indicator. It was a crash, not wrong numbers; finished checkpoints were kept.
+2. **Shuffle artifact:** the overnight gap was being moved into the session, which handed intraday longs SPY's overnight drift.
+3. **ORB intrabar bias, found through the luck benchmark:** a target could fill on the trigger bar while a stop in the same bar
+   was ignored. The first fix (worst case) overcorrected, counting lows printed before the breakout as stops after it, and
+   gave Sharpe -11 on tight stops. The final version uses the standard OHLC path convention.
+4. **Unresolvable stops:** ORB stops of 0.05×/0.10× ATR fit inside one median 5-min bar (0.086%), so 5-min data cannot tell
+   whether stop or target hit first. They are ineligible but still counted in N. 1-minute bars would be needed to test them.
+
+### Results
+| | Real data | Shuffled noise |
+|---|---:|---:|
+| Best search Sharpe of 100,176 | **1.62** | **1.61** |
+| Deflated-Sharpe hurdle (expected max of N unskilled trials) | 1.39 | 1.56 |
+| White's Reality Check p, search split (H0: nothing beats vol-matched SPY) | 0.974 | 1.000 |
+| Reality Check p, validate split over the 500 shortlisted | 0.702 | 0.142 |
+| Top-10 validate Sharpe range | 1.51–2.19 | 0.8–3.0 |
+| SPY Sharpe, search / validate | 0.64 / 1.23 | 0.92 / 0.36 |
+
+The best real combination is no better than the best one found in shuffled noise. The best real Deflated Sharpe is 0.66
+(0.95 needed); against vol-matched SPY it is 0.015 at best.
+Family view: no daily family has more than 7.7% of its combinations beating SPY on both search and validate (vol
+targeting). Trend and rotation: 0.0%. The intraday noise band is the only family with a large share (22%), and its top
+picks are the 2024 paper's own default parameters. The search rediscovered the published rule, not something new.
+
+**Holdout (run once, 2024-11-18 .. 2026-11-03, 491 sessions):**
+
+| Strategy | CAGR | Vol | Sharpe | Max DD | Longest DD (d) | Trades | Vol-matched SPY CAGR / DD | ΔSharpe vs SPY [95% CI] |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| SPY buy & hold | 15.1% | 16.6% | 0.70 | -18.8% | 127 | 1 | — | — |
+| 10-ETF TSMOM (round 2) | 11.5% | 8.8% | 0.84 | -6.9% | 112 | 24 | 10.1% / -10.1% | +0.14 [-0.82, +0.98] |
+| #1/#2 noise band QQQ, paper params (stop max / band: identical trades) | 18.1% | 15.9% | 0.88 | -14.6% | 385 | 279 | 14.7% / -18.0% | +0.18 [-2.12, +1.98] |
+| #3 noise band SPY, VWAP stop | -6.3% | 15.4% | -0.60 | -25.6% | 355 | 304 | 14.4% / -17.6% | -1.30 [-3.55, +0.41] |
+| #4 noise band SPY, long-only, 7d | 3.2% | 6.8% | -0.07 | -8.1% | 417 | 141 | 8.8% / -7.8% | -0.77 [-2.19, +0.43] |
+| #5 ORB QQQ 15-min, gap filter, 1x | 4.9% | 5.5% | 0.19 | -3.2% | 177 | 255 | 7.9% / -6.2% | -0.51 [-2.45, +1.17] |
+| #6 ORB QQQ 10-min, gap filter, 1% risk | 7.3% | 19.5% | 0.26 | -14.2% | 276 | 261 | 16.9% / -21.8% | -0.44 [-2.32, +1.01] |
+| #7 noise band QQQ 7d, VWAP stop | 13.1% | 16.6% | 0.59 | -13.2% | 334 | 295 | 15.1% / -18.8% | -0.11 [-2.36, +1.58] |
+| #8/#9 noise band QQQ 7d, band / max stop | 11.3% | 16.0% | 0.50 | -18.5% | 558 | 295 | 14.8% / -18.2% | -0.20 [-2.61, +1.64] |
+| #10 noise band QQQ, hourly checks | 12.4% | 14.5% | 0.61 | -10.0% | 381 | 249 | 13.9% / -16.6% | -0.09 [-2.39, +1.63] |
+
+**Nothing survives.** Pre-declared rule: Holm-adjusted p < 0.05 for ΔSharpe > 0 AND CAGR above vol-matched SPY. All 10
+have Holm p = 1.00. Only #1/#2 (the same trades) had a higher holdout Sharpe than SPY and TSMOM. They beat vol-matched SPY
+by 3.4 pts CAGR, but the CI spans -2.1 to +2.0, and the same rule on SPY (#3) lost 6.3%/yr. 8 of 10 fell below SPY's Sharpe.
+
+### The round-5 fixes (`search/fixes.md`, search / validate Sharpe; SPY 0.64 / 1.23)
+- **Vol target (H1):** cap 1.5x 0.79/1.15 vs original 0.78/1.14, the same. Slower re-levering and all three combined are worse in search.
+- **Noise band:** skipping the quiet regime (H2) helped search (1.29) but hurt validate (0.77). No entries after 12:30 (H3)
+  cut search to 0.86 with a similar validate (1.73).
+- **ORB:** short-only (H4a) is worse. The gap-direction filter (H4b) lifted validate from 0.17 to 0.78 and fed picks #5/#6,
+  which made 0.19/0.26 Sharpe in the holdout.
+- **Trend re-entry:** SMA100 beat SMA200 on both splits (0.82/1.03 vs 0.66/0.95), but still not SPY.
+- No fix turned a strategy into one that beats SPY on both splits.
+
+### Caveats
+- The holdout years (2024–26) were already seen in rounds 1–5, and the grid contains rules I had looked at there. That can
+  only bias toward false positives, so the negative result stands.
+- Only one shuffle was run (compute): it shows the scale of luck, not a full null distribution.
+- The fast engines hold target weights between rebalances; finalists were rerun on the exact engine (intraday: same per-trade engine).

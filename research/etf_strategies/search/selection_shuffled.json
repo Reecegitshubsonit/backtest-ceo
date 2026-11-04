@@ -1,0 +1,240 @@
+{
+ "mode": "shuffled",
+ "N": 100176,
+ "eligible": 88370,
+ "spy_sharpe": {
+  "search": 0.9224644381204821,
+  "validate": 0.3603568962587191
+ },
+ "best_search_sharpe": 1.611759148545852,
+ "rc_search_p": 1.0,
+ "rc_validate_p_shortlist": 0.142,
+ "shortlist": 500,
+ "neighbor_survivors": 360,
+ "top10": [
+  {
+   "id": 83499,
+   "family": "I1_orb",
+   "params": {
+    "orbars": 1,
+    "dir": "long",
+    "entry": "break",
+    "stop": "atr25",
+    "target": 3,
+    "quiet": false,
+    "gapf": "none",
+    "size": "risk1",
+    "sym": "QQQ"
+   },
+   "search_sharpe": 1.4185080713596185,
+   "validate_sharpe": 3.0267996146505647,
+   "neighbors": 4,
+   "nb_med_search": 1.4823185695999643,
+   "nb_med_validate": 2.6224436912275797,
+   "dsr_vs_zero": 0.35469735120391754,
+   "dsr_vs_volmatched_spy": 0.011939500758358035,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 641
+  },
+  {
+   "id": 83475,
+   "family": "I1_orb",
+   "params": {
+    "orbars": 1,
+    "dir": "long",
+    "entry": "break",
+    "stop": "atr25",
+    "target": 2,
+    "quiet": false,
+    "gapf": "none",
+    "size": "risk1",
+    "sym": "QQQ"
+   },
+   "search_sharpe": 1.4930040321940259,
+   "validate_sharpe": 2.927357725899829,
+   "neighbors": 4,
+   "nb_med_search": 1.3960323730105755,
+   "nb_med_validate": 2.474335963858678,
+   "dsr_vs_zero": 0.4306180436006973,
+   "dsr_vs_volmatched_spy": 0.01682138672889255,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 641
+  },
+  {
+   "id": 70640,
+   "family": "F4_candles",
+   "params": {
+    "pattern": "inside_up",
+    "hold": 5,
+    "trend": "below200",
+    "sizing": "slot",
+    "univ": "SPY"
+   },
+   "search_sharpe": 1.0601851329199825,
+   "validate_sharpe": 2.298332472527853,
+   "neighbors": 2,
+   "nb_med_search": 1.0684996226627432,
+   "nb_med_validate": 1.9923153139090184,
+   "dsr_vs_zero": 0.1028292269295562,
+   "dsr_vs_volmatched_spy": 0.002209169490919649,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 34
+  },
+  {
+   "id": 70661,
+   "family": "F4_candles",
+   "params": {
+    "pattern": "inside_up",
+    "hold": 10,
+    "trend": "below200",
+    "sizing": "slot",
+    "univ": "SPY"
+   },
+   "search_sharpe": 1.4123220491992456,
+   "validate_sharpe": 2.2009843249575782,
+   "neighbors": 1,
+   "nb_med_search": 1.0601851329199825,
+   "nb_med_validate": 2.298332472527853,
+   "dsr_vs_zero": 0.35203906147271,
+   "dsr_vs_volmatched_spy": 0.01697449415156793,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 28
+  },
+  {
+   "id": 67397,
+   "family": "F3_meanrev",
+   "params": {
+    "ind": 25,
+    "exit": "revert",
+    "maxhold": 20,
+    "trend": "none",
+    "sizing": "allin",
+    "univ": "GTAA5"
+   },
+   "search_sharpe": 1.016518816368224,
+   "validate_sharpe": 2.148268236279512,
+   "neighbors": 3,
+   "nb_med_search": 0.8323923729561095,
+   "nb_med_validate": 1.8049991321341854,
+   "dsr_vs_zero": 0.09125022868297361,
+   "dsr_vs_volmatched_spy": 0.0019188181720123931,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 270
+  },
+  {
+   "id": 83484,
+   "family": "I1_orb",
+   "params": {
+    "orbars": 1,
+    "dir": "long",
+    "entry": "break",
+    "stop": "atr25",
+    "target": 2,
+    "quiet": true,
+    "gapf": "none",
+    "size": "1x",
+    "sym": "SPY"
+   },
+   "search_sharpe": 1.0167064648190238,
+   "validate_sharpe": 1.5540418026490508,
+   "neighbors": 4,
+   "nb_med_search": 0.7161383115879851,
+   "nb_med_validate": 1.1673349786272218,
+   "dsr_vs_zero": 0.08540757263474447,
+   "dsr_vs_volmatched_spy": 0.0015793805660552773,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 404
+  },
+  {
+   "id": 61734,
+   "family": "F3_meanrev",
+   "params": {
+    "ind": 7,
+    "exit": "revert",
+    "maxhold": 20,
+    "trend": "sma200",
+    "sizing": "allin",
+    "univ": "GTAA5"
+   },
+   "search_sharpe": 1.049479161586231,
+   "validate_sharpe": 1.334366567735783,
+   "neighbors": 3,
+   "nb_med_search": 0.8652127278047181,
+   "nb_med_validate": 1.2180223629148212,
+   "dsr_vs_zero": 0.08677177657984136,
+   "dsr_vs_volmatched_spy": 0.002266235458142085,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 376
+  },
+  {
+   "id": 83472,
+   "family": "I1_orb",
+   "params": {
+    "orbars": 1,
+    "dir": "long",
+    "entry": "break",
+    "stop": "atr25",
+    "target": 2,
+    "quiet": false,
+    "gapf": "none",
+    "size": "1x",
+    "sym": "SPY"
+   },
+   "search_sharpe": 1.0485080945691136,
+   "validate_sharpe": 1.2166965300156305,
+   "neighbors": 4,
+   "nb_med_search": 0.859845977032466,
+   "nb_med_validate": 0.6949072303105646,
+   "dsr_vs_zero": 0.10016180001460606,
+   "dsr_vs_volmatched_spy": 0.001873309988153271,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 611
+  },
+  {
+   "id": 47008,
+   "family": "F2_rotation",
+   "params": {
+    "looks": 23,
+    "skip": 21,
+    "K": 4,
+    "absf": "none",
+    "weight": "invvol",
+    "rebal": "quarterly",
+    "vt": null,
+    "univ": "GTAA5"
+   },
+   "search_sharpe": 1.0592006280126764,
+   "validate_sharpe": 0.9377575450491208,
+   "neighbors": 4,
+   "nb_med_search": 0.9174065584726212,
+   "nb_med_validate": 0.7430512876582852,
+   "dsr_vs_zero": 0.10737665719498679,
+   "dsr_vs_volmatched_spy": 0.005319582294069369,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 20
+  },
+  {
+   "id": 31456,
+   "family": "F2_rotation",
+   "params": {
+    "looks": 14,
+    "skip": 21,
+    "K": 4,
+    "absf": "none",
+    "weight": "invvol",
+    "rebal": "quarterly",
+    "vt": null,
+    "univ": "GTAA5"
+   },
+   "search_sharpe": 1.0605535793788121,
+   "validate_sharpe": 0.8913854423244398,
+   "neighbors": 4,
+   "nb_med_search": 0.8596601795648326,
+   "nb_med_validate": 0.6001556165091237,
+   "dsr_vs_zero": 0.10833960784993546,
+   "dsr_vs_volmatched_spy": 0.0055020924393955895,
+   "sr0_expected_max_annual": 1.5623157636650031,
+   "search_trades": 12
+  }
+ ]
+}
