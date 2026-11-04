@@ -53,7 +53,6 @@ class Opp:
 def scan(client: KalshiClient, cfg: WxConfig, now: datetime | None = None, session=None, log=print) -> list[Opp]:
     now = now or datetime.now(timezone.utc)
     cal = cfg.calibration()
-    ens_cache: dict[str, tuple] = {}
     nws_cache: dict = {}
     out: list[Opp] = []
     for series in cfg.series or DEFAULT_SERIES:
@@ -73,18 +72,11 @@ def scan(client: KalshiClient, cfg: WxConfig, now: datetime | None = None, sessi
                 continue
             icao, lat, lon, std, _ = STATIONS[code]
             lead = (day - local_std_today(std, now)).days
-            if not 0 <= lead <= cfg.max_lead_days:
+            if not cfg.min_lead_days <= lead <= cfg.max_lead_days:
                 continue
-            if code not in ens_cache:
-                try:
-                    ens_cache[code] = fc.ensemble_members(lat, lon, session=session)
-                except Exception as e:
-                    log(f"{code}: ensemble fetch failed: {e}")
-                    ens_cache[code] = None
-            if not ens_cache[code]:
-                continue
-            members = fc.member_extremes(*ens_cache[code], day, std, kind)
-            if len(members) < 10:
+            members = list(fc.model_extremes(lat, lon, day, std, kind, session=session).values())
+            if len(members) < len(fc.DET_MODELS):
+                log(f"{code} {day}: model forecast incomplete")
                 continue
             obs = None
             if lead == 0:

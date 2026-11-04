@@ -52,8 +52,10 @@ def test_member_extremes_and_distribution():
     assert len(xs) == 20 and xs[0] == 70 and xs[-1] == pytest.approx(71.9)
     mu, sd = distribution(xs, 1, "high", WxConfig())
     assert mu == pytest.approx(sum(xs) / 20 + 0.8) and sd == 2.3  # spread below floor -> floor
-    cal = {"high_lead1": {"n": 40, "bias": 1.4, "sd": 2.9}}
+    cal = {"high_lead1": {"n": 40, "bias": 1.4, "sd": 2.9, "models": list(fc.DET_MODELS)}}
     assert distribution(xs, 1, "high", WxConfig(), cal) == pytest.approx((sum(xs) / 20 + 1.4, 2.9))
+    old = {"high_lead1": {"n": 40, "bias": 3.0, "sd": 2.9}}  # pre-fix calibration (other models): ignored
+    assert distribution(xs, 1, "high", WxConfig(), old) == pytest.approx((sum(xs) / 20 + 0.8, 2.3))
 
 
 def iso(dt):
@@ -159,3 +161,41 @@ def test_live_requires_opt_in(tmp_path):
 def test_stats():
     s = stats([1, 2, 3, -2])
     assert s["n"] == 4 and s["bias"] == 1.0 and s["mae"] == 2.0
+
+
+def test_backtest_simulate_and_loo():
+    from weather.backtest import loo, simulate
+    errs = {date(2026, 10, i): float(i % 3 - 1) for i in range(1, 31)}
+    m, sd = loo(errs, date(2026, 10, 5))
+    assert abs(m) < 0.2 and sd >= 1.0
+    assert loo({date(2026, 10, 1): 1.0}, date(2026, 10, 1)) is None
+    rows = [
+        # model 0.60 vs market mid 0.30 -> blended 0.45, YES at 0.31 has edge ~0.13 -> bet, and it wins
+        {"station": "NYC", "event": "E1", "ticker": "A", "p_model": 0.60, "bid": 0.29, "ask": 0.31, "result": "yes"},
+        # model 0.10 vs mid 0.50 -> NO at 0.51, blended p_no 0.70 -> edge ~0.18 -> bet, and it loses
+        {"station": "NYC", "event": "E1", "ticker": "B", "p_model": 0.10, "bid": 0.49, "ask": 0.51, "result": "yes"},
+        # agrees with market: no bet
+        {"station": "MIA", "event": "E2", "ticker": "C", "p_model": 0.50, "bid": 0.49, "ask": 0.51, "result": "no"},
+    ]
+    res = simulate(rows, WxConfig())
+    assert res["bets"] == 2 and res["win_rate"] == 0.5
+    won = [b for b in res["list"] if b["ticker"] == "A"][0]
+    assert won["side"] == "yes" and won["pnl"] > 0
+    lost = [b for b in res["list"] if b["ticker"] == "B"][0]
+    assert lost["side"] == "no" and lost["pnl"] == -lost["cost"]
+    assert sum(b["cost"] for b in res["list"]) <= 4.0 + 1e-9  # max_per_event
+
+
+def test_quotes_at_uses_last_candle_before_decision():
+    from weather.backtest import quotes_at
+
+    class S:
+        def get(self, url, params=None, headers=None, timeout=None):
+            body = {"markets": [{"market_ticker": "A", "candlesticks": [
+                {"end_period_ts": 100, "yes_bid": {"close_dollars": "0.40"}, "yes_ask": {"close_dollars": "0.44"}},
+                {"end_period_ts": 200, "yes_bid": {"close_dollars": "0.0000"}, "yes_ask": {"close_dollars": "0.99"}},
+                {"end_period_ts": 300, "yes_bid": {"close_dollars": "0.60"}, "yes_ask": {"close_dollars": "0.62"}}]}]}
+            return type("R", (), {"status_code": 200, "json": lambda s: body, "text": ""})()
+
+    c = KalshiClient(base_url="https://x/trade-api/v2", session=S(), min_interval=0)
+    assert quotes_at(c, {"A": 250}) == {"A": (0.40, 0.44)}  # empty book at 200 skipped, 300 is after decision

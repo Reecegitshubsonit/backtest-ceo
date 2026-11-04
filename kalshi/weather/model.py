@@ -47,15 +47,16 @@ def bracket_prob(strike_type: str, floor: float | None, cap: float | None, mu: f
 @dataclass
 class WxConfig:
     series: list[str] = field(default_factory=list)       # empty = stations.DEFAULT_SERIES
-    bias: float = 0.8            # F added to the ensemble high (hourly grid misses the peak); lows use -bias
+    bias: float = 0.8            # F added to the model high when uncalibrated (hourly grid misses the peak)
     inflate: float = 1.3         # ensemble spread multiplier
     sd_floor: dict = field(default_factory=lambda: {"0": 1.6, "1": 2.3, "2": 3.0, "3": 3.6})
-    max_lead_days: int = 2       # trade today, tomorrow and the day after
+    min_lead_days: int = 1       # same-day is not calibrated yet: trade tomorrow only by default
+    max_lead_days: int = 1
     min_hours_left: float = 1.0  # stop trading a market this close to its close
     min_edge: float = 0.06       # blended prob minus all-in cost, per $1 contract
     max_edge: float = 0.20       # bigger "edges" on liquid markets are model error: skip and log
     model_weight: float = 0.5    # blended prob = w * model + (1 - w) * market mid
-    nws_weight: float = 0.5      # highs: centre = w * NWS point forecast + (1 - w) * ensemble
+    nws_weight: float = 0.0      # highs: centre = w * NWS point forecast + (1 - w) * models (not backtestable)
     min_price: float = 0.10      # longshots are where the favorite-longshot bias bites
     max_price: float = 0.92
     min_volume_24h: float = 300
@@ -81,13 +82,13 @@ class WxConfig:
 
 
 def distribution(members: list[float], lead: int, kind: str, cfg: WxConfig, cal: dict | None = None) -> tuple[float, float]:
-    from .forecast import mean_sd
+    from .forecast import DET_MODELS, mean_sd
 
     m, sd = mean_sd(members)
     bias = cfg.bias if kind == "high" else -cfg.bias
     floor = float(cfg.sd_floor.get(str(min(lead, 3)), 3.0))
     if cal:  # per-station measured bias and error spread at this lead
-        c = cal.get(f"{kind}_lead{min(lead, 2)}") or cal.get(f"{kind}_lead1")
-        if c and c.get("n", 0) >= 20:
+        c = cal.get(f"{kind}_lead{max(1, min(lead, 2))}")
+        if c and c.get("n", 0) >= 20 and c.get("models") == list(DET_MODELS):
             bias, floor = c["bias"], max(c["sd"], 1.0)
     return m + bias, max(sd * cfg.inflate, floor)

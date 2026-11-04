@@ -11,6 +11,9 @@ PREVIOUS_RUNS_URL = "https://previous-runs-api.open-meteo.com/v1/forecast"
 NWS = "https://api.weather.gov"
 UA = {"User-Agent": "kalshibot-weather (personal research script)", "Accept": "application/geo+json"}
 MODELS = "gfs025,ecmwf_ifs025"
+FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+DET_MODELS = ("gfs_global", "ecmwf_ifs025")  # traded, calibrated and backtested on the same models
+MIN_HOURS = 8  # some models are 3-hourly
 
 
 def climate_window(day: date, std_utc: int) -> tuple[datetime, datetime]:
@@ -38,7 +41,7 @@ def member_extremes(times: list[datetime], members: dict[str, list], day: date, 
     out = []
     for vals in members.values():
         xs = [vals[i] for i in idx if i < len(vals) and vals[i] is not None]
-        if len(xs) >= 20:
+        if len(xs) >= MIN_HOURS:
             out.append(max(xs) if kind == "high" else min(xs))
     return out
 
@@ -64,24 +67,59 @@ def observed_extreme(icao: str, day: date, std_utc: int, kind: str, now: datetim
     return max(vals) if kind == "high" else min(vals)
 
 
-def previous_run_extremes(lat: float, lon: float, start: date, end: date, std_utc: int, kind: str,
-                          lead_days: int = 1, session=None) -> dict[date, float]:
-    """Day-ahead forecast extremes for past days (Open-Meteo Previous Runs API), for calibration."""
+def _hourly(url: str, params: dict, session=None) -> tuple[list[datetime], dict]:
     s = session or requests
-    var = f"temperature_2m_previous_day{lead_days}"
-    r = s.get(PREVIOUS_RUNS_URL, params={"latitude": lat, "longitude": lon, "hourly": var,
-                                         "temperature_unit": "fahrenheit", "timezone": "GMT",
-                                         "start_date": (start - timedelta(days=1)).isoformat(),
-                                         "end_date": (end + timedelta(days=1)).isoformat()}, timeout=60)
+    r = s.get(url, params=params, timeout=60)
     r.raise_for_status()
     h = r.json()["hourly"]
-    times = [datetime.fromisoformat(t).replace(tzinfo=timezone.utc) for t in h["time"]]
-    out, d = {}, start
-    while d <= end:
-        xs = member_extremes(times, {var: h[var]}, d, std_utc, kind)
+    return [datetime.fromisoformat(t).replace(tzinfo=timezone.utc) for t in h["time"]], h
+
+
+def model_extremes(lat: float, lon: float, day: date, std_utc: int, kind: str, session=None,
+                   models=DET_MODELS) -> dict[str, float]:
+    """Current-run climate-day max/min per deterministic model (what the bot trades on)."""
+    out = {}
+    for m in models:
+        try:
+            times, h = _hourly(FORECAST_URL, {"latitude": lat, "longitude": lon, "hourly": "temperature_2m",
+                                              "models": m, "temperature_unit": "fahrenheit", "timezone": "GMT",
+                                              "forecast_days": 4, "past_days": 1}, session)
+        except Exception:
+            continue
+        xs = member_extremes(times, {k: v for k, v in h.items() if k.startswith("temperature_2m")}, day, std_utc, kind)
         if xs:
-            out[d] = xs[0]
-        d += timedelta(days=1)
+            out[m] = xs[0]
+    return out
+
+
+def previous_run_extremes(lat: float, lon: float, start: date, end: date, std_utc: int, kind: str,
+                          lead_days: int = 1, session=None, models=DET_MODELS) -> dict[date, float]:
+    """What the models said `lead_days` ahead, for past days (Open-Meteo Previous Runs API).
+    Averaged over the models that answer, exactly like the live forecast."""
+    var = f"temperature_2m_previous_day{lead_days}"
+    per_model: list[dict[date, float]] = []
+    for m in models:
+        try:
+            times, h = _hourly(PREVIOUS_RUNS_URL, {"latitude": lat, "longitude": lon, "hourly": var, "models": m,
+                                                   "temperature_unit": "fahrenheit", "timezone": "GMT",
+                                                   "start_date": (start - timedelta(days=1)).isoformat(),
+                                                   "end_date": (end + timedelta(days=1)).isoformat()}, session)
+        except Exception:
+            continue
+        series = {k: v for k, v in h.items() if k.startswith(var)}
+        got, d = {}, start
+        while d <= end:
+            xs = member_extremes(times, series, d, std_utc, kind)
+            if xs:
+                got[d] = xs[0]
+            d += timedelta(days=1)
+        if got:
+            per_model.append(got)
+    out = {}
+    for d in set().union(*per_model) if per_model else []:
+        vals = [pm[d] for pm in per_model if d in pm]
+        if len(vals) == len(per_model):  # require every model, so live and history match
+            out[d] = sum(vals) / len(vals)
     return out
 
 

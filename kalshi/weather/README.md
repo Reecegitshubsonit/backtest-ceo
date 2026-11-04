@@ -15,24 +15,30 @@ Separate from the copy bot. It uses the same Kalshi client and paper or live mac
   $5–10K a day per bracket in big cities.
 
 ## How it estimates probabilities
-1. **Ensemble forecasts:** Open-Meteo's GFS (31 members) and ECMWF (51 members). Hourly temperature at the
-   station's coordinates.
-2. **Each member's high or low:** taken over the exact climate-day window.
-3. **Forecast distribution:** Normal(ensemble mean + bias, max(ensemble spread × 1.3, error floor for the lead time)).
-   - Ensembles are under-dispersed.
-   - An hourly grid misses the peak, so raw highs run low. The default bias is +0.8°F.
-   - `calibrate` replaces the bias and error floor with errors measured per station.
-4. **Same-day trading:** the temperature observed so far (NWS station observations) is a hard floor for the high
-   (a ceiling for the low). Brackets it has already passed are worth 0 or 1. This is often the clearest edge
-   late in the day.
-5. **Bracket probabilities:** each bracket's probability is computed with the whole-degree rounding.
-6. **Blending:** highs centre on 50% NWS point forecast and 50% ensemble. The bracket probability is then
-   50% model and 50% market mid. Any remaining "edge" above 20¢ is logged as model error and skipped. Longshots
-   under 10¢ are skipped.
-7. **When it buys:** YES or NO, whichever beats the ask plus the taker fee by at least `min_edge` (6¢).
+1. **Forecast:** GFS and ECMWF deterministic forecasts (Open-Meteo), averaged. It takes each model's
+   climate-day high or low at the station's coordinates.
+2. **Calibration:** `calibrate` measures, per station, the error of *the same two models* one and two days ahead
+   against Kalshi's settled values. The forecast distribution is Normal(model average + bias, error sd).
+   - The first version calibrated a different forecast (Open-Meteo "best match") from the one it traded, which
+     shifted the centre by up to 3°F. Calibration files now record their models, and mismatched ones are ignored.
+3. **Lead time:** tomorrow's markets only, by default. Same-day isn't calibrated, and the market there has live
+   observations.
+4. **Bracket probabilities:** computed with the whole-degree rounding. Each is then 50% model and 50% market mid.
+   - "Edges" above 20¢ are logged as model error and skipped.
+   - Longshots under 10¢ are skipped.
+   - It buys YES or NO only when the edge clears the ask plus the taker fee by `min_edge` (6¢).
 
-The first uncalibrated paper run (2026-11-04) bought six 5–8¢ longshots at "edges" of 20–37¢. That's the
-signature of a model that's off by 2–3°F, which is why these guards exist.
+## Backtest before trusting it
+`backtest` replays the last ~58 days, which is all Kalshi keeps outside its archive.
+- **Decision time:** 20:00 UTC the day before.
+- **Prices:** real Kalshi bid and ask from hourly candles.
+- **Forecast:** the day-ahead forecast that existed then.
+- **Bias and spread:** fitted on the station's *other* days only.
+- **Rules:** the same buying rules as live.
+
+It prints P&L, ROI and t for several settings, per city. It also reports a Brier score for the model and for
+the market, on every quoted bracket. If the market's Brier is lower, the market already forecasts better than
+this model, and any "edge" is noise.
 
 ## Use (from the `kalshi/` folder)
 ```bash
@@ -42,9 +48,12 @@ Read-only: show mispriced brackets now.
 ```bash
 .venv/bin/python -m weather scan
 ```
-Measure forecast error per station against Kalshi's settled values (60 days):
+Measure forecast error per station against Kalshi's settled values (60 days), then backtest:
 ```bash
 .venv/bin/python -m weather calibrate --days 60
+```
+```bash
+.venv/bin/python -m weather backtest
 ```
 Paper trade, every 15 minutes:
 ```bash

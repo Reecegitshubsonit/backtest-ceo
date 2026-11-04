@@ -69,7 +69,7 @@ def run(client: KalshiClient, series_list: list[str] | None, days: int, out: Pat
                 log(f"{series} lead {lead}: forecast fetch failed: {e}")
                 continue
             errs = [truth[d] - f[d] for d in truth if d in f]
-            entry[f"{kind}_lead{lead}"] = stats(errs)
+            entry[f"{kind}_lead{lead}"] = {**stats(errs), "models": list(fc.DET_MODELS)}
             log(f"{series:14} {code} {kind:4} lead{lead}: {entry[f'{kind}_lead{lead}']}")
     res["updated"] = date.today().isoformat()
     res["days"] = days

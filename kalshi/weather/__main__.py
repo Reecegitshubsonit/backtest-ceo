@@ -31,6 +31,9 @@ def main(argv=None) -> None:
     c = sub.add_parser("calibrate", help="measure forecast error vs Kalshi settled values")
     c.add_argument("--days", type=int, default=60)
     c.add_argument("--series", nargs="*")
+    b = sub.add_parser("backtest", help="walk-forward test on Kalshi's real past prices")
+    b.add_argument("--days", type=int, default=58)
+    b.add_argument("--series", nargs="*")
     st = sub.add_parser("status")
     st.add_argument("--live", action="store_true")
     a = ap.parse_args(argv)
@@ -69,6 +72,22 @@ def main(argv=None) -> None:
 
         run(KalshiClient(min_interval=0.25), a.series, a.days, Path(cfg.calibration_path))
         print(f"wrote {cfg.calibration_path}")
+    elif a.cmd == "backtest":
+        from .backtest import run as bt
+
+        res = bt(KalshiClient(min_interval=0.25), cfg, a.series, a.days, DATA / "weather_backtest.json")
+        print(f"\n{res['brackets']} quoted brackets | Brier model {res['brier_model']} vs market {res['brier_market']}"
+              " (lower is better)")
+        print(f"{'variant':18} {'bets':>5} {'win%':>6} {'staked':>8} {'pnl':>8} {'roi':>7} {'t':>6}")
+        for k, v in {**res["variants"], "YOUR CONFIG": res["config_result"]}.items():
+            if v.get("bets"):
+                print(f"{k:18} {v['bets']:5d} {v['win_rate']:6.1%} {v['staked']:8.2f} {v['pnl']:+8.2f} {v['roi']:+7.1%} {v['t']:6.2f}")
+            else:
+                print(f"{k:18}     0")
+        print("\nby city (your config):")
+        for s_, v in res["by_station"].items():
+            print(f"  {s_:4} {v['bets']:4d} bets  pnl {v['pnl']:+7.2f}  roi {v['roi']:+6.1%}  t {v['t']:5.2f}")
+        print("details: data/weather_backtest.json")
     elif a.cmd == "status":
         path = DATA / ("wx_live_state.json" if a.live else "wx_paper_state.json")
         from kalshibot.paper import State
