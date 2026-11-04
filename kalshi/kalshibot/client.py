@@ -86,7 +86,7 @@ class KalshiClient:
             headers = self._auth_headers(path) if auth else {}
             r = self.s.get(url, params=params, headers=headers, timeout=20)
             if r.status_code == 429 or r.status_code >= 500:
-                time.sleep(0.5 * 2**attempt)
+                time.sleep(float(r.headers.get("retry-after") or 0) or 0.5 * 2**attempt)
                 continue
             if r.status_code != 200:
                 raise KalshiError(f"GET {endpoint} -> {r.status_code}: {r.text[:300]}")
