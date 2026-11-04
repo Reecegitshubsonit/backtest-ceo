@@ -13,8 +13,10 @@ BOOK = {"orderbook_fp": {"yes_dollars": [["0.60", "500"]], "no_dollars": [["0.38
 
 
 class Live:
-    def __init__(self, balance=30.0, held="0"):
+    def __init__(self, balance=30.0, held="0", shards=None, market_shard=0):
         self.balance, self.held, self.posts = balance, held, []
+        self.shards = shards if shards is not None else {0: balance}
+        self.market_shard_idx, self.transfers, self.settle = market_shard, [], True
         self.fill = {"fill_count": "3.00", "average_fill_price": "0.6200", "average_fee_paid": "0.0200"}
 
     def _r(self, body, code=200):
@@ -25,15 +27,26 @@ class Live:
         if path.startswith("/portfolio"):
             assert headers and "KALSHI-ACCESS-SIGNATURE" in headers
         if path == "/portfolio/balance":
-            return self._r({"balance": int(self.balance * 100)})
+            if sum(self.shards.values()) != self.balance and len(self.shards) == 1:
+                self.shards = {0: self.balance}
+            return self._r({"balance": int(self.balance * 100), "balance_dollars": f"{self.balance:.4f}",
+                            "balance_breakdown": [{"exchange_index": k, "balance": f"{v:.4f}"} for k, v in self.shards.items()]})
         if path == "/portfolio/positions":
             return self._r({"market_positions": [{"ticker": "KXT-1", "position_fp": self.held}]})
         if path.endswith("/orderbook"):
             return self._r(BOOK)
-        return self._r({"market": {"ticker": "KXT-1", "status": "active"}})
+        return self._r({"market": {"ticker": "KXT-1", "status": "active", "exchange_index": self.market_shard_idx}})
 
     def post(self, url, json=None, headers=None, timeout=None):
         assert "KALSHI-ACCESS-SIGNATURE" in headers
+        if url.endswith("/intra_exchange_instance_transfer"):
+            usd = json["amount"] / 10000
+            self.transfers.append(json)
+            if not self.settle:
+                return self._r({"transfer_id": "t1"})
+            self.shards[json["source_exchange_shard"]] -= usd
+            self.shards[json["destination_exchange_shard"]] = self.shards.get(json["destination_exchange_shard"], 0) + usd
+            return self._r({"transfer_id": "t1"})
         self.posts.append(json)
         return self._r({"order_id": "o1", **self.fill}, 201)
 
@@ -122,3 +135,24 @@ def test_read_only_client_cannot_post():
     c = KalshiClient(base_url="https://x/trade-api/v2", session=Live(), min_interval=0)
     with pytest.raises(KalshiError):
         c.create_order("KXT-1", "bid", 1, 0.5)
+
+
+def test_live_buy_moves_money_to_the_markets_shard(tmp_path, keyfile):
+    # like the real account: $2.01 on shard 0, $22.53 on shard 2, market (tennis) on shard 3
+    s = Live(balance=24.54, shards={0: 2.01, 2: 22.53}, market_shard=3)
+    e = engine(tmp_path, keyfile, s)
+    out = e.handle(sig())
+    assert out["result"] == "copied"
+    t = s.transfers[0]
+    assert t["source_exchange_shard"] == 2 and t["destination_exchange_shard"] == 3
+    assert t["source"] == t["destination"] == "event_contract" and isinstance(t["amount"], int)
+    assert s.shards[3] >= 3 * 0.63  # enough for the order before it was sent
+
+
+def test_live_buy_waits_for_transfer_and_never_orders_unfunded(tmp_path, keyfile):
+    s = Live(balance=24.54, shards={0: 2.01, 2: 22.53}, market_shard=3)
+    s.settle = False  # transfer accepted but never lands
+    e = engine(tmp_path, keyfile, s)
+    e.client.transfer_wait_s = 0.2
+    out = e.handle(sig())
+    assert out["result"] == "skip" and out["reason"] == "shard_funding" and s.posts == []

@@ -155,6 +155,12 @@ class WxTrader:
         fill, f, order_id = o.ask, fee(n, o.ask, cfg.taker_fee_rate), None
         if self.live:
             try:
+                ok, note = self.client.ensure_shard_funds(o.ticker, n * o.ask + f + 0.02)
+            except KalshiError as e:
+                ok, note = False, str(e)
+            if not ok:
+                return {"result": "skip", "reason": "shard_funding", "ticker": o.ticker, "err": note}
+            try:
                 res = (self.client.create_order(o.ticker, "bid", n, o.ask) if o.side == "yes"
                        else self.client.create_order(o.ticker, "ask", n, r2(1 - o.ask)))
             except KalshiError as e:

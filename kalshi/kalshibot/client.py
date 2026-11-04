@@ -151,6 +151,54 @@ class KalshiClient:
     def positions(self, ticker: str | None = None) -> dict:
         return self.get("/portfolio/positions", {"limit": 1000, "ticker": ticker}, auth=True)
 
+    def shard_balances(self) -> dict[int, float]:
+        """Cash per exchange shard (Kalshi splits markets across matching engines, each with its own balance)."""
+        out = {}
+        for b in self.balance().get("balance_breakdown") or []:
+            try:
+                out[int(b.get("exchange_index", 0))] = float(b.get("balance") or 0)
+            except (TypeError, ValueError):
+                pass
+        return out
+
+    def market_shard(self, ticker: str) -> int:
+        return int(self.market(ticker).get("exchange_index") or 0)
+
+    def transfer_between_shards(self, source: int, dest: int, usd: float) -> dict:
+        import uuid
+
+        body = {"source": "event_contract", "destination": "event_contract", "amount": int(round(usd * 10000)),
+                "source_exchange_shard": source, "destination_exchange_shard": dest,
+                "client_transfer_id": str(uuid.uuid4())}
+        return self.post("/portfolio/intra_exchange_instance_transfer", body)
+
+    transfer_wait_s = 15.0
+
+    def ensure_shard_funds(self, ticker: str, need_usd: float, wait_s: float | None = None) -> tuple[bool, str]:
+        """API orders don't move money between shards (the app does). Top up the market's shard if short."""
+        shard = self.market_shard(ticker)
+        bal = self.shard_balances()
+        have = bal.get(shard, 0.0)
+        if have >= need_usd:
+            return True, f"shard {shard} has ${have:.2f}"
+        short = round(need_usd - have + 0.05, 2)
+        moved = []
+        for src, amt in sorted(bal.items(), key=lambda kv: -kv[1]):
+            if src == shard or amt <= 0 or short <= 0:
+                continue
+            take = round(min(amt, short), 2)
+            self.transfer_between_shards(src, shard, take)
+            moved.append(f"${take:.2f} {src}->{shard}")
+            short = round(short - take, 2)
+        if short > 0.0001:
+            return False, f"total balance too small for ${need_usd:.2f} on shard {shard}"
+        deadline = time.time() + (self.transfer_wait_s if wait_s is None else wait_s)
+        while time.time() < deadline:  # transfers are processed asynchronously
+            if self.shard_balances().get(shard, 0.0) >= need_usd:
+                return True, "moved " + ", ".join(moved)
+            time.sleep(1.0)
+        return False, "transfer not settled in time (" + ", ".join(moved) + ")"
+
     def balance_usd(self) -> float:
         b = self.balance()
         v = b.get("balance_dollars")

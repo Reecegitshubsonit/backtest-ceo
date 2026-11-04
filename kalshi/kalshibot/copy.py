@@ -241,6 +241,13 @@ class CopyEngine:
         if self.live:
             limit = r2(min(cfg.max_price, ask if sig.price is None else max(ask, min(sig.price + cfg.max_slippage, ask + 0.01))))
             try:
+                ok, note = self.client.ensure_shard_funds(ticker, n * limit + fee(n, limit, cfg.taker_fee_rate) + 0.02)
+            except KalshiError as e:
+                ok, note = False, str(e)
+            self.log("shard_funding", ts=now, ticker=ticker, ok=ok, note=note)
+            if not ok:
+                return self.skip(sig, "shard_funding", ticker=ticker, err=note)
+            try:
                 if sig.side == "yes":
                     res = self.client.create_order(ticker, "bid", n, limit)
                 else:
