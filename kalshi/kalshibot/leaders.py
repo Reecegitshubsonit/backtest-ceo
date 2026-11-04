@@ -238,3 +238,100 @@ def report(keep: list[Trader], drop: list[Trader], top: int) -> str:
 
 def dump(keep: list[Trader], drop: list[Trader], path: Path) -> None:
     path.write_text(json.dumps({"keep": [asdict(t) for t in keep], "drop": [asdict(t) for t in drop]}, indent=1))
+
+
+# -- re-score on the trades the Rivo feed actually carries ($1,000+) ----------------------------
+API = "https://api.rivo.markets/v2"
+
+
+def api_trades(key: str, trader: str, since_iso: str, max_rows: int = 120, session=None) -> list[dict]:
+    """A trader's Kalshi buys from Rivo's API (only $1,000+ trades exist there), newest first."""
+    s = session or requests.Session()
+    rows, cursor = [], None
+    while len(rows) < max_rows:
+        p = {"venue": "kalshi", "trader": f"kalshi:{trader}", "action": "buy", "since": since_iso,
+             "limit": min(200, max_rows - len(rows))}
+        if cursor:
+            p["cursor"] = cursor
+        r = s.get(f"{API}/trades", params=p, headers={"Authorization": f"Bearer {key}"}, timeout=30)
+        if r.status_code == 429:
+            time.sleep(float(r.headers.get("retry-after", 10)))
+            continue
+        r.raise_for_status()
+        body = r.json()
+        rows += body.get("data") or []
+        cursor = body.get("nextCursor")
+        if not cursor:
+            break
+    return rows
+
+
+@dataclass
+class FeedScore:
+    name: str
+    bets: int = 0            # settled market+side groups in the price band
+    open_bets: int = 0
+    avg_price: float = 0.0
+    win_rate: float = 0.0
+    gross: float = 0.0       # mean return per $1 staked per bet, before costs
+    net: float = 0.0         # after taker fee and slippage
+    t: float = 0.0
+    usd: float = 0.0
+    reasons: list = field(default_factory=list)
+
+
+def score_feed(name: str, rows: list[dict], rules: Rules, price_band=(0.10, 0.95), min_bets: int = 12) -> FeedScore:
+    """One bet per (market, side): usd-weighted entry, held to settlement, $1 flat stake per bet."""
+    groups: dict[tuple, dict] = {}
+    for x in rows:
+        m = x.get("market") or {}
+        tick, p, usd = m.get("venueId"), x.get("price"), x.get("usd") or 0
+        if not tick or p is None or m.get("kind") == "parlay" or tick.startswith("KXMVE"):
+            continue
+        g = groups.setdefault((tick, x.get("outcome")), {"usd": 0.0, "pw": 0.0, "result": x.get("result")})
+        g["usd"] += usd
+        g["pw"] += p * usd
+        if x.get("result") in ("win", "loss", "void"):
+            g["result"] = x["result"]
+    fs = FeedScore(name)
+    rets, prices, wins = [], [], 0
+    for g in groups.values():
+        if not g["usd"]:
+            continue
+        p = g["pw"] / g["usd"]
+        if not price_band[0] <= p <= price_band[1]:
+            continue
+        if g["result"] not in ("win", "loss"):
+            fs.open_bets += g["result"] == "open"
+            continue
+        gross = (1 - p) / p if g["result"] == "win" else -1.0
+        rets.append((gross, p))
+        prices.append(p)
+        wins += g["result"] == "win"
+        fs.usd += g["usd"]
+    fs.bets = len(rets)
+    if fs.bets < min_bets:
+        fs.reasons.append(f"only {fs.bets} settled $1K+ bets")
+        return fs
+    net = [r - rules.taker_fee_rate * (1 - p) - rules.slippage / p for r, p in rets]
+    fs.avg_price = sum(prices) / fs.bets
+    fs.win_rate = wins / fs.bets
+    fs.gross = sum(r for r, _ in rets) / fs.bets
+    fs.net = sum(net) / fs.bets
+    sd = math.sqrt(sum((v - fs.net) ** 2 for v in net) / (fs.bets - 1)) or 1e-9
+    fs.t = fs.net / sd * math.sqrt(fs.bets)
+    if fs.net <= 0:
+        fs.reasons.append(f"net {fs.net:+.1%}")
+    elif fs.t < rules.min_t:
+        fs.reasons.append(f"t={fs.t:.2f} (noise)")
+    return fs
+
+
+def feed_report(scores: list[FeedScore], top: int) -> str:
+    keep = sorted((s for s in scores if not s.reasons), key=lambda s: -s.t)
+    out = [f"{len(keep)} pass / {len(scores) - len(keep)} filtered (only $1,000+ trades, last 30 days)\n",
+           f"{'trader':26} {'bets':>4} {'open':>4} {'price':>5} {'win%':>5} {'gross':>7} {'net':>7} {'t':>5} {'$ staked':>10}"]
+    for s in keep[:top]:
+        out.append(f"{s.name[:26]:26} {s.bets:4d} {s.open_bets:4d} {s.avg_price:5.2f} {s.win_rate:5.0%} "
+                   f"{s.gross:+7.1%} {s.net:+7.1%} {s.t:5.2f} {s.usd:10,.0f}")
+    return "\n".join(out)

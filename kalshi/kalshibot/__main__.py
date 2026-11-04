@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import asdict
 from pathlib import Path
 
@@ -50,6 +51,10 @@ def main(argv=None) -> None:
     ld.add_argument("--top", type=int, default=10)
     ld.add_argument("--slippage", type=float, default=0.02)
     ld.add_argument("--write", default=None, help="write picks into this copy config (e.g. copy_config.json)")
+    ld.add_argument("--feed", action="store_true",
+                    help="re-score on $1,000+ trades from Rivo's API (what the stream carries); needs RIVO_API_KEY")
+    ld.add_argument("--candidates", type=int, default=40, help="with --feed: how many page-ranked traders to re-score")
+    ld.add_argument("--max-rows", type=int, default=120, help="with --feed: trades per trader (5,000/day budget)")
     sub.add_parser("account", help="authenticated read-only: balance and positions (checks your keys)")
     a = ap.parse_args(argv)
 
@@ -124,6 +129,31 @@ def main(argv=None) -> None:
 
         pages = L.fetch(None, Path(a.cache), refresh=a.refresh)
         keep, drop = L.rank(pages, L.Rules(slippage=a.slippage))
+        if a.feed:
+            import os
+            from datetime import datetime, timedelta, timezone
+
+            key = os.environ.get("RIVO_API_KEY") or sys.exit("Set RIVO_API_KEY")
+            rules = L.Rules(slippage=a.slippage)
+            # candidates: everyone not ruled out by structure (market maker / idle / parlays), best page t first
+            structural = ("market maker", "idle", "parlays")
+            pool = keep + sorted((t for t in drop if not any(r.startswith(structural) for r in t.reasons)
+                                  and t.sim_n), key=lambda t: -(t.t_stat or -99))
+            since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            scores = []
+            for t in pool[:a.candidates]:
+                rows = L.api_trades(key, t.name.lower(), since, a.max_rows)
+                scores.append(L.score_feed(t.name.lower(), rows, rules))
+                print(f"  {t.name}: {len(rows)} trades", file=sys.stderr)
+            print(L.feed_report(scores, a.top))
+            Path(a.cache, "_feed_scored.json").write_text(json.dumps([asdict(s) for s in scores], indent=1))
+            if a.write:
+                best = sorted((s for s in scores if not s.reasons), key=lambda s: -s.t)[:a.top]
+                base = json.loads(Path(a.write).read_text()) if Path(a.write).exists() else {}
+                base["traders"] = {s.name: 1.0 for s in best}
+                Path(a.write).write_text(json.dumps(base, indent=1))
+                print(f"wrote {len(best)} traders to {a.write}")
+            return
         print(L.report(keep, drop, a.top))
         L.dump(keep, drop, Path(a.cache) / "_scored.json")
         if a.write:

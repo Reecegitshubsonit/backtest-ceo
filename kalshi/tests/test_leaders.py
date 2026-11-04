@@ -40,3 +40,23 @@ def test_filters():
 
 def test_leaderboard_names():
     assert L.leaderboard_names('<a href="/trader/kalshi/a.b">x</a><a href="/trader/kalshi/c">') == ["a.b", "c"]
+
+
+def _row(tick, outcome, p, usd, result, kind="nfl"):
+    return {"market": {"venueId": tick, "kind": kind}, "outcome": outcome, "price": p, "usd": usd, "result": result}
+
+
+def test_score_feed_groups_fills_and_charges_costs():
+    rows = [_row("A", "Yes", 0.40, 1000, "win"), _row("A", "Yes", 0.50, 1000, "win")]  # one bet at 0.45
+    rows += [_row(f"W{i}", "Yes", 0.5, 1500, "win") for i in range(10)]
+    rows += [_row(f"L{i}", "No", 0.5, 1500, "loss") for i in range(5)]
+    rows += [_row("P", "Yes", 0.3, 2000, "win", kind="parlay"), _row("O", "Yes", 0.5, 1000, "open"),
+             _row("X", "Yes", 0.03, 1000, "win")]  # parlay, open and out-of-band are not scored
+    s = L.score_feed("x", rows, L.Rules())
+    assert s.bets == 16 and s.open_bets == 1
+    exp_gross = ((1 - 0.45) / 0.45 + 10 * 1.0 - 5) / 16
+    assert abs(s.gross - exp_gross) < 1e-9 and s.net < s.gross and s.t > 0
+
+
+def test_score_feed_small_sample():
+    assert L.score_feed("x", [_row("A", "Yes", 0.5, 1000, "win")], L.Rules()).reasons == ["only 1 settled $1K+ bets"]
