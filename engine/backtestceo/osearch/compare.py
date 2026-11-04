@@ -25,7 +25,7 @@ EARLIER_OPTIONS = {
 def earlier(h0, h1):
     rows = []
     und, days = f.load()
-    hd = [d for d in days if h0 <= d <= h1]
+    hd = [d for d in days if str(h0) <= str(d) <= str(h1)]
     ctx = f.day_ctx(und, days)
     ctx = {k: x for k, x in ctx.items() if k[1] in hd and (o.CACHE / f"opt/{k[0]}-{k[1]}.json").exists()
            and len(x["bars"]) >= 70}
@@ -56,6 +56,8 @@ def main():
     shuf = json.loads((S.RUN / "shuffled" / "finalists.json").read_text())
     hr = json.loads((S.RUN / "real" / "holdout.json").read_text())
     hs = json.loads((S.RUN / "shuffled" / "holdout.json").read_text())
+    p2 = S.RUN / "real" / "holdout_2x_spread.json"
+    x2 = {r["desc"]: r["holdout_2x"] for r in json.loads(p2.read_text())} if p2.exists() else {}
     seg = real["segments"]
     h0, h1 = date.fromisoformat(seg[2]), date.fromisoformat(seg[3])
     L = ["# Options strategy search: 100,000 combinations, walk-forward, multiple-testing corrected", "",
@@ -66,6 +68,10 @@ def main():
          f"{real['eligible']:,} had >= {S.MIN_SEARCH_TRADES} search trades. Top {S.TOP_TO_VALIDATE} by search Sharpe went to "
          f"validation; finalists = best validation Sharpe that pass the neighbour test (>= 2/3 of one-step neighbours "
          f"profitable in search and validation). Top {S.N_FINAL} were run on the holdout once.", "",
+         "Bug found and fixed before the holdout was touched: the first run picked strikes using the entry bar's own "
+         "VWAP (the next 30 minutes), which let 0DTE 15:30 condors 'see' the close (validation Sharpe 12.8, same in the "
+         "shuffled run). Now strikes are picked from the last print of a bar that closed before entry, and entry fills at "
+         "the worse of that print and the entry-bar VWAP, then +- half-spread. All numbers below are after the fix.", "",
          "## Luck benchmark (same search, signals shuffled in time)", "",
          "| Run | Eligible | Best search Sharpe | 95th pct search Sharpe | Passed validation | Best validation Sharpe | Neighbour rejects | Finalists |",
          "|---|---:|---:|---:|---:|---:|---:|---:|"]
@@ -74,17 +80,19 @@ def main():
                  f"{r['validated']} | {r['best_validate_sharpe']:.2f} | {r['neighbour_rejects']} | {len(r['finals'])} |")
     for lab, H in (("Real", hr), ("Shuffled (luck benchmark)", hs)):
         L += ["", f"## {lab}: finalists on the holdout (run once)", "",
-              "| # | Strategy | Search n / Sharpe / DSR | Validate n / Sharpe / DSR | Neighbours | Holdout trades | Win % | Exp $ | Total $ | Max DD $ | Sharpe | p (1-sided) | Survives |",
-              "|---:|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|"]
+              "| # | Strategy | Search n / Sharpe / DSR | Validate n / Sharpe / DSR | Neighbours | Holdout trades | Win % | Exp $ | Total $ | Max DD $ | Sharpe | p (1-sided) | 2x spread exp $ / Sharpe | Survives |",
+              "|---:|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|"]
         for i, r in enumerate(H):
             h = r["holdout"]
             surv = (h["n"] >= 30 and h["exp"] > 0 and r["p_one_sided"] < 0.05 / max(len(H), 1)
                     and r["dsr_validate"] >= 0.95)
             r["survives"] = surv
+            z = x2.get(r["desc"]) if lab == "Real" else None
+            stress = f"{z['exp']:.2f} / {z['sharpe']:.2f}" if z else "-"
             L.append(f"| {i+1} | {r['desc']} | {r['search']['n']} / {r['search']['sharpe']:.2f} / {r['dsr_search']:.2f} | "
                      f"{r['validate']['n']} / {r['validate']['sharpe']:.2f} / {r['dsr_validate']:.2f} | {r['nb_pass']} | "
                      f"{h['n']} | {h['win']*100:.1f} | {h['exp']:.2f} | {h['total']:.0f} | {h['mdd']:.0f} | {h['sharpe']:.2f} | "
-                     f"{r['p_one_sided']:.4f} | {'YES' if surv else 'no'} |")
+                     f"{r['p_one_sided']:.4f} | {stress} | {'YES' if surv else 'no'} |")
     n_surv = sum(r["survives"] for r in hr)
     L += ["", "Survives = holdout >= 30 trades, positive expectancy, one-sided p < 0.05/10 (Bonferroni over the 10 "
           "holdout tests) and validation Deflated Sharpe >= 0.95.", "",

@@ -20,7 +20,7 @@ import numpy as np
 
 from . import data as D
 
-OUT = D.DIR / "outcomes"
+OUT = D.DIR / __import__("os").environ.get("OSEARCH_OUTCOMES", "outcomes")
 TIMES = ["10:00", "12:00", "14:00", "15:30"]
 SLOT = {t: (int(t[:2]) * 60 + int(t[3:]) - 570) // 30 for t in TIMES}       # 30-min slot index 0..12
 BUCKETS = [0, 1, 7, 30]
@@ -186,18 +186,24 @@ def run_symbol(sym):
                 if sl - 1 not in bars[d]: continue
                 S = bars[d][sl - 1]["c"]
                 g = tape.dpos[d] * 13 + sl
-                px = tape.fillpx[:, g]
-                # don't fill on a print older than this session
-                fresh = ~np.isnan(tape.vw[:, tape.dpos[d] * 13: g + 1]).all(axis=1)
-                ok = ~np.isnan(px) & fresh & (px > 0)
+                # Strike selection uses only what is known at entry: last option print in a bar that closed
+                # before entry (this session), with the underlying at the same bar close. No look-ahead.
+                seen = tape.mark[:, g - 1]
+                fresh = ~np.isnan(tape.vw[:, tape.dpos[d] * 13: g]).all(axis=1)
+                ok = ~np.isnan(seen) & fresh & (seen > 0)
                 if ok.sum() < 4: continue
-                mins_left = (13 - sl) * 30 + 390 * (len(tdays) - 1 - tape.dpos[d])
+                mins_left = (13 - sl + 1) * 30 + 390 * (len(tdays) - 1 - tape.dpos[d])
                 T = max(mins_left, 15) / (390 * 252)
                 delta = np.full(tape.n, np.nan)
-                delta[ok] = implied_delta(S, tape.strike[ok], T, px[ok], tape.right[ok])
-                half = hs(sym, b, np.nan_to_num(px))
+                delta[ok] = implied_delta(S, tape.strike[ok], T, seen[ok], tape.right[ok])
+                # Fill: executed over the entry bar (its VWAP), but never better than the last seen print:
+                # buys at max(seen, vwap), sells at min(seen, vwap) - side applied in simulate via q.
+                px = np.where(np.isnan(tape.fillpx[:, g]), seen, tape.fillpx[:, g])
+                px = np.where(ok, px, np.nan)
+                worse_hi, worse_lo = np.fmax(px, seen), np.fmin(px, seen)
+                half = hs(sym, b, np.nan_to_num(np.fmax(px, seen)))
                 key = (sym, gidx[d], ti, b)
-                res = simulate(tape, g, delta, px, half, intrinsic, b, sym, hs)
+                res = simulate(tape, g, delta, (worse_lo, worse_hi), half, intrinsic, b, sym, hs)
                 if res is None: continue
                 pnl, ex, risk = res
                 # exit slot -> global day index
@@ -258,8 +264,9 @@ def simulate(tape, g, delta, px, half, intrinsic, bucket, sym, hs):
             if a is None or bb is None: continue
             legs = [(a, 1), (bb, 1)]
         idx = np.array([l[0] for l in legs]); q = np.array([l[1] for l in legs], float)
-        mid0 = px[idx]
-        efill = mid0 + q * half[idx]                       # buy at ask (q>0), sell at bid (q<0)
+        lo, hi = px
+        mid0 = np.where(q > 0, hi[idx], lo[idx])           # worse of last print / entry-bar VWAP for our side
+        efill = mid0 + q * half[idx]                       # then buy at ask (q>0), sell at bid (q<0)
         net0 = float((q * mid0).sum())                     # >0 debit, <0 credit
         credit_fam = fam in ("credit", "condor")
         scale = (-net0 if credit_fam else net0) * 100

@@ -210,9 +210,14 @@ def pipeline(label, shuffle):
     ok = (V[:, 0] >= MIN_VAL_TRADES) & (V[:, 1] > 0) & (V[:, 3] > 0)
     order = top[ok][np.argsort(-V[ok, 3])]
     vmap = {int(i): V[k] for k, i in enumerate(top)}
-    finals, rejected_nb = [], 0
+    finals, rejected_nb, seen_sets, dupes = [], 0, set(), 0
     for i in order:
-        cfg = cfgs[i]; nb = neighbours(cfg)
+        cfg = cfgs[i]
+        # filters/signals that don't change a non-directional trade give identical trade sets: keep one
+        fp = tuple(np.round(V[list(top).index(i)], 6))
+        if fp in seen_sets: dupes += 1; continue
+        seen_sets.add(fp)
+        nb = neighbours(cfg)
         good = 0
         for c in nb:
             ms = metrics(*trades(c, tables, seg, 0), seg, 0); mv = metrics(*trades(c, tables, seg, 1), seg, 1)
@@ -229,13 +234,13 @@ def pipeline(label, shuffle):
                    best_search_sharpe=float(S[elig, 3].max() * math.sqrt(252)) if len(elig) else 0,
                    p95_search_sharpe=float(np.percentile(S[elig, 3], 95) * math.sqrt(252)) if len(elig) else 0,
                    validated=int(ok.sum()), best_validate_sharpe=float(V[ok, 3].max() * math.sqrt(252)) if ok.any() else 0,
-                   neighbour_rejects=rejected_nb, finals=finals,
+                   neighbour_rejects=rejected_nb, duplicate_trade_sets=dupes, finals=finals,
                    segments=[str(days[seg[0]]), str(days[seg[1]]), str(days[seg[2]]), str(days[seg[3] - 1])])
     (RUN / label).mkdir(parents=True, exist_ok=True)
     (RUN / label / "finalists.json").write_text(json.dumps(summary, indent=1))
     print(f"[{label}] eligible {len(elig):,}; best search Sharpe {summary['best_search_sharpe']:.2f} "
           f"(95th pct {summary['p95_search_sharpe']:.2f}); validated {ok.sum()}/{len(top)}, best validate Sharpe "
-          f"{summary['best_validate_sharpe']:.2f}; neighbour rejects {rejected_nb}; finalists {len(finals)}", flush=True)
+          f"{summary['best_validate_sharpe']:.2f}; neighbour rejects {rejected_nb}; duplicate trade sets {dupes}; finalists {len(finals)}", flush=True)
     for f in finals:
         print(f"  {f['desc']} | search n={f['search']['n']} SR={f['search']['sharpe']:.2f} DSR={f['dsr_search']:.2f} | "
               f"val n={f['validate']['n']} SR={f['validate']['sharpe']:.2f} DSR={f['dsr_validate']:.2f} | nb {f['nb_pass']}",
@@ -267,6 +272,15 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "search"
     if cmd == "search":
         pipeline("real", False); pipeline("shuffled", True)
+    elif cmd == "stress":
+        # cost sensitivity only (no re-selection): real finalists on the holdout with outcomes built at SPREAD_MULT=2
+        summ = json.loads((RUN / "real" / "finalists.json").read_text())
+        days, seg, tables = load(False); out = []
+        for f in summ["finals"]:
+            m = metrics(*trades(np.array(f["cfg"], np.int16), tables, seg, 2), seg, 2); m.pop("daily", None)
+            out.append(dict(desc=f["desc"], holdout_2x=m))
+            print(f"[2x] {f['desc']} | n={m['n']} exp={m['exp']:.2f} SR={m['sharpe']:.2f}")
+        (RUN / "real" / "holdout_2x_spread.json").write_text(json.dumps(out, indent=1))
     elif cmd == "holdout":
         for lab, sh in (("real", False), ("shuffled", True)):
             for r in holdout(lab, sh):
