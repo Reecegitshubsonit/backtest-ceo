@@ -254,7 +254,7 @@ def day_events(args):
 
 def build(workers=3):
     days = sessions()
-    todo = [(i, d) for i, d in enumerate(days) if d >= START]
+    todo = [(i, d) for i, d in enumerate(days) if d >= START and (ROOT / "news" / f"{d}.json").exists()]
     with Pool(workers) as p:
         done = sum(1 for r in p.imap_unordered(day_events, todo, chunksize=4) if r)
     print("event days:", done)
